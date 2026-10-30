@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-source), "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --color-paper: #f4efe6;
+  --color-ink: #1c2430;
+  --color-pine: #1e3b34;
+  --color-pine-soft: #2d564c;
+  --color-clay: #d4652f;
+  --color-clay-dark: #b6521f;
+  --color-line: #e3dacb;
+  --color-card: #fffdf9;
+  --color-moss: #2f6f4e;
+  --color-amber: #8a5a12;
+  --color-rose: #9d3140;
+  --color-mist: #eef3f1;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-source), "Segoe UI", sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+}
+
+.policy-prose {
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.policy-prose h1,
+.policy-prose h2,
+.policy-prose h3 {
+  font-family: var(--font-display);
+  line-height: 1.25;
+  margin: 1.4rem 0 0.6rem;
+}
+
+.policy-prose h1 {
+  font-size: 1.8rem;
+}
+
+.policy-prose h2 {
+  font-size: 1.4rem;
+}
+
+.policy-prose h3 {
+  font-size: 1.15rem;
+}
+
+.policy-prose p,
+.policy-prose ul,
+.policy-prose ol,
+.policy-prose table {
+  margin: 0.75rem 0;
+}
+
+.policy-prose ul,
+.policy-prose ol {
+  padding-left: 1.25rem;
+}
+
+.policy-prose ul {
+  list-style: disc;
+}
+
+.policy-prose ol {
+  list-style: decimal;
+}
+
+.policy-prose a {
+  color: var(--color-pine-soft);
+  text-decoration: underline;
+}
+
+.policy-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.policy-prose th,
+.policy-prose td {
+  border: 1px solid var(--color-line);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+::selection {
+  background: #f3c7ae;
+}
