@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/features/auth/actions";
 import { roleLabel } from "@/lib/format";
 import type { Profile } from "@/lib/types";
+import { moduleFromPath } from "@/modules/registry";
 import { cn } from "@/lib/utils";
 
 export function AppShell({
@@ -19,32 +20,27 @@ export function AppShell({
   unread: number;
   children: ReactNode;
 }) {
-  const items = [
-    { href: "/dashboard", label: "Home" },
-    { href: "/policies", label: "Policies" },
-    { href: "/amendments", label: "Suggestions", count: pending },
-    { href: "/notifications", label: "Notifications", count: unread },
-  ];
-
-  if (profile.role === "admin") {
-    items.push({ href: "/admin/people", label: "People" }, { href: "/admin/categories", label: "Categories" });
-  }
+  const path = usePathname();
+  const current = moduleFromPath(path);
+  const counts = { pending, unread };
+  const items = (current?.nav ?? []).filter((item) => !item.adminOnly || profile.role === "admin");
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
-      <aside className="bg-pine text-white md:min-h-screen">
-        <div className="flex items-end justify-between gap-4 px-4 py-4 md:block md:px-5 md:py-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">Jordan Fitness</p>
-            <p className="font-display text-2xl leading-none">Policy Hub</p>
-          </div>
+      <aside className="border-white/10 bg-pine text-white md:min-h-screen md:border-r">
+        <div className="px-4 py-4 md:px-5 md:py-6">
+          <Link href="/" className="block rounded-xl outline-none hover:text-yellow">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">Jordan Orbit</p>
+            <p className="font-display mt-1 text-xl text-white">{current?.name ?? "Modules"}</p>
+          </Link>
+          <p className="mt-1 text-xs text-white/55">{current?.tagline}</p>
         </div>
-        <SideNav items={items} />
+        <SideNav items={items} counts={counts} />
         <div className="hidden border-t border-white/10 px-5 py-4 md:block">
           <p className="truncate text-sm font-semibold">{profile.full_name || profile.email}</p>
-          <p className="text-sm text-white/70">{roleLabel(profile.role)}</p>
+          <p className="text-sm text-white/60">{roleLabel(profile.role)}</p>
           <form action={signOut} className="mt-3">
-            <button type="submit" className="text-sm font-semibold text-white underline-offset-2 hover:underline">
+            <button type="submit" className="text-sm font-semibold text-yellow">
               Sign out
             </button>
           </form>
@@ -54,7 +50,7 @@ export function AppShell({
         <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
           <p className="truncate text-sm">{profile.full_name || profile.email}</p>
           <form action={signOut}>
-            <button type="submit" className="text-sm font-semibold text-pine">
+            <button type="submit" className="text-sm font-semibold text-yellow">
               Sign out
             </button>
           </form>
@@ -65,27 +61,32 @@ export function AppShell({
   );
 }
 
-function SideNav({ items }: { items: { href: string; label: string; count?: number }[] }) {
+function SideNav({
+  items,
+  counts,
+}: {
+  items: { href: string; label: string; count?: "pending" | "unread" }[];
+  counts: { pending: number; unread: number };
+}) {
   const path = usePathname();
 
   return (
-    <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-3" aria-label="Main">
+    <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-3" aria-label="Orbit People">
       {items.map((item) => {
         const active = item.href === "/dashboard" ? path === item.href : path === item.href || path.startsWith(`${item.href}/`);
+        const count = item.count ? counts[item.count] : 0;
         return (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
               "flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold",
-              active ? "bg-white text-pine" : "text-white/90 hover:bg-white/10",
+              active ? "bg-yellow text-[#0D0D0D]" : "text-white/85 hover:bg-white/10 hover:text-white",
             )}
           >
             <span>{item.label}</span>
-            {item.count ? (
-              <span className={cn("rounded-full px-2 py-0.5 text-xs", active ? "bg-clay text-white" : "bg-white/15")}>
-                {item.count}
-              </span>
+            {count ? (
+              <span className={cn("font-mono text-xs tabular-nums", active ? "text-[#0D0D0D]" : "text-yellow")}>{count}</span>
             ) : null}
           </Link>
         );

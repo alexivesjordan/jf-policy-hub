@@ -31,7 +31,7 @@ export function DiffView({
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-white">
+    <div className="overflow-hidden rounded-3xl border border-line bg-field">
       <div className="hidden bg-pine text-sm font-semibold text-white lg:grid lg:grid-cols-2">
         <div className="px-3 py-2">{leftLabel}</div>
         <div className="border-l border-white/15 px-3 py-2">{rightLabel}</div>

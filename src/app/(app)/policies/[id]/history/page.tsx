@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { actorName, formatTimestamp } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
 
+export const instant = false;
 export const metadata = { title: "Version history" };
 
 export default async function HistoryPage({
@@ -34,7 +35,7 @@ export default async function HistoryPage({
       <form method="get" className="flex flex-col gap-3 rounded-3xl border border-line bg-card p-4 md:flex-row md:items-end">
         <label className="text-sm font-semibold">
           From
-          <select name="from" defaultValue={String(from)} className="mt-1 block w-full rounded-2xl border border-line bg-white px-3 py-2 font-normal">
+          <select name="from" defaultValue={String(from)} className="mt-1 block w-full rounded-2xl border border-line bg-field px-3 py-2 font-normal">
             {versions.map((version) => (
               <option key={version.id} value={version.version_number}>
                 Version {version.version_number}
@@ -44,7 +45,7 @@ export default async function HistoryPage({
         </label>
         <label className="text-sm font-semibold">
           To
-          <select name="to" defaultValue={String(to)} className="mt-1 block w-full rounded-2xl border border-line bg-white px-3 py-2 font-normal">
+          <select name="to" defaultValue={String(to)} className="mt-1 block w-full rounded-2xl border border-line bg-field px-3 py-2 font-normal">
             {versions.map((version) => (
               <option key={version.id} value={version.version_number}>
                 Version {version.version_number}
@@ -52,7 +53,7 @@ export default async function HistoryPage({
             ))}
           </select>
         </label>
-        <button type="submit" className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white">
+        <button type="submit" className="rounded-full bg-yellow px-4 py-2 text-sm font-semibold text-[#0D0D0D]">
           Show the difference
         </button>
       </form>

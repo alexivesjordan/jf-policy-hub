@@ -1,30 +1,55 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-source), "Segoe UI", sans-serif;
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --color-paper: #f4efe6;
-  --color-ink: #1c2430;
-  --color-pine: #1e3b34;
-  --color-pine-soft: #2d564c;
-  --color-clay: #d4652f;
-  --color-clay-dark: #b6521f;
-  --color-line: #e3dacb;
-  --color-card: #fffdf9;
-  --color-moss: #2f6f4e;
-  --color-amber: #8a5a12;
-  --color-rose: #9d3140;
-  --color-mist: #eef3f1;
+  --font-sans: var(--font-grotesk), "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --color-paper: #000527;
+  --color-ink: #f4f6fb;
+  --color-pine: #000c5e;
+  --color-pine-soft: #ffc502;
+  --color-yellow: #ffc502;
+  --color-clay: #ffc502;
+  --color-clay-dark: #e6b100;
+  --color-danger: #ce0037;
+  --color-line: #2c3566;
+  --color-card: #070d2b;
+  --color-field: #0d0d0d;
+  --color-moss: #ffc502;
+  --color-amber: #ffc502;
+  --color-rose: #ff8fa3;
+  --color-mist: #12183a;
+  --color-grey: #6d6d6d;
 }
 
 body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-source), "Segoe UI", sans-serif;
+  background: #000527;
+  color: #f4f6fb;
+  font-family: var(--font-grotesk), "Segoe UI", sans-serif;
 }
 
 .font-display {
-  font-family: var(--font-fraunces), Georgia, serif;
+  font-family: var(--font-grotesk), "Segoe UI", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.orbit-grid {
+  background-color: #000527;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 12, 94, 0.85), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: auto, 56px 56px, 56px 56px;
+}
+
+input,
+textarea,
+select {
+  color-scheme: dark;
+}
+
+:focus-visible {
+  outline: 2px solid #ffc502;
+  outline-offset: 2px;
 }
 
 .policy-prose {
@@ -35,7 +60,8 @@ body {
 .policy-prose h1,
 .policy-prose h2,
 .policy-prose h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-grotesk), "Segoe UI", sans-serif;
+  letter-spacing: -0.03em;
   line-height: 1.25;
   margin: 1.4rem 0 0.6rem;
 }
@@ -73,7 +99,7 @@ body {
 }
 
 .policy-prose a {
-  color: var(--color-pine-soft);
+  color: #ffc502;
   text-decoration: underline;
 }
 
@@ -85,12 +111,13 @@ body {
 
 .policy-prose th,
 .policy-prose td {
-  border: 1px solid var(--color-line);
+  border: 1px solid #2c3566;
   padding: 0.45rem 0.6rem;
   text-align: left;
   vertical-align: top;
 }
 
 ::selection {
-  background: #f3c7ae;
+  background: #ffc502;
+  color: #0d0d0d;
 }

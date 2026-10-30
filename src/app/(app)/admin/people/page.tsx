@@ -14,7 +14,7 @@ export default async function PeoplePage() {
       <div>
         <h1 className="font-display text-4xl">People</h1>
         <p className="mt-2 max-w-2xl text-ink/75">
-          Invite a colleague by email, choose their role, or switch off access. Deactivated people cannot open Policy Hub.
+          Invite a colleague by email, choose their role, or switch off access. Deactivated people cannot open Jordan Orbit.
         </p>
       </div>
       <Card>

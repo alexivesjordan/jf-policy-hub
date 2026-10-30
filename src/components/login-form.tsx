@@ -19,7 +19,7 @@ export function LinkError() {
 
 function nextPathFromLocation() {
   const next = new URLSearchParams(window.location.search).get("next") ?? "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
 export function LoginForm() {
@@ -94,7 +94,7 @@ export function LoginForm() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-2 rounded-full bg-paper p-1">
+      <div className="grid grid-cols-3 gap-2 rounded-full bg-field p-1">
         {(
           [
             ["link", "Email link"],
@@ -110,7 +110,7 @@ export function LoginForm() {
               setError(null);
               setMessage(null);
             }}
-            className={`min-h-10 rounded-full px-2 text-sm font-semibold ${mode === value ? "bg-white text-pine shadow-sm" : "text-ink/70"}`}
+            className={`min-h-10 rounded-full px-2 text-sm font-semibold ${mode === value ? "bg-yellow text-[#0D0D0D]" : "text-white/60"}`}
           >
             {label}
           </button>

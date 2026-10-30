@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger" = "primary") {
   return cn(
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-    variant === "primary" && "bg-clay text-white hover:bg-clay-dark",
-    variant === "secondary" && "border border-line bg-card text-ink hover:bg-white",
-    variant === "ghost" && "text-ink hover:bg-white",
-    variant === "danger" && "bg-rose text-white hover:opacity-90",
+    variant === "primary" && "bg-yellow text-[#0D0D0D] shadow-[0_0_24px_rgba(255,197,2,0.18)] hover:bg-clay-dark",
+    variant === "secondary" && "border border-line bg-card text-ink hover:border-yellow/50 hover:bg-white/5",
+    variant === "ghost" && "text-ink hover:bg-white/10",
+    variant === "danger" && "bg-danger text-white hover:brightness-110",
   );
 }
 
@@ -50,7 +50,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 const controlClass =
-  "w-full rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink outline-none ring-pine focus:ring-2";
+  "w-full rounded-2xl border border-line bg-field px-3 py-2.5 text-base text-ink outline-none ring-yellow transition focus:border-yellow focus:ring-2 focus:shadow-[0_0_0_4px_rgba(255,197,2,0.15)]";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(controlClass, props.className)} />;
@@ -102,14 +102,14 @@ export function Badge({
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
-        tone === "neutral" && "bg-mist text-ink",
-        tone === "draft" && "bg-amber/15 text-amber",
-        tone === "active" && "bg-moss/15 text-moss",
-        tone === "archived" && "bg-ink/10 text-ink/70",
-        tone === "pending" && "bg-clay/15 text-clay-dark",
-        tone === "good" && "bg-moss/15 text-moss",
-        tone === "bad" && "bg-rose/10 text-rose",
-        tone === "auto" && "bg-pine/10 text-pine",
+        tone === "neutral" && "bg-field/10 text-ink",
+        tone === "draft" && "bg-yellow/15 text-yellow",
+        tone === "active" && "bg-yellow/15 text-yellow",
+        tone === "archived" && "bg-field/10 text-white/60",
+        tone === "pending" && "bg-yellow/15 text-yellow",
+        tone === "good" && "bg-yellow/15 text-yellow",
+        tone === "bad" && "bg-danger/20 text-rose",
+        tone === "auto" && "bg-field/10 text-yellow",
       )}
     >
       {children}

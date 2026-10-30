@@ -8,6 +8,8 @@ import { requireUser } from "@/lib/auth";
 import { actorName, displayName, formatDate, formatTimestamp, needsDocument, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
 
+export const instant = false;
+
 const auditLabels: Record<string, string> = {
   "policy.created": "Policy created",
   "policy.updated": "Policy updated",
@@ -37,7 +39,7 @@ export default async function PolicyPage({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="text-sm font-semibold text-pine">{policy.category?.name}</p>
+          <p className="text-sm font-semibold text-yellow">{policy.category?.name}</p>
           <h1 className="font-display mt-1 text-4xl">{policy.title}</h1>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone={policy.status}>{statusLabel(policy.status)}</Badge>
@@ -85,7 +87,7 @@ export default async function PolicyPage({
         {policy.source_file_name ? (
           <p className="mt-4 text-sm">
             Attached file:{" "}
-            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-pine underline">
+            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-yellow underline">
               {policy.source_file_name}
             </Link>
           </p>

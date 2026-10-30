@@ -1,8 +1,20 @@
-# Policy Hub
+# Jordan Orbit
 
-Internal policy library for Jordan Fitness. Staff can read policies, HR can upload or write them, and approvers can accept or reject suggested changes. It is not a customer-facing site.
+AI operations and automation platform for Jordan Fitness. It is not a customer-facing site.
 
-The app is ready to deploy on Vercel. This repository does not deploy it. Apply the database migrations and set the environment variables, then connect the repo in Vercel when you are ready.
+The live module is **Orbit People** (HR and compliance): the policy library, version history, and review queue. The home screen also lists Orbit Service, Orbit Supply, Orbit Operations, Orbit Sales, and Orbit Finance. Those five show a coming-soon state until their own routes are added.
+
+## Modules
+
+Modules are registered in `src/modules/registry.ts`. Each entry has a name, tagline, icon, status, and the paths it owns. To add a module:
+
+1. Add an entry to `orbitModules`. Use `status: "coming-soon"` until the screens exist.
+2. When it is ready, set `status: "active"`, point `href` at its home route, list its `paths` and `nav`, and add the routes under `src/app`.
+3. The sidebar reads the registry, so a new active module does not need a separate navigation component.
+
+Orbit People keeps the existing policy routes (`/dashboard`, `/policies`, `/amendments`, `/notifications`, `/admin`).
+
+Production deploys from `main` on Vercel. The four environment variables must be set on the Vercel project before a build. `NEXT_PUBLIC_*` values are read at build time.
 
 ## What v1 includes
 
@@ -28,11 +40,12 @@ The app is ready to deploy on Vercel. This repository does not deploy it. Apply 
 
 ## Project layout
 
-Features are grouped so another business area can be added without folding it into the policy code.
+Features are grouped so another business area can be added as its own module.
 
 ```
-src/app/                  routes, including /api for the research agent
-src/features/policies/    policy reads, saves, uploads, Word text extraction
+src/modules/registry.ts   module list, paths, and navigation
+src/app/                  launcher, sign-in, and module routes
+src/features/policies/    Orbit People policy reads, saves, uploads, Word text extraction
 src/features/amendments/  suggestions and the agent payload check
 src/features/notifications/  in-app delivery and the email hook
 src/features/admin/       invites, roles, categories
@@ -42,7 +55,7 @@ src/lib/                  Supabase clients, formatting, diff
 supabase/migrations/      schema, RLS, storage bucket, placeholder seed
 ```
 
-To add a later area, create `src/features/<area>/`, add routes under `src/app/(app)/`, and add a new migration. Do not reuse policy tables for unrelated records.
+To add a later area, register it in `src/modules/registry.ts`, add its routes, and add a migration if it needs tables. Do not reuse the policy tables for unrelated records.
 
 ## Local setup
 
