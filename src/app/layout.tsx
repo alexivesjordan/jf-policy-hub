@@ -1,30 +1,30 @@
 import type { Metadata } from "next";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const source = Source_Sans_3({
+const grotesk = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-source",
+  variable: "--font-grotesk",
 });
 
-const display = Fraunces({
+const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Policy Hub",
-    template: "%s · Policy Hub",
+    default: "Jordan Orbit",
+    template: "%s · Jordan Orbit",
   },
-  description: "Internal policy library for Jordan Fitness.",
+  description: "Jordan Orbit is the AI operations and automation platform for Jordan Fitness. Orbit People is the live module for HR and compliance.",
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={`${source.variable} ${display.variable} h-full`}>
-      <body className="min-h-full antialiased">{children}</body>
+    <html lang="en-GB" className={`${grotesk.variable} ${mono.variable} h-full`}>
+      <body className="min-h-full bg-paper font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

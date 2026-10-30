@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger" = "primary") {
   return cn(
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-    variant === "primary" && "bg-clay text-white hover:bg-clay-dark",
-    variant === "secondary" && "border border-line bg-card text-ink hover:bg-white",
-    variant === "ghost" && "text-ink hover:bg-white",
-    variant === "danger" && "bg-rose text-white hover:opacity-90",
+    variant === "primary" && "bg-red text-white shadow-[0_0_24px_rgba(206,0,55,0.28)] hover:bg-red-deep",
+    variant === "secondary" && "border border-line bg-card text-white hover:border-white/40 hover:bg-white/5",
+    variant === "ghost" && "text-white hover:bg-white/10",
+    variant === "danger" && "border border-red-deep bg-transparent text-white hover:bg-red-deep/30",
   );
 }
 
@@ -44,13 +44,13 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
     <label className="block space-y-1.5">
       <span className="block text-sm font-semibold text-ink">{label}</span>
       {children}
-      {hint ? <span className="block text-sm text-ink/70">{hint}</span> : null}
+      {hint ? <span className="block text-sm text-grey">{hint}</span> : null}
     </label>
   );
 }
 
 const controlClass =
-  "w-full rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink outline-none ring-pine focus:ring-2";
+  "w-full rounded-2xl border border-line bg-field px-3 py-2.5 text-base text-white outline-none ring-red transition focus:border-red focus:ring-2 focus:shadow-[0_0_0_4px_rgba(206,0,55,0.28)]";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(controlClass, props.className)} />;
@@ -76,10 +76,10 @@ export function Banner({
       role={tone === "error" ? "alert" : "status"}
       className={cn(
         "rounded-2xl border px-4 py-3 text-sm leading-6",
-        tone === "info" && "border-line bg-mist text-ink",
-        tone === "success" && "border-moss/30 bg-moss/10 text-moss",
-        tone === "warning" && "border-amber/30 bg-amber/10 text-amber",
-        tone === "error" && "border-rose/30 bg-rose/10 text-rose",
+        tone === "info" && "border-line bg-card text-white",
+        tone === "success" && "border-line bg-card text-white",
+        tone === "warning" && "border-line bg-card text-white",
+        tone === "error" && "border-red bg-card text-white",
       )}
     >
       {children}
@@ -102,14 +102,14 @@ export function Badge({
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
-        tone === "neutral" && "bg-mist text-ink",
-        tone === "draft" && "bg-amber/15 text-amber",
-        tone === "active" && "bg-moss/15 text-moss",
-        tone === "archived" && "bg-ink/10 text-ink/70",
-        tone === "pending" && "bg-clay/15 text-clay-dark",
-        tone === "good" && "bg-moss/15 text-moss",
-        tone === "bad" && "bg-rose/10 text-rose",
-        tone === "auto" && "bg-pine/10 text-pine",
+        tone === "neutral" && "border border-line bg-transparent text-grey",
+        tone === "draft" && "border border-line bg-transparent text-white",
+        tone === "active" && "bg-red text-white",
+        tone === "archived" && "border border-line bg-transparent text-grey",
+        tone === "pending" && "border border-red bg-transparent text-white",
+        tone === "good" && "bg-red text-white",
+        tone === "bad" && "border border-red-deep bg-transparent text-white",
+        tone === "auto" && "border border-line bg-transparent text-white",
       )}
     >
       {children}

@@ -77,7 +77,7 @@ export function UploadForm({
       </Field>
 
       {hasContent ? (
-        <label className="flex items-start gap-3 rounded-2xl bg-amber/10 px-3 py-3 text-sm text-amber">
+        <label className="flex items-start gap-3 rounded-2xl border border-line bg-card px-3 py-3 text-sm text-white">
           <input type="checkbox" name="confirmReplace" value="yes" className="mt-1" />
           <span>Replace the current policy text with the text from this Word document. Leave this unticked if you are only adding a PDF.</span>
         </label>

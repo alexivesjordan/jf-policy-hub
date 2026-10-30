@@ -5,7 +5,8 @@ import { formatDate, formatTimestamp, severityLabel, statusLabel } from "@/lib/f
 import { oneParam } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 
-export const metadata = { title: "Suggestions" };
+export const instant = false;
+export const metadata = { title: "Review queue" };
 
 const filters = [
   { value: "", label: "All" },
@@ -28,7 +29,8 @@ export default async function AmendmentsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-4xl">Suggestions</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+        <h1 className="font-display mt-2 text-4xl">Review queue</h1>
         <p className="mt-2 max-w-2xl text-ink/75">
           {reviewer
             ? "Review proposed policy text, then approve it, edit it, or reject it with a comment."
@@ -40,7 +42,7 @@ export default async function AmendmentsPage({
           <Link
             key={filter.value || "all"}
             href={filter.value ? `/amendments?status=${filter.value}` : "/amendments"}
-            className={`rounded-full px-3 py-2 text-sm font-semibold ${status === filter.value ? "bg-pine text-white" : "bg-white text-ink"}`}
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${status === filter.value ? "bg-red text-white" : "border border-line bg-card text-white"}`}
           >
             {filter.label}
           </Link>

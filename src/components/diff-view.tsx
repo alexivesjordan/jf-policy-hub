@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 function cellClass(kind: DiffKind) {
   return cn(
     "min-h-8 whitespace-pre-wrap break-words px-3 py-1.5",
-    kind === "add" && "bg-moss/10",
-    kind === "remove" && "bg-rose/10",
+    kind === "add" && "bg-white/10",
+    kind === "remove" && "bg-red/20",
     kind === "empty" && "bg-paper/60 text-transparent",
   );
 }
@@ -31,8 +31,8 @@ export function DiffView({
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-white">
-      <div className="hidden bg-pine text-sm font-semibold text-white lg:grid lg:grid-cols-2">
+    <div className="overflow-hidden rounded-3xl border border-line bg-field">
+      <div className="hidden bg-card text-sm font-semibold text-white lg:grid lg:grid-cols-2">
         <div className="px-3 py-2">{leftLabel}</div>
         <div className="border-l border-white/15 px-3 py-2">{rightLabel}</div>
       </div>
@@ -40,13 +40,13 @@ export function DiffView({
         {rows.map((row, index) => (
           <div key={index} className="grid grid-cols-1 border-t border-line text-sm lg:grid-cols-2">
             <div className={cellClass(row.left.kind)}>
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/50 lg:hidden">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-grey lg:hidden">
                 {leftLabel}
               </span>
               {row.left.text || " "}
             </div>
             <div className={cn(cellClass(row.right.kind), "lg:border-l lg:border-line")}>
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/50 lg:hidden">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-grey lg:hidden">
                 {rightLabel}
               </span>
               {row.right.text || " "}

@@ -5,6 +5,7 @@ import { oneParam } from "@/lib/utils";
 import { Badge, TextLink } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 
+export const instant = false;
 export const metadata = { title: "Policies" };
 
 export default async function PoliciesPage({
@@ -36,7 +37,8 @@ export default async function PoliciesPage({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="font-display text-4xl">Policies</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+          <h1 className="font-display mt-2 text-4xl">Policies</h1>
           <p className="mt-2 max-w-2xl text-ink/75">
             Upload a finished Word or PDF file into a placeholder, or open a policy and write it here.
           </p>
@@ -52,11 +54,11 @@ export default async function PoliciesPage({
       <form className="grid gap-3 rounded-3xl border border-line bg-card p-4 md:grid-cols-4" method="get">
         <label className="space-y-1 text-sm font-semibold md:col-span-2">
           Search
-          <input name="q" defaultValue={q} placeholder="Search titles and text" className="w-full rounded-2xl border border-line bg-white px-3 py-2.5 font-normal" />
+          <input name="q" defaultValue={q} placeholder="Search titles and text" className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal" />
         </label>
         <label className="space-y-1 text-sm font-semibold">
           Category
-          <select name="category" defaultValue={category} className="w-full rounded-2xl border border-line bg-white px-3 py-2.5 font-normal">
+          <select name="category" defaultValue={category} className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal">
             <option value="">All categories</option>
             {categories.map((item) => (
               <option key={item.id} value={item.slug}>
@@ -67,7 +69,7 @@ export default async function PoliciesPage({
         </label>
         <label className="space-y-1 text-sm font-semibold">
           Status
-          <select name="status" defaultValue={status} className="w-full rounded-2xl border border-line bg-white px-3 py-2.5 font-normal">
+          <select name="status" defaultValue={status} className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal">
             <option value="">All statuses</option>
             <option value="draft">Draft</option>
             <option value="active">Active</option>
@@ -75,7 +77,7 @@ export default async function PoliciesPage({
           </select>
         </label>
         <div className="md:col-span-4">
-          <button type="submit" className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white">
+          <button type="submit" className="rounded-full bg-red px-4 py-2 text-sm font-semibold text-white">
             Apply filters
           </button>
         </div>
@@ -93,7 +95,7 @@ export default async function PoliciesPage({
               <li key={policy.id} className="rounded-3xl border border-line bg-card px-5 py-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-pine">
+                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-white">
                       {policy.title}
                     </Link>
                     <p className="mt-1 text-sm text-ink/70">

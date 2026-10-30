@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { displayName, formatDate, formatTimestamp, severityLabel, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
 
+export const instant = false;
 export const metadata = { title: "Review suggestion" };
 
 export default async function AmendmentPage({
@@ -25,7 +26,7 @@ export default async function AmendmentPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-semibold text-pine">{amendment.policy?.title}</p>
+        <p className="text-sm font-semibold text-grey">{amendment.policy?.title}</p>
         <h1 className="font-display mt-1 text-4xl">{amendment.summary}</h1>
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone={amendment.status === "pending" ? "pending" : amendment.status === "rejected" ? "bad" : "good"}>
@@ -65,7 +66,7 @@ export default async function AmendmentPage({
           <ul className="mt-3 space-y-1 text-sm">
             {amendment.source_urls.map((url) => (
               <li key={url}>
-                <a href={url} className="text-pine underline" rel="noreferrer" target="_blank">
+                <a href={url} className="text-white underline decoration-red" rel="noreferrer" target="_blank">
                   {url}
                 </a>
               </li>

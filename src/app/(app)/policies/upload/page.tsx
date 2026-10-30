@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { needsDocument } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
 
+export const instant = false;
 export const metadata = { title: "Upload a policy" };
 
 export default async function UploadPage({
