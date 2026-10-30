@@ -107,6 +107,13 @@ export async function getPolicy(id: string) {
   return mapPolicy(data as PolicyJoin);
 }
 
+export async function findPolicy(id: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("policies").select(policySelect).eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return mapPolicy(data as PolicyJoin);
+}
+
 export async function listVersions(policyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
