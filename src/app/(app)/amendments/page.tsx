@@ -29,7 +29,7 @@ export default async function AmendmentsPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-yellow">Orbit People</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
         <h1 className="font-display mt-2 text-4xl">Review queue</h1>
         <p className="mt-2 max-w-2xl text-ink/75">
           {reviewer
@@ -42,7 +42,7 @@ export default async function AmendmentsPage({
           <Link
             key={filter.value || "all"}
             href={filter.value ? `/amendments?status=${filter.value}` : "/amendments"}
-            className={`rounded-full px-3 py-2 text-sm font-semibold ${status === filter.value ? "bg-yellow text-[#0D0D0D]" : "bg-field text-ink"}`}
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${status === filter.value ? "bg-red text-white" : "border border-line bg-card text-white"}`}
           >
             {filter.label}
           </Link>

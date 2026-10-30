@@ -10,7 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
-        <p className="text-sm font-semibold uppercase tracking-wide text-yellow">Jordan Orbit</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Orbit</p>
         <h1 className="font-display mt-2 text-4xl">Jordan Orbit needs a database connection</h1>
         <p className="mt-3 leading-7 text-ink/80">
           Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, apply the SQL migrations, then restart the app. The README lists every step.

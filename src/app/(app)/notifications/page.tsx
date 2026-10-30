@@ -20,7 +20,7 @@ export default async function NotificationsPage() {
         </div>
         {unread ? (
           <form action={markAllNotificationsRead}>
-            <button type="submit" className="text-sm font-semibold text-yellow underline">
+            <button type="submit" className="text-sm font-semibold text-white underline decoration-red">
               Mark all read
             </button>
           </form>
@@ -41,11 +41,11 @@ export default async function NotificationsPage() {
                   <p className="mt-1 text-sm leading-6 text-ink/80">{item.body}</p>
                   <p className="mt-2 text-xs text-ink/60">{formatTimestamp(item.created_at)}</p>
                 </div>
-                {!item.read_at ? <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-clay" aria-label="Unread" /> : null}
+                {!item.read_at ? <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-red" aria-label="Unread" /> : null}
               </div>
               <div className="mt-3 flex gap-4 text-sm font-semibold">
                 {item.link ? (
-                  <Link href={item.link} className="text-yellow underline">
+                  <Link href={item.link} className="text-white underline decoration-red">
                     Open
                   </Link>
                 ) : null}

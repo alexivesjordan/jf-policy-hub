@@ -11,7 +11,7 @@ export function LinkError() {
   const params = useSearchParams();
   if (params.get("error") !== "link") return null;
   return (
-    <p className="rounded-2xl bg-rose/10 px-4 py-3 text-sm text-rose">
+    <p className="rounded-2xl border border-red bg-card px-4 py-3 text-sm text-white">
       That email link is invalid or has expired. Request a new one.
     </p>
   );
@@ -110,7 +110,7 @@ export function LoginForm() {
               setError(null);
               setMessage(null);
             }}
-            className={`min-h-10 rounded-full px-2 text-sm font-semibold ${mode === value ? "bg-yellow text-[#0D0D0D]" : "text-white/60"}`}
+            className={`min-h-10 rounded-full px-2 text-sm font-semibold ${mode === value ? "bg-red text-white" : "text-grey"}`}
           >
             {label}
           </button>
@@ -139,11 +139,11 @@ export function LoginForm() {
       </form>
 
       {mode === "signup" ? (
-        <p className="text-sm leading-6 text-ink/70">
+        <p className="text-sm leading-6 text-grey">
           The first account for alex.ives@jordanfitness.com becomes the administrator. Everyone else starts as staff until an administrator changes their role.
         </p>
       ) : (
-        <p className="text-sm leading-6 text-ink/70">
+        <p className="text-sm leading-6 text-grey">
           Use the email address you were invited with. An email link is the simplest way in.
         </p>
       )}

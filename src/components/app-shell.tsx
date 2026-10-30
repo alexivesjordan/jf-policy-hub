@@ -27,20 +27,20 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
-      <aside className="border-white/10 bg-pine text-white md:min-h-screen md:border-r">
+      <aside className="border-line bg-pine text-white md:min-h-screen md:border-r">
         <div className="px-4 py-4 md:px-5 md:py-6">
-          <Link href="/" className="block rounded-xl outline-none hover:text-yellow">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">Jordan Orbit</p>
+          <Link href="/" className="block rounded-xl outline-none">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Orbit</p>
             <p className="font-display mt-1 text-xl text-white">{current?.name ?? "Modules"}</p>
           </Link>
-          <p className="mt-1 text-xs text-white/55">{current?.tagline}</p>
+          <p className="mt-1 text-xs text-grey">{current?.tagline}</p>
         </div>
         <SideNav items={items} counts={counts} />
         <div className="hidden border-t border-white/10 px-5 py-4 md:block">
           <p className="truncate text-sm font-semibold">{profile.full_name || profile.email}</p>
-          <p className="text-sm text-white/60">{roleLabel(profile.role)}</p>
+          <p className="text-sm text-grey">{roleLabel(profile.role)}</p>
           <form action={signOut} className="mt-3">
-            <button type="submit" className="text-sm font-semibold text-yellow">
+            <button type="submit" className="text-sm font-semibold text-white underline decoration-red underline-offset-4">
               Sign out
             </button>
           </form>
@@ -50,7 +50,7 @@ export function AppShell({
         <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
           <p className="truncate text-sm">{profile.full_name || profile.email}</p>
           <form action={signOut}>
-            <button type="submit" className="text-sm font-semibold text-yellow">
+            <button type="submit" className="text-sm font-semibold text-white underline decoration-red underline-offset-4">
               Sign out
             </button>
           </form>
@@ -81,12 +81,12 @@ function SideNav({
             href={item.href}
             className={cn(
               "flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold",
-              active ? "bg-yellow text-[#0D0D0D]" : "text-white/85 hover:bg-white/10 hover:text-white",
+              active ? "bg-red text-white" : "text-white hover:bg-white/10",
             )}
           >
             <span>{item.label}</span>
             {count ? (
-              <span className={cn("font-mono text-xs tabular-nums", active ? "text-[#0D0D0D]" : "text-yellow")}>{count}</span>
+              <span className="font-mono text-xs tabular-nums text-white">{count}</span>
             ) : null}
           </Link>
         );

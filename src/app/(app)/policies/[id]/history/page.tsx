@@ -53,7 +53,7 @@ export default async function HistoryPage({
             ))}
           </select>
         </label>
-        <button type="submit" className="rounded-full bg-yellow px-4 py-2 text-sm font-semibold text-[#0D0D0D]">
+        <button type="submit" className="rounded-full bg-red px-4 py-2 text-sm font-semibold text-white">
           Show the difference
         </button>
       </form>

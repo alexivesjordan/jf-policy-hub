@@ -39,7 +39,7 @@ export default async function PolicyPage({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="text-sm font-semibold text-yellow">{policy.category?.name}</p>
+          <p className="text-sm font-semibold text-grey">{policy.category?.name}</p>
           <h1 className="font-display mt-1 text-4xl">{policy.title}</h1>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone={policy.status}>{statusLabel(policy.status)}</Badge>
@@ -87,7 +87,7 @@ export default async function PolicyPage({
         {policy.source_file_name ? (
           <p className="mt-4 text-sm">
             Attached file:{" "}
-            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-yellow underline">
+            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-white underline decoration-red">
               {policy.source_file_name}
             </Link>
           </p>

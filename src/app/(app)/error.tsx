@@ -11,7 +11,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     <div className="max-w-lg space-y-4">
       <h1 className="font-display text-3xl">Something went wrong</h1>
       <p className="leading-7 text-ink/80">Refresh the page. If it keeps happening, tell an administrator.</p>
-      <button type="button" onClick={() => reset()} className="rounded-full bg-yellow px-4 py-2 font-semibold text-[#0D0D0D]">
+      <button type="button" onClick={() => reset()} className="rounded-full bg-red px-4 py-2 font-semibold text-white">
         Try again
       </button>
     </div>

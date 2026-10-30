@@ -41,10 +41,10 @@ export function MarkdownEditor({ name, defaultValue }: { name: string; defaultVa
           name={name}
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          className="min-h-80 w-full rounded-2xl border border-line bg-field px-3 py-3 text-base leading-7 outline-none ring-yellow focus:ring-2"
+          className="min-h-80 w-full rounded-2xl border border-line bg-field px-3 py-3 text-base leading-7 outline-none ring-red focus:ring-2"
         />
         <div className="min-h-80 rounded-2xl border border-line bg-paper/50 px-4 py-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">Preview</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-grey">Preview</p>
           {value.trim() ? <PolicyContent markdown={value} /> : <p className="text-sm text-ink/60">The preview appears here as you write.</p>}
         </div>
       </div>
