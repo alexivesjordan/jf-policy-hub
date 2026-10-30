@@ -102,6 +102,7 @@ SQL lives in `supabase/migrations` and is applied in filename order:
 1. `20261030150000_schema.sql` — tables, immutability, auth trigger, version and review functions
 2. `20261030150100_rls_storage.sql` — row level security and the private `policy-documents` bucket
 3. `20261030150200_seed_placeholders.sql` — HR and health & safety drafts with empty text
+4. `20261030170000_fill_empty_policy_text.sql` — fill an empty version from an attached PDF or Word file
 
 Hosted project, Supabase CLI:
 
@@ -111,7 +112,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-Management API or SQL editor: run the three files in that order, once. Do not edit a migration that has already been applied. Add a new file instead.
+Management API or SQL editor: run the files in that order, once. Do not edit a migration that has already been applied. Add a new file instead.
 
 The seed creates these drafts (empty text, no file):
 
@@ -125,11 +126,19 @@ Each placeholder has version 1, “Placeholder created”, so the first real upl
 
 **Policies → Upload a policy document**, or **Upload** on a placeholder.
 
-- `.docx`: the text is extracted into the policy, the original file is stored, and a new version is saved. You can then edit the text.
-- `.pdf`: the file is stored and a new version is saved. PDF text is not extracted. You can still type an editable copy.
+- `.docx` and text-based `.pdf`: the text is extracted into the policy, keeping headings, paragraphs and lists where the file has them. The original file is stored, and a new version is saved.
+- A scanned PDF with no text layer is refused. Paste the wording with Edit text instead.
 - Older `.doc` files are refused. Save them as `.docx` first.
 - Files larger than 10 MB are refused.
-- If the policy already has text, a Word upload asks you to confirm before replacing it.
+- Every draft and active policy can take a new file, including one that already has a document. If it already has text, confirm before the new file replaces it.
+- A policy page with an attached file and empty text has **Read text from the attached file**. That fills the empty version. From the command line, after migration `20261030170000_fill_empty_policy_text.sql`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  npx tsx scripts/backfill-policy-text.ts 1452efac-98ce-4129-9cd6-48ce93a62ec4
+```
+
+That id is the Modern Slavery & Human Trafficking policy.
 - Leave “ready for people to follow” unticked to keep the policy as a draft while you check the wording.
 
 Direct edits in **Edit text** also create a version. Ask for a short “What changed?” note so the history stays readable.

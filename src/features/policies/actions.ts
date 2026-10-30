@@ -8,7 +8,7 @@ import { messageFromError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 import { safeFileName } from "@/lib/utils";
 import type { PolicyStatus } from "@/lib/types";
-import { detectDocument, docxToMarkdown } from "@/features/policies/docx";
+import { detectDocument, documentToMarkdown } from "@/features/policies/extract-text";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -89,10 +89,16 @@ export async function savePolicyForm(_prev: ActionState, formData: FormData): Pr
 
   if (!result.ok) return result;
 
+  refreshPolicy(result.id);
+  redirect(`/policies/${result.id}`);
+}
+
+function refreshPolicy(id: string) {
   revalidatePath("/dashboard");
   revalidatePath("/policies");
-  revalidatePath(`/policies/${result.id}`);
-  redirect(`/policies/${result.id}`);
+  revalidatePath("/policies/upload");
+  revalidatePath(`/policies/${id}`);
+  revalidatePath(`/policies/${id}/history`);
 }
 
 export async function uploadPolicyDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -146,10 +152,10 @@ export async function uploadPolicyDocument(_prev: ActionState, formData: FormDat
       current_content: string;
     };
 
-    if (kind === "docx" && existing.current_content.trim() && formData.get("confirmReplace") !== "yes") {
+    if (existing.current_content.trim() && formData.get("confirmReplace") !== "yes") {
       return {
         ok: false,
-        message: "This policy already has text. Tick the box to replace it with the Word document.",
+        message: "This policy already has text. Tick the box to replace it with the text from this file.",
       };
     }
 
@@ -164,16 +170,18 @@ export async function uploadPolicyDocument(_prev: ActionState, formData: FormDat
     return { ok: false, message: "Add a title and category for the new policy." };
   }
 
-  if (kind === "docx") {
-    try {
-      content = await docxToMarkdown(bytes);
-    } catch (error) {
-      console.error(error);
-      return { ok: false, message: "We could not read that Word file. Try saving it again as .docx." };
+  try {
+    const extracted = await documentToMarkdown(kind, bytes);
+    if (!extracted) {
+      return {
+        ok: false,
+        message: "We could not find any text in that file. If it is a scanned PDF, paste the text with Edit text instead.",
+      };
     }
-    if (!content) {
-      return { ok: false, message: "We could not find any text in that Word file." };
-    }
+    content = extracted;
+  } catch (error) {
+    console.error(error);
+    return { ok: false, message: "We could not read that file. Try a .docx or a text-based PDF." };
   }
 
   const storedName = safeFileName(file.name);
@@ -216,8 +224,87 @@ export async function uploadPolicyDocument(_prev: ActionState, formData: FormDat
     return result;
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath("/policies");
-  revalidatePath(`/policies/${result.id}`);
+  refreshPolicy(result.id);
   redirect(`/policies/${result.id}?uploaded=${kind}`);
+}
+
+export async function readAttachedText(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireUser();
+  const policyId = clean(formData.get("policyId"));
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("policies")
+    .select("id, title, category_id, status, review_date, owner_id, current_content, source_file_path, source_file_name")
+    .eq("id", policyId)
+    .maybeSingle();
+
+  if (error || !data?.source_file_path) {
+    return { ok: false, message: "That policy has no file to read." };
+  }
+
+  const policy = data as {
+    id: string;
+    title: string;
+    category_id: string;
+    status: PolicyStatus;
+    review_date: string | null;
+    owner_id: string | null;
+    current_content: string;
+    source_file_path: string;
+    source_file_name: string | null;
+  };
+
+  const downloaded = await supabase.storage.from("policy-documents").download(policy.source_file_path);
+  if (downloaded.error || !downloaded.data) {
+    return { ok: false, message: "We could not open the attached file." };
+  }
+
+  const bytes = new Uint8Array(await downloaded.data.arrayBuffer());
+  const kind = detectDocument(policy.source_file_name || policy.source_file_path, bytes);
+  if (!kind) {
+    return { ok: false, message: "The attached file is not a PDF or Word document." };
+  }
+
+  let text = "";
+  try {
+    text = await documentToMarkdown(kind, bytes);
+  } catch (readError) {
+    console.error(readError);
+    return { ok: false, message: "We could not read that file." };
+  }
+  if (!text) {
+    return { ok: false, message: "No text could be read. The file may be a scanned image." };
+  }
+
+  if (!policy.current_content.trim()) {
+    const filled = await supabase.rpc("fill_empty_policy_text", {
+      p_policy_id: policy.id,
+      p_content: text,
+    });
+    if (filled.error) {
+      return { ok: false, message: messageFromError(filled.error, "We could not save the text from that file.") };
+    }
+    refreshPolicy(policy.id);
+    redirect(`/policies/${policy.id}?uploaded=${kind}`);
+  }
+
+  const result = await savePolicy({
+    policyId: policy.id,
+    isNew: false,
+    title: policy.title,
+    categoryId: policy.category_id,
+    status: policy.status,
+    reviewDate: policy.review_date,
+    ownerId: policy.owner_id,
+    content: text,
+    changeSummary: "Read the text from the attached file again",
+    reason: "",
+    legalSource: "",
+    sourceFilePath: null,
+    sourceFileName: null,
+    replaceSourceFile: false,
+  });
+  if (!result.ok) return result;
+  refreshPolicy(policy.id);
+  redirect(`/policies/${policy.id}?uploaded=${kind}`);
 }

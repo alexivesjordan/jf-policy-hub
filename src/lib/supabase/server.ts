@@ -12,6 +12,9 @@ export async function createClient() {
   }
 
   return createServerClient(url, key, {
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
     cookies: {
       getAll() {
         return cookieStore.getAll();
