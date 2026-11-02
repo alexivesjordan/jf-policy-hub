@@ -112,12 +112,9 @@ Authentication → URL configuration:
 | Site URL | `https://jf-policy-hub.vercel.app` with no trailing slash. Use `http://localhost:3000` only on a local project. |
 | Redirect URLs | `https://jf-policy-hub.vercel.app/auth/callback`, `https://jf-policy-hub.vercel.app/auth/confirm`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/confirm`. A wildcard `https://jf-policy-hub.vercel.app/**` is fine as well. |
 
-Authentication → Emails → Templates. Paste the files in `supabase/templates` (the buttons use `{{ .TokenHash }}` so the link works from any device):
+Authentication → Emails → Templates. Leave the defaults in place. On the free tier, Supabase refuses template edits while it is still sending mail itself. The default invite and reset emails are enough: both land on `/auth/confirm`, then on the set-password page.
 
-| Template | Subject | Source |
-| --- | --- | --- |
-| Invite user | You're invited to Jordan Orbit | `supabase/templates/invite.html` |
-| Reset password | Choose a password for Jordan Orbit | `supabase/templates/recovery.html` |
+`supabase/templates/invite.html` and `supabase/templates/recovery.html` are for later, after custom SMTP is switched on and template edits are allowed. Those links use `token_hash`, and `/auth/confirm` accepts that as well as the default redirect shapes.
 
 `alex.ives@jordanfitness.com` already has an account and no password. Forgot password is the way to set one. Do not turn public sign-up back on to do that.
 

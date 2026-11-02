@@ -12,7 +12,7 @@ export function LinkError() {
   if (params.get("error") !== "link") return null;
   return (
     <p className="rounded-2xl border border-red bg-card px-4 py-3 text-sm text-white">
-      That link is invalid or has expired. Request a new password email.
+      That link is invalid or has expired. Ask for a new invite, or request another password email.
     </p>
   );
 }
