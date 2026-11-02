@@ -18,9 +18,9 @@ Production deploys from `main` on Vercel. The four environment variables must be
 
 ## What v1 includes
 
-- Email magic link and password sign-in. Roles are administrator, approver, and staff.
-- Administrators invite people, change roles, and deactivate accounts.
-- The first sign-up for `alex.ives@jordanfitness.com` becomes an administrator (database trigger).
+- Email and password sign-in. Public registration is off. Forgot password sets a first password or replaces one.
+- Administrators invite `@jordanfitness.com` addresses, change roles, deactivate accounts, and switch the Orbit People licence.
+- `alex.ives@jordanfitness.com` stays an administrator (database trigger). Roles are administrator, editor/HR, and staff.
 - Policy library with category, owner, status, review date, editable text, and an optional PDF or Word file.
 - Blank draft placeholders for a typical UK HR and health & safety set, so the library is not empty.
 - Every save and every upload creates an immutable version, with a side-by-side diff.
@@ -48,8 +48,8 @@ src/app/                  launcher, sign-in, and module routes
 src/features/policies/    Orbit People policy reads, saves, uploads, Word text extraction
 src/features/amendments/  suggestions and the agent payload check
 src/features/notifications/  in-app delivery and the email hook
-src/features/admin/       invites, roles, categories
-src/features/auth/        sign-out
+src/features/admin/       invites, roles, module licences, categories
+src/features/auth/        sign-in, password reset, sign-out
 src/components/           shared screens
 src/lib/                  Supabase clients, formatting, diff
 supabase/migrations/      schema, RLS, storage bucket, placeholder seed
@@ -78,22 +78,58 @@ cp .env.example .env.local
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only. Invites and the research-agent API. Never expose it to the browser. |
 | `RESEARCH_AGENT_TOKEN` | Server only. Bearer token for `POST /api/amendments` and `GET /api/policies`. Use a long random string. |
 
-3. In the Supabase dashboard, under Authentication → URL configuration, set:
+3. Apply the migrations (next section), then set the Authentication values in [Sign-in settings](#sign-in-settings).
 
-- Site URL: `http://localhost:3000` locally, and the Vercel URL in production
-- Redirect URLs: `http://localhost:3000/auth/callback` and `https://<your-app>/auth/callback`
-
-4. Enable the Email provider. Magic link and password both use it. For local experiments you can turn off “Confirm email” so the first account can sign in immediately. Production should keep confirmation on.
-
-5. Apply the migrations (next section), then:
+4. Start the app:
 
 ```bash
 npm run dev
 ```
 
-6. Open `http://localhost:3000` and create the account `alex.ives@jordanfitness.com`. That address is stored as administrator. Invite everyone else from **People**. New accounts start as staff unless you pick another role on the invite.
+5. If `alex.ives@jordanfitness.com` does not exist yet, add that user in the Supabase dashboard (Authentication → Users → Add user) and mark the email confirmed. The database makes that address an administrator. Then open `http://localhost:3000/login/forgot` and set a password. Invite everyone else from **Users**.
 
-`supabase/config.toml` is set up for the Supabase CLI (`supabase start` / `supabase db reset` locally). Local email is caught by Inbucket when you use the CLI stack.
+`supabase/config.toml` is set up for the Supabase CLI (`supabase start` / `supabase db reset` locally). Local email is caught by Inbucket when you use the CLI stack. Public sign-up is off there as well.
+
+## Sign-in settings
+
+Apply these on the hosted project after migration `20261102160000_access_control.sql`. The app does not configure the provider for you.
+
+Authentication → Sign In / Providers (the labels are “Allow new users to sign up” and the Email provider):
+
+| Setting | Value |
+| --- | --- |
+| Allow new users to sign up | Off. Invites use the service role and still work. |
+| Email provider | On. |
+| Confirm email | On. The invite link confirms the address. |
+| Secure password change | Off, so Change password in the user menu does not ask for a second email. |
+| Minimum password length | 8. Leave the extra character-class rule empty. |
+| Azure / Microsoft | Leave disabled. Sign-in is email and password. |
+
+Authentication → URL configuration:
+
+| Setting | Value |
+| --- | --- |
+| Site URL | `https://jf-policy-hub.vercel.app` with no trailing slash. Use `http://localhost:3000` only on a local project. |
+| Redirect URLs | `https://jf-policy-hub.vercel.app/auth/callback`, `https://jf-policy-hub.vercel.app/auth/confirm`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/confirm`. A wildcard `https://jf-policy-hub.vercel.app/**` is fine as well. |
+
+Authentication → Emails → Templates. Paste the files in `supabase/templates` (the buttons use `{{ .TokenHash }}` so the link works from any device):
+
+| Template | Subject | Source |
+| --- | --- | --- |
+| Invite user | You're invited to Jordan Orbit | `supabase/templates/invite.html` |
+| Reset password | Choose a password for Jordan Orbit | `supabase/templates/recovery.html` |
+
+`alex.ives@jordanfitness.com` already has an account and no password. Forgot password is the way to set one. Do not turn public sign-up back on to do that.
+
+Someone who is not invited can still end up with an auth user if they are added in the dashboard. The app shows “No access yet” until an administrator invites that `@jordanfitness.com` address. Any other domain never receives access.
+
+Later, when DNS for the sending domain is verified, point Supabase at Resend under Authentication → Emails → SMTP:
+
+- Host `smtp.resend.com`, port `465` (or `587`)
+- Username `resend`, password the Resend API key
+- Sender name `Jordan Orbit`, sender email an address on the verified domain
+
+Until that is on, Supabase’s own mailer sends the invite and reset emails. No application code change is required for the switch.
 
 ## Migrations
 
@@ -103,6 +139,7 @@ SQL lives in `supabase/migrations` and is applied in filename order:
 2. `20261030150100_rls_storage.sql` — row level security and the private `policy-documents` bucket
 3. `20261030150200_seed_placeholders.sql` — HR and health & safety drafts with empty text
 4. `20261030170000_fill_empty_policy_text.sql` — fill an empty version from an attached PDF or Word file
+5. `20261102160000_access_control.sql` — invite-only access, `@jordanfitness.com`, module licences, last sign-in
 
 Hosted project, Supabase CLI:
 
@@ -147,11 +184,13 @@ Direct edits in **Edit text** also create a version. Ask for a short “What cha
 
 | Role | Can do |
 | --- | --- |
-| Staff | Read policies, upload and edit text, send suggestions, see their notifications |
-| Approver | Everything staff can do, plus approve, edit-then-approve, or reject suggestions |
-| Administrator | Everything an approver can do, plus invites, roles, deactivation, and categories |
+| Staff | Read policies, upload and edit text, send suggestions, see their notifications, when Orbit People is on |
+| Editor / HR | Everything staff can do, plus approve, edit-then-approve, or reject suggestions. Stored as `approver`. |
+| Administrator | Everything an editor can do, plus Users, roles, deactivation, module licences, and categories. Administrators can open Orbit People even if that licence is off. |
 
-Deactivated people keep their history but cannot open the app. You cannot deactivate yourself or remove the last active administrator.
+Deactivated people keep their history but cannot open the app. You cannot deactivate yourself or remove the last active administrator. `alex.ives@jordanfitness.com` cannot be given another role.
+
+An invite writes `user.invited`. A role change writes `user.role_changed`. Deactivating or switching someone back on writes `user.deactivated` or `user.reactivated`. A People licence change writes `user.module_changed`. The database enforces this, not only the Users screen. The service role is used on the server to send the invite email and is not available in the browser.
 
 ## Suggestions and automatic updates
 
@@ -253,7 +292,7 @@ Do this when you want the app live. It is not done from this repository automati
 1. Apply the migrations to the production Supabase project.
 2. Create a Vercel project from this repo. Framework preset: Next.js. Do not change the build command (`next build`).
 3. Set the four environment variables from `.env.example` for Production (and Preview, if you want preview databases separated).
-4. In Supabase Authentication → URL configuration, add the Vercel URL and `https://<your-domain>/auth/callback`.
+4. In Supabase Authentication, apply the [sign-in settings](#sign-in-settings), including the production Site URL and redirect URLs.
 5. Deploy. `NEXT_PUBLIC_*` values are baked in at build time, so change them and redeploy if the Supabase URL changes.
 
 ## Scripts

@@ -53,8 +53,14 @@ export function plusDays(isoDate: string, days: number) {
 
 export function roleLabel(role: string) {
   if (role === "admin") return "Administrator";
-  if (role === "approver") return "Approver";
+  if (role === "approver") return "Editor / HR";
   return "Staff";
+}
+
+export function memberStatus(person: { is_active: boolean; access_granted: boolean }) {
+  if (!person.is_active) return "Deactivated";
+  if (!person.access_granted) return "No access";
+  return "Active";
 }
 
 export function statusLabel(status: string) {

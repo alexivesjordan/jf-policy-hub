@@ -39,7 +39,7 @@ export const orbitModules: OrbitModule[] = [
       { href: "/policies", label: "Policies" },
       { href: "/amendments", label: "Review queue", count: "pending" },
       { href: "/notifications", label: "Notifications", count: "unread" },
-      { href: "/admin/people", label: "People", adminOnly: true },
+      { href: "/admin/users", label: "Users", adminOnly: true },
       { href: "/admin/categories", label: "Categories", adminOnly: true },
     ],
   },

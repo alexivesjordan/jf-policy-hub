@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isCompanyEmail, normaliseEmail } from "@/lib/access";
 import { requireRole, requestOrigin } from "@/lib/auth";
 import type { ActionState } from "@/lib/action-state";
 import { hasServiceRole } from "@/lib/env";
@@ -19,109 +20,113 @@ function asRole(value: string): Role | null {
   return null;
 }
 
+function revalidateUsers() {
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/people");
+}
+
 export async function inviteUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const admin = await requireRole(["admin"]);
-  const email = clean(formData.get("email")).toLowerCase();
+  await requireRole(["admin"]);
+  const email = normaliseEmail(clean(formData.get("email")));
   const fullName = clean(formData.get("fullName"));
   const role = asRole(clean(formData.get("role")));
+  const peopleEnabled = formData.get("peopleEnabled") === "yes";
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, message: "Enter a valid email address." };
+  if (!isCompanyEmail(email)) {
+    return { ok: false, message: "Use a @jordanfitness.com email address." };
   }
   if (!role) return { ok: false, message: "Choose a role." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_prepare_invite", {
+    p_email: email,
+    p_full_name: fullName,
+    p_role: role,
+    p_people_enabled: peopleEnabled,
+  });
+
+  if (error) {
+    return { ok: false, message: messageFromError(error, "We could not save that invite.") };
+  }
+
+  const prepared = (data ?? {}) as { already_registered?: boolean; role?: Role };
+  revalidateUsers();
+
+  if (prepared.already_registered) {
+    return {
+      ok: true,
+      message: `${email} already has an account. Their role and access are updated. If they have not set a password, they can use Forgot password.`,
+    };
+  }
+
   if (!hasServiceRole()) {
-    return { ok: false, message: "Invites need SUPABASE_SERVICE_ROLE_KEY on the server." };
+    return {
+      ok: false,
+      message: "Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.",
+    };
   }
 
   const service = createAdminClient();
   if (!service) {
-    return { ok: false, message: "Invites need SUPABASE_SERVICE_ROLE_KEY on the server." };
+    return {
+      ok: false,
+      message: "Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.",
+    };
   }
 
   const origin = await requestOrigin();
-  const { data, error } = await service.auth.admin.inviteUserByEmail(email, {
+  const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
-    redirectTo: `${origin}/auth/callback`,
+    redirectTo: `${origin}/auth/confirm`,
   });
 
-  if (error || !data.user) {
-    const friendly = error?.message?.toLowerCase().includes("already")
-      ? "That person already has an account."
-      : "We could not send the invite. Check the email address and try again.";
-    if (error) console.error(error);
-    return { ok: false, message: friendly };
+  if (inviteError) {
+    const already = inviteError.message.toLowerCase().includes("already");
+    if (already) {
+      await supabase.rpc("admin_prepare_invite", {
+        p_email: email,
+        p_full_name: fullName,
+        p_role: role,
+        p_people_enabled: peopleEnabled,
+      });
+      revalidateUsers();
+      return {
+        ok: true,
+        message: `${email} already has an account. Their role and access are updated. If they have not set a password, they can use Forgot password.`,
+      };
+    }
+    console.error(inviteError);
+    return {
+      ok: false,
+      message: "Their access is saved, but the invite email was not sent. Try again in a moment.",
+    };
   }
 
-  const supabase = await createClient();
-  const assignedRole = email === "alex.ives@jordanfitness.com" ? "admin" : role;
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({ role: assignedRole, full_name: fullName || null })
-    .eq("id", data.user.id);
-
-  if (updateError) {
-    return { ok: false, message: messageFromError(updateError, "The invite was sent, but the role was not saved.") };
-  }
-
-  await supabase.rpc("log_event", {
-    p_action: "user.invited",
-    p_entity_type: "profile",
-    p_entity_id: data.user.id,
-    p_policy_id: null,
-    p_details: { email, role: assignedRole, invited_by: admin.id },
-  });
-
-  revalidatePath("/admin/people");
-  return { ok: true, message: `Invite sent to ${email}.` };
+  return {
+    ok: true,
+    message: `Invite sent to ${email}. They choose a password from that email, and a later sign-in uses the same account.`,
+  };
 }
 
 export async function updateUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const me = await requireRole(["admin"]);
+  await requireRole(["admin"]);
   const userId = clean(formData.get("userId"));
   const role = asRole(clean(formData.get("role")));
   const active = formData.get("isActive") === "yes";
+  const peopleEnabled = formData.get("peopleEnabled") === "yes";
   if (!role) return { ok: false, message: "Choose a role." };
 
-  if (userId === me.id && !active) {
-    return { ok: false, message: "You cannot deactivate your own account." };
-  }
-  if (userId === me.id && role !== "admin") {
-    return { ok: false, message: "You cannot remove your own administrator access." };
-  }
-
   const supabase = await createClient();
-  const { data: target, error: targetError } = await supabase
-    .from("profiles")
-    .select("id, role, is_active, email")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (targetError || !target) return { ok: false, message: "That person could not be found." };
-
-  const current = target as { id: string; role: Role; is_active: boolean; email: string };
-  if ((current.role === "admin" && role !== "admin") || (current.role === "admin" && current.is_active && !active)) {
-    const { count } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin")
-      .eq("is_active", true)
-      .neq("id", userId);
-    if ((count ?? 0) === 0) {
-      return { ok: false, message: "Keep at least one active administrator." };
-    }
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      role: current.email === "alex.ives@jordanfitness.com" ? "admin" : role,
-      is_active: active,
-    })
-    .eq("id", userId);
+  const { error } = await supabase.rpc("admin_update_member", {
+    p_user_id: userId,
+    p_role: role,
+    p_is_active: active,
+    p_people_enabled: peopleEnabled,
+  });
 
   if (error) return { ok: false, message: messageFromError(error, "We could not update that person.") };
 
-  revalidatePath("/admin/people");
+  revalidateUsers();
   return { ok: true, message: "Saved." };
 }
 

@@ -11,7 +11,6 @@ import type {
   PolicyRecord,
   PolicyStatus,
   PolicyVersion,
-  Profile,
 } from "@/lib/types";
 
 const policySelect = `
@@ -52,13 +51,15 @@ export async function listPeople() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, is_active, created_at, updated_at")
+    .select("id, email, full_name")
+    .eq("is_active", true)
+    .eq("access_granted", true)
     .order("email");
   if (error) {
     console.error(error);
     throw new Error("Could not load people");
   }
-  return (data ?? []) as Profile[];
+  return (data ?? []) as Person[];
 }
 
 export async function listPolicies(filters: {

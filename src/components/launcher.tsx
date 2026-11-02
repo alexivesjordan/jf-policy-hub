@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ModuleGlyph } from "@/components/module-icon";
-import { signOut } from "@/features/auth/actions";
+import { UserMenu } from "@/components/user-menu";
 import type { Profile } from "@/lib/types";
 import { orbitModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -10,16 +10,7 @@ export function Launcher({ profile }: { profile: Profile | null }) {
     <div className="orbit-grid min-h-screen text-ink">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-grey">Jordan Fitness</p>
-        {profile ? (
-          <div className="flex items-center gap-4 text-sm">
-            <span className="hidden text-grey sm:inline">{profile.full_name || profile.email}</span>
-            <form action={signOut}>
-              <button type="submit" className="font-semibold text-white underline decoration-red underline-offset-4">
-                Sign out
-              </button>
-            </form>
-          </div>
-        ) : null}
+        {profile ? <UserMenu profile={profile} placement="down" className="w-56" /> : null}
       </header>
       <main className="mx-auto flex w-full max-w-5xl flex-col px-5 pb-16 pt-6 md:pt-10">
         <div className="text-center">
