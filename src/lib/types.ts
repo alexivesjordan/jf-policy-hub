@@ -1,4 +1,12 @@
 export type Role = "admin" | "approver" | "staff";
+
+export const ORBIT_MODULE_IDS = ["people", "service", "supply", "operations", "sales", "finance"] as const;
+export type OrbitModuleId = (typeof ORBIT_MODULE_IDS)[number];
+
+export type ModuleAccess = {
+  module_id: OrbitModuleId;
+  enabled: boolean;
+};
 export type PolicyStatus = "draft" | "active" | "archived";
 export type AmendmentStatus = "pending" | "approved" | "rejected" | "auto-applied";
 export type Severity = "low" | "medium" | "high";
@@ -9,8 +17,15 @@ export type Profile = {
   full_name: string | null;
   role: Role;
   is_active: boolean;
+  access_granted: boolean;
+  last_sign_in_at: string | null;
   created_at: string;
   updated_at: string;
+  modules?: ModuleAccess[];
+};
+
+export type DirectoryUser = Profile & {
+  modules: ModuleAccess[];
 };
 
 export type Category = {

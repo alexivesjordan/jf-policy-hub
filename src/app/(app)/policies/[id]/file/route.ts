@@ -1,11 +1,12 @@
 import { connection } from "next/server";
+import { accessRedirect } from "@/lib/access";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   await connection();
   const profile = await getCurrentProfile();
-  if (!profile?.is_active) return new Response("Unauthorised", { status: 401 });
+  if (!profile || accessRedirect(profile)) return new Response("Unauthorised", { status: 401 });
 
   const { id } = await context.params;
   const supabase = await createClient();

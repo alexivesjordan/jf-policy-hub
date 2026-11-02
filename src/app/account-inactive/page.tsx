@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { signOut } from "@/features/auth/actions";
+import { accessRedirect } from "@/lib/access";
 import { getCurrentProfile } from "@/lib/auth";
 
 export const metadata = { title: "Account inactive" };
@@ -15,8 +16,9 @@ export default function InactivePage() {
 
 async function InactiveContent() {
   const profile = await getCurrentProfile();
+  const destination = accessRedirect(profile);
   if (!profile) redirect("/login");
-  if (profile.is_active) redirect("/dashboard");
+  if (destination !== "/account-inactive") redirect(destination ?? "/");
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6">

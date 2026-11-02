@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { signOut } from "@/features/auth/actions";
-import { roleLabel } from "@/lib/format";
+import { UserMenu } from "@/components/user-menu";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -27,7 +26,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
-      <aside className="border-line bg-pine text-white md:min-h-screen md:border-r">
+      <aside className="flex flex-col border-line bg-pine text-white md:sticky md:top-0 md:h-screen md:border-r">
         <div className="px-4 py-4 md:px-5 md:py-6">
           <Link href="/" className="block rounded-xl outline-none">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Orbit</p>
@@ -36,24 +35,13 @@ export function AppShell({
           <p className="mt-1 text-xs text-grey">{current?.tagline}</p>
         </div>
         <SideNav items={items} counts={counts} />
-        <div className="hidden border-t border-white/10 px-5 py-4 md:block">
-          <p className="truncate text-sm font-semibold">{profile.full_name || profile.email}</p>
-          <p className="text-sm text-grey">{roleLabel(profile.role)}</p>
-          <form action={signOut} className="mt-3">
-            <button type="submit" className="text-sm font-semibold text-white underline decoration-red underline-offset-4">
-              Sign out
-            </button>
-          </form>
+        <div className="mt-auto hidden border-t border-white/10 px-3 py-3 md:block">
+          <UserMenu profile={profile} placement="up" />
         </div>
       </aside>
       <div className="min-w-0">
-        <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
-          <p className="truncate text-sm">{profile.full_name || profile.email}</p>
-          <form action={signOut}>
-            <button type="submit" className="text-sm font-semibold text-white underline decoration-red underline-offset-4">
-              Sign out
-            </button>
-          </form>
+        <div className="flex justify-end border-b border-line px-3 py-2 md:hidden">
+          <UserMenu profile={profile} placement="down" className="max-w-xs" />
         </div>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>

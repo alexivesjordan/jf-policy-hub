@@ -19,7 +19,7 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md space-y-6">
           <div>
             <h2 className="font-display text-3xl text-white">Sign in</h2>
-            <p className="mt-2 text-grey">Use an email link or your password.</p>
+            <p className="mt-2 text-grey">Use your Jordan Fitness email and password.</p>
           </div>
           {isSupabaseConfigured() ? (
             <>
