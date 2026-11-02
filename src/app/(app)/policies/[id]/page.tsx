@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UploadForm } from "@/components/upload-form";
+import { ReadAttachedTextForm, UploadForm } from "@/components/upload-form";
 import { DiffView } from "@/components/diff-view";
 import { PolicyContent } from "@/components/policy-content";
 import { Banner, Badge, Card, TextLink } from "@/components/ui";
@@ -17,6 +17,7 @@ const auditLabels: Record<string, string> = {
   "amendment.approved": "Suggestion approved",
   "amendment.rejected": "Suggestion rejected",
   "amendment.auto_applied": "Suggestion applied automatically",
+  "policy.text_extracted": "Text read from the attached file",
 };
 
 export default async function PolicyPage({
@@ -63,7 +64,9 @@ export default async function PolicyPage({
         </Banner>
       ) : null}
       {uploaded === "pdf" ? (
-        <Banner tone="success">PDF stored with this policy. Download it below. The original file is kept as uploaded.</Banner>
+        <Banner tone="success">
+          PDF uploaded. The text below is what we read from the file, and the original PDF stays attached. Use Edit text if you want to tidy it.
+        </Banner>
       ) : null}
       {uploaded === "auto" ? (
         <Banner tone="success">A low-severity suggestion was applied automatically and saved as a new version.</Banner>
@@ -94,11 +97,11 @@ export default async function PolicyPage({
         ) : null}
       </Card>
 
-      {empty ? (
+      {!policy.source_file_path ? (
         <Card>
           <h2 className="font-display text-2xl">This policy is waiting for a document</h2>
-          <p className="mt-2 text-sm leading-6 text-ink/75">
-            Upload the finished Word or PDF file. Word files become editable text. Either way, the upload is saved as a new version.
+          <p className="mt-2 text-sm leading-6 text-grey">
+            Upload a Word or PDF file. The text is read into the policy so it can be edited, and the original file stays attached.
           </p>
           <div className="mt-5">
             <UploadForm
@@ -109,21 +112,42 @@ export default async function PolicyPage({
           </div>
         </Card>
       ) : (
-        <Card>
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <>
+          <Card>
             <h2 className="font-display text-2xl">Policy text</h2>
-            <TextLink href={`/policies/upload?policy=${policy.id}`} variant="secondary">
-              Upload a new file
-            </TextLink>
-          </div>
-          {policy.current_content.trim() ? (
-            <PolicyContent markdown={policy.current_content} />
-          ) : (
-            <p className="text-sm text-ink/70">
-              There is no editable text yet. The attached file is the source document.
-            </p>
-          )}
-        </Card>
+            {policy.current_content.trim() ? (
+              <div className="mt-4">
+                <PolicyContent markdown={policy.current_content} />
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm leading-6 text-grey">
+                  This version has a file but no editable text yet. Read the text from the attached file, or upload a new version below.
+                </p>
+                <ReadAttachedTextForm policyId={policy.id} />
+              </div>
+            )}
+          </Card>
+          {policy.status !== "archived" ? (
+            <Card>
+              <h2 className="font-display text-2xl">Upload a new version</h2>
+              <p className="mt-2 text-sm leading-6 text-grey">
+                Add another Word or PDF file. The text is read in, the new file is attached, and the previous version stays in the history.
+              </p>
+              <div className="mt-5">
+                <UploadForm
+                  policies={[]}
+                  categories={[]}
+                  locked={{
+                    id: policy.id,
+                    title: policy.title,
+                    hasContent: policy.current_content.trim().length > 0,
+                  }}
+                />
+              </div>
+            </Card>
+          ) : null}
+        </>
       )}
 
       {latest && previous ? (

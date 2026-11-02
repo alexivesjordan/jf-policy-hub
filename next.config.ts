@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["unpdf"],
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
