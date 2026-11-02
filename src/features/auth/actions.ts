@@ -22,19 +22,38 @@ export async function requestPasswordReset(_prev: ActionState, formData: FormDat
     return { ok: false, message: "Use your @jordanfitness.com email address." };
   }
 
-  const supabase = await createClient();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    return { ok: false, message: "Supabase is not configured." };
+  }
+
+  // The cookie client always sends a PKCE code challenge. Supabase then
+  // redirects with ?code=, which only works in the browser that stored the
+  // verifier. This request omits the challenge, so the default reset email
+  // redirects with the session in the hash and works on any device. Admin
+  // invites already do that. /auth/confirm accepts both shapes.
   const origin = await requestOrigin();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm`,
+  const endpoint = new URL("/auth/v1/recover", url);
+  endpoint.searchParams.set("redirect_to", `${origin}/auth/confirm`);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+    cache: "no-store",
   });
 
-  if (error) {
-    const detail = error.message.toLowerCase();
+  if (!response.ok) {
+    const detail = (await response.text()).toLowerCase();
     if (detail.includes("rate") || detail.includes("seconds") || detail.includes("once")) {
       return { ok: false, message: "Please wait a moment, then request another email." };
     }
     if (!detail.includes("not found") && !detail.includes("signup")) {
-      console.error(error);
+      console.error("Password reset email failed", response.status);
       return {
         ok: false,
         message: "We could not send the email. Check that email is switched on in Supabase, then try again.",
