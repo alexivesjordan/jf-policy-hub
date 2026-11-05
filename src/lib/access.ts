@@ -33,3 +33,17 @@ export function accessRedirect(profile: Profile | null) {
   if (!canUsePeople(profile)) return "/no-access";
   return null;
 }
+
+export function canUseOperations(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  return profile.modules?.some((module) => module.module_id === "operations" && module.enabled) ?? false;
+}
+
+/** Home screen: People or Operations. People routes still use accessRedirect. */
+export function homeRedirect(profile: Profile | null) {
+  if (!profile) return "/login";
+  if (!profile.access_granted) return "/no-access";
+  if (!profile.is_active) return "/account-inactive";
+  if (canUsePeople(profile) || canUseOperations(profile)) return null;
+  return "/no-access";
+}

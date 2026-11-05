@@ -525,7 +525,9 @@ declare
   v_costs integer;
 begin
   execute 'set local role authenticated';
-  select count(*) into v_jobs from ops.install_jobs;
+  select count(*) into v_jobs
+  from ops.install_jobs
+  where coalesce(cin7_number, '') not like 'FIXTURE-%';
   select count(*) into v_contacts from ops.site_contacts;
   select count(*) into v_costs from ops.quote_costs;
   if v_jobs <> 2 or v_contacts <> 0 or v_costs <> 0 then

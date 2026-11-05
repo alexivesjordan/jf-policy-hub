@@ -12,7 +12,7 @@ export default function LoginPage() {
         <h1 className="font-display mt-6 max-w-lg text-5xl font-semibold tracking-wide text-white md:text-6xl">JORDAN ORBIT</h1>
         <p className="mt-4 max-w-md text-lg leading-8 text-grey">AI operations and automation platform</p>
         <p className="mt-8 max-w-md text-sm leading-6 text-grey">
-          Orbit People is open for HR and compliance. Other modules are on the way.
+          Orbit People is open for HR and compliance. The install office is open for Operations. The other modules are on the way.
         </p>
       </section>
       <section className="flex items-center bg-paper px-6 py-10 lg:px-12">

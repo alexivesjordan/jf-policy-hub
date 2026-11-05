@@ -7,6 +7,7 @@ export type ModuleNavItem = {
   label: string;
   count?: "pending" | "unread";
   adminOnly?: boolean;
+  ownerOnly?: boolean;
 };
 
 export type OrbitModule = {
@@ -66,12 +67,19 @@ export const orbitModules: OrbitModule[] = [
   {
     id: "operations",
     name: "Orbit Operations",
-    tagline: "Fabrications & logistics",
-    href: "/modules/operations",
-    status: "coming-soon",
+    tagline: "Install office",
+    href: "/operations",
+    status: "active",
     icon: "operations",
-    paths: ["/modules/operations"],
-    nav: [],
+    paths: ["/operations"],
+    nav: [
+      { href: "/operations", label: "Overview" },
+      { href: "/operations/jobs", label: "Jobs" },
+      { href: "/operations/tasks", label: "Tasks" },
+      { href: "/operations/notifications", label: "Notifications", count: "unread" },
+      { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
+      { href: "/operations/settings", label: "Pricing", ownerOnly: true },
+    ],
   },
   {
     id: "sales",

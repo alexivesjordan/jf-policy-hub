@@ -1,3 +1,5 @@
+import { canUseOperations, canUsePeople, homeRedirect } from "../src/lib/access";
+import type { Profile } from "../src/lib/types";
 import { generateOrbitToken, hashOrbitToken } from "../src/lib/orbit/token-hash";
 import { orbitStoragePath, prepareOrbitUpload } from "../src/lib/orbit/prepare-upload";
 
@@ -40,6 +42,30 @@ async function main() {
   const path = orbitStoragePath("ops", "22222222-2222-4222-8222-222222222222", "jpg");
   assert(path.startsWith("ops/22222222-2222-4222-8222-222222222222/"), "storage path shape");
   assert(!path.includes("..") && !path.includes("customer"), "storage path leaked a name");
+
+  const opsOnly: Profile = {
+    id: "00000000-0000-4000-8000-000000000001",
+    email: "ops.only@jordanfitness.com",
+    full_name: null,
+    role: "staff",
+    is_active: true,
+    access_granted: true,
+    last_sign_in_at: null,
+    created_at: "2026-11-05T00:00:00Z",
+    updated_at: "2026-11-05T00:00:00Z",
+    modules: [
+      { module_id: "people", enabled: false },
+      { module_id: "operations", enabled: true },
+    ],
+  };
+  assert(canUseOperations(opsOnly) && !canUsePeople(opsOnly), "operations licence");
+  assert(homeRedirect(opsOnly) === null, "operations home");
+  assert(homeRedirect(null) === "/login", "signed out home");
+  const neither: Profile = {
+    ...opsOnly,
+    modules: [{ module_id: "operations", enabled: false }],
+  };
+  assert(homeRedirect(neither) === "/no-access", "no module home");
 
   console.log("orbit m0 app checks passed");
 }

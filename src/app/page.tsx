@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Launcher } from "@/components/launcher";
-import { requireUser } from "@/lib/auth";
+import { homeRedirect } from "@/lib/access";
+import { getCurrentProfile } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export const metadata = {
@@ -17,6 +19,8 @@ export default function HomePage() {
 
 async function HomeGate() {
   if (!isSupabaseConfigured()) return <Launcher profile={null} />;
-  const profile = await requireUser();
+  const profile = await getCurrentProfile();
+  const destination = homeRedirect(profile);
+  if (destination) redirect(destination);
   return <Launcher profile={profile} />;
 }
