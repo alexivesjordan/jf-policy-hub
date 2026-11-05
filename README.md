@@ -137,8 +137,16 @@ SQL lives in `supabase/migrations` and is applied in filename order:
 3. `20261030150200_seed_placeholders.sql` — HR and health & safety drafts with empty text
 4. `20261030170000_fill_empty_policy_text.sql` — fill an empty version from an attached PDF or Word file
 5. `20261102160000_access_control.sql` — invite-only access, `@jordanfitness.com`, module licences, last sign-in
+6. `20261105120000_orbit_core.sql` — shared Core schema (workflow, audit, tasks, notifications, settings, files, gate overrides, tokens)
+7. `20261105120100_ops_installs.sql` — Operations / Installs tables, status protection, and the manual on-hold / lost stub
 
-Hosted project, Supabase CLI:
+Apply 6 and 7 on a **preview** Supabase project first. Do not run them on the production People project until the Orbit Core pull request has been reviewed. They do not rewrite the People tables. A trigger on `public.profiles` gives `alex.ives@jordanfitness.com` the Operations module and the named owner role. `public.audit_log` and `public.notifications` stay as they are; Core adds `core.audit_log` and `core.notifications` beside them.
+
+There is no Cin7 connection in these migrations. Customer segment, customer type, and quote/order numbers are stored as empty columns until that integration is specified.
+
+`supabase/config.toml` exposes the `core` and `ops` schemas for the local CLI. On a hosted preview project, add those same names under Project Settings → API → Exposed schemas before querying the tables directly. The M0 routes call `public` functions, so they work before that setting is changed.
+
+Hosted preview project, Supabase CLI (link the preview ref, not production):
 
 ```bash
 npx supabase login
