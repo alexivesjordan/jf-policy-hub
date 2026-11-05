@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ModuleGlyph } from "@/components/module-icon";
 import { UserMenu } from "@/components/user-menu";
+import { canUsePeople } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 import { orbitModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,22 @@ export function Launcher({ profile }: { profile: Profile | null }) {
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
           {orbitModules.map((module) => {
             const soon = module.status === "coming-soon";
+            const locked = module.id === "people" && profile ? !canUsePeople(profile) : false;
+            if (locked) {
+              return (
+                <li key={module.id}>
+                  <div className="flex min-h-28 items-center gap-4 rounded-2xl border border-line bg-card px-5 py-4 text-white">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line text-grey">
+                      <ModuleGlyph name={module.icon} className="h-6 w-6" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="text-lg font-semibold text-white">{module.name}</span>
+                      <span className="mt-0.5 block text-sm text-grey">Needs an Orbit People licence</span>
+                    </span>
+                  </div>
+                </li>
+              );
+            }
             return (
               <li key={module.id}>
                 <Link

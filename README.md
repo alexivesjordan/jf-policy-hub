@@ -2,7 +2,7 @@
 
 AI operations and automation platform for Jordan Fitness. It is not a customer-facing site.
 
-The live module is **Orbit People** (HR and compliance): the policy library, version history, and review queue. The home screen also lists Orbit Service, Orbit Supply, Orbit Operations, Orbit Sales, and Orbit Finance. Those five show a coming-soon state until their own routes are added.
+The live modules are **Orbit People** (HR and compliance) and the **Orbit Operations** install office (jobs, pricing, tasks, and notifications, without Cin7). The home screen also lists Orbit Service, Orbit Supply, Orbit Sales, and Orbit Finance. Those four show a coming-soon state until their own routes are added.
 
 ## Modules
 
