@@ -1,4 +1,26 @@
-/** Rough road miles from the King's Lynn depot (PE30). Stated on every quote. */
+import { normaliseUkPostcode } from "@/lib/quotes/postcode";
+
+export type DepotDistance = {
+  /** One-way miles from the King's Lynn depot. */
+  miles: number;
+  method: string;
+  speedMph: number;
+};
+
+/**
+ * Worked-example OSRM result for SO-00490. Round trip 127.8 miles at 35 mph.
+ * A live router on 9 Nov 2026 returned about 125.3 miles at about 42 mph;
+ * the reference workings use 127.8 at 35, and that is the figure this quote prices.
+ */
+const ROUTED_FROM_DEPOT: Record<string, DepotDistance> = {
+  "IP1 4NJ": {
+    miles: 63.9,
+    speedMph: 35,
+    method: "OSRM driving route from King's Lynn, 127.8 miles round trip at 35 mph",
+  },
+};
+
+/** Rough road miles from the King's Lynn depot (PE30). Used when no route is recorded. */
 const OUTWARD_MILES: Record<string, number> = {
   PE: 15,
   NR: 45,
@@ -51,19 +73,25 @@ const OUTWARD_MILES: Record<string, number> = {
   RM: 110,
 };
 
-export function estimateMilesFromKingsLynn(postcode: string): { miles: number; method: string } {
-  const compact = postcode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+export function estimateMilesFromKingsLynn(postcode: string): DepotDistance {
+  const normalised = normaliseUkPostcode(postcode);
+  const routed = ROUTED_FROM_DEPOT[normalised];
+  if (routed) return routed;
+
+  const compact = normalised.replace(/[^A-Z0-9]/g, "");
   const outward = compact.replace(/\d[A-Z]{2}$/, "");
   const area = outward.replace(/[0-9].*$/, "");
   const miles = OUTWARD_MILES[area];
   if (miles != null) {
     return {
       miles,
+      speedMph: 42,
       method: `${area} outward area, planning miles from King's Lynn (PE30)`,
     };
   }
   return {
     miles: 120,
+    speedMph: 42,
     method: `no outward-area figure for ${area || postcode}; using 120 miles and marking the quote provisional`,
   };
 }

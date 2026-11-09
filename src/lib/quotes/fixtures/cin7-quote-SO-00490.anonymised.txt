@@ -1,19 +1,16 @@
-Anonymised text extracted from a Cin7 Core quote layout.
-Customer name, address, and sales contact are replaced.
-This is not the original PDF and must stay free of real customer details.
-Quote No: SO-00490 is retained so the parser can be checked against that layout.
+Anonymised text extracted from a Cin7 Core quote. Customer name, street and contacts are replaced. Product lines are the quote's own.
 Quote No: SO-00490
 
 Customer
-Sample Fitness Ltd
-1 Anonymised Street
-Stowmarket
+Sample Fitness Club
+1 Anonymised Road
+Ipswich
 IP14NJ
 
 Delivery Address
-Sample Fitness Ltd
-Unit 2, Anonymised Estate
-Stowmarket
+Sample Fitness Club
+1 Anonymised Road
+Ipswich
 IP14NJ
 
 Sales Contact
@@ -26,166 +23,107 @@ Terms
 Customer Reference
 Currency
 SO-00490
-09 Nov 2026
-30 days
-SAMPLE-REF
+06/11/2026
+Prepayment
+06/11
 GBP
 
 # SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
-1 JTRBARSN2-
-1N-RC
-Jordan snatch bar
-1 700.00 0 700.00 700.00 140.00
-2 JTDR-05-10
-BLK
-Rubber dumbbell
-2 350.87 0 350.87 701.73 140.35
-3 JTFIX-003
-Anonymised product 3
-3 234.49 0 234.49 703.46 140.69
-4 JTFIX-004
-Anonymised product 4
-4 176.30 0 176.30 705.19 141.04
-5 JTFIX-005
-Anonymised product 5
-1 706.92 0 706.92 706.92 141.38
-6 JTFIX-006
-Anonymised product 6
-2 354.33 0 354.33 708.65 141.73
-7 JTFIX-007
-Anonymised product 7
-3 236.79 0 236.79 710.38 142.08
-8 JTFIX-008
-Anonymised product 8
-4 178.03 0 178.03 712.11 142.42
-9 JTFIX-009
-Anonymised product 9
-1 713.84 0 713.84 713.84 142.77
-10 JTFIX-010
-Anonymised product 10
-2 357.79 0 357.79 715.57 143.11
-11 JTRBAR-
-20KG
-Training bar
-3 239.10 0 239.10 717.30 143.46
-12 JTFIX-012
-Anonymised product 12
-4 179.76 0 179.76 719.03 143.81
+1 JF-C2SE-2 Concept2 SkiErg - Including 1.00 679.17 0.00% 679.17 679.17 135.83
+PM5 Monitor
+2 JF-C2SE-FS-2 Concept2 SkiErg Floor Stand 1.00 195.83 0.00% 195.83 195.83 39.17
+3 JLC-HEXR-P1 JORDAN 1kg-10kg Hex Rubber 1.00 275.00 35.00% 178.75 178.75 35.75
+Dumbbell Set (10 Pairs, 1kg increments)
+4 JTDR-05-10 10 pair Vertical Rack 1.00 285.00 35.00% 185.25 185.25 37.05
+BLK - 1-10kg dumbbells (oval frame)
+5 JTBR-10-BLK Barbell Rack Holds 10 1.00 430.00 35.00% 279.50 279.50 55.90
+- Black
+6 JTRBARSN2- JORDAN 10 - 45kg 1.00 1,004.50 35.00% 652.93 652.93 130.59
+1N-RC Rubber Fixed Barbell (5kg increments / 10 Bars) - Straight Bar - Red
+7 JF-J75-CR-BLK- JORDAN J75 Cable Rack 1.00 3,545.54 35.00% 2,304.60 2,304.60 460.92
+V3 Gen III - Black - Including J-Hooks & Weight Horns
+8 JTKBRC3-10 JORDAN 10kg Black Rubber 1.00 44.00 35.00% 28.60 28.60 5.72
+Kettlebell/ Chrome Handle (each)
+9 JTKBRC3-12 JORDAN 12kg Black Rubber 1.00 52.80 35.00% 34.32 34.32 6.86
+Kettlebell/ Chrome Handle (each)
 
 This quotation is valid for 30 days.
-Printed: 09/11/2026 10:00 Page 1 of 4
+Printed: 09/11/2026 Page 1 of 4
 
 # SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
-13 JTFIX-013
-Anonymised product 13
-1 720.76 0 720.76 720.76 144.15
-14 JTFIX-014
-Anonymised product 14
-2 361.25 0 361.25 722.49 144.50
-15 JTFIX-015
-Anonymised product 15
-3 241.41 0 241.41 724.22 144.84
-16 JTFIX-016
-Anonymised product 16
-4 181.49 0 181.49 725.95 145.19
-17 JTFIX-017
-Anonymised product 17
-1 727.68 0 727.68 727.68 145.54
-18 JTFIX-018
-Anonymised product 18
-2 364.71 0 364.71 729.41 145.88
-19 JTFIX-019
-Anonymised product 19
-3 243.71 0 243.71 731.14 146.23
-20 JTFIX-020
-Anonymised product 20
-4 183.22 0 183.22 732.87 146.57
-21 JTFIX-021
-Anonymised product 21
-1 734.60 0 734.60 734.60 146.92
-22 JTFIX-022
-Anonymised product 22
-2 368.17 0 368.17 736.33 147.27
-23 JTFIX-023
-Anonymised product 23
-3 246.02 0 246.02 738.06 147.61
-24 JTFIX-024
-Anonymised product 24
-4 184.95 0 184.95 739.79 147.96
+10 JTKBRC3-16 JORDAN 16kg Black Rubber 1.00 70.40 35.00% 45.76 45.76 9.15
+Kettlebell/ Chrome Handle (each)
+11 JTKBRC3-20 JORDAN 20kg Black Rubber 1.00 88.00 35.00% 57.20 57.20 11.44
+Kettlebell/ Chrome Handle (each)
+12 JTKBRC3-04 JORDAN 4kg Black Rubber 1.00 17.60 35.00% 11.44 11.44 2.29
+Kettlebell/ Chrome Handle (each)
+13 JTKBRC3-06 JORDAN 6kg Black Rubber 1.00 26.40 35.00% 17.16 17.16 3.43
+Kettlebell/ Chrome Handle (each)
+14 JTKBRC3-08 JORDAN 8kg Black Rubber 1.00 35.20 35.00% 22.88 22.88 4.58
+Kettlebell/ Chrome Handle (each)
+15 JLTR-01 JORDAN 38mm diameter, 15m 1.00 180.00 35.00% 117.00 117.00 23.40
+Black Battle Rope
+16 JF-SB-05 JORDAN Black Slam Ball 1.00 13.49 35.00% 8.77 8.77 1.75
+- 5kg
+17 JF-SB-07 JORDAN Black Slam Ball 1.00 15.34 35.00% 9.97 9.97 1.99
+- 7kg
+18 JF-SB-09 JORDAN Black Slam Ball 1.00 20.24 35.00% 13.16 13.16 2.63
+- 9kg
+19 JF-EC-950ET- JORDAN Elite Cardio - 3.00 5,075.00 35.00% 3,298.75 9,896.25 1,979.25
+TFT-21.5 950E Treadmill - 21.5" TFT Screen
+20 JF-EC-805R- JORDAN Elite Cardio - 1.00 3,331.67 35.00% 2,165.59 2,165.59 433.12
+15.6 805R Recumbent Bike - 15.6" TFT Screen
+21 JF-EC-805U- JORDAN Elite Cardio - 2.00 3,130.83 35.00% 2,035.04 4,070.08 814.02
+15.6 805U Upright Bike - 15.6" TFT Screen
+22 JF-EC-90AB- JORDAN Elite Cardio - 1.00 1,858.33 35.00% 1,207.91 1,207.91 241.58
+LCD 90+ Air Bike - LCD Screen
+23 JF-C2RE-SL-3 Concept2 RowErg - Standard 2.00 825.00 0.00% 825.00 1,650.00 330.00
+Legs
+24 JF-PS-PIN-SP- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Shoulder Press - Black
+25 JF-PS-PIN-VP- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Vertical Chest Press - Black
+26 JF-PS-PIN-LP- JORDAN Performance Strength - 1.00 2,526.32 35.00% 1,642.11 1,642.11 328.42
+BLK Pin Loaded Leg Press - Black
+27 JF-PS-PIN-DCA- JORDAN Performance Strength - 1.00 2,089.74 35.00% 1,358.33 1,358.33 271.67
+BLK Pin Loaded Dual Dip/Chin Assist - Black
+28 JF-PS-PIN-LPD- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Lat Pulldown - Black
+29 JF-EC-805D- JORDAN Elite Cardio - 3.00 4,018.33 35.00% 2,611.91 7,835.74 1,567.15
+15.6 805D Elliptical - 15.6" TFT Screen
+30 JF-PS-PIN-SR- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Seated Row - Black
+31 JF-PS-PIN-DPF- JORDAN Performance Strength - 1.00 1,988.57 35.00% 1,292.57 1,292.57 258.51
+BLK Pin Loaded Dual Delt/Pec Fly - Black
+32 JF-PS-PIN-HAD- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Hip Adductor - Black
+33 JF-PS-PIN-SLC- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Seated Leg Curl - Black
+34 JF-CKB-P1 JORDAN 8-40kg Competition 9 1.00 850.00 35.00% 552.50 552.50 110.50
+Kettlebell Set
+35 JF-KBR-2-BLK JORDAN Kettlebell Rack - 1.00 208.33 35.00% 135.41 135.41 27.08
+2 Tier - Black
+36 JF-CRBP-P1 JORDAN 150kg Coloured Rubber 1.00 560.00 35.00% 364.00 364.00 72.80
+Bumper Plate Set
+37 JF-AFID-BLK JORDAN Adjustable FID Bench 1.00 399.00 35.00% 259.35 259.35 51.87
+- Black
+38 JLPOWB-01 JORDAN Power Band - 1.00 12.00 35.00% 7.80 7.80 1.56
+13mm Red (each)
+39 JLPOWB-02 JORDAN Power Band - 1.00 16.50 35.00% 10.73 10.73 2.15
+22mm Black (each)
+40 JLPOWB-03 JORDAN Power Band - 1.00 21.50 35.00% 13.98 13.98 2.80
+32mm Purple (each)
+41 JLPOWB-04 JORDAN Power Band - 1.00 35.00 35.00% 22.75 22.75 4.55
+44mm Green (each)
+42 JLPOWB-05 JORDAN Power Band - 1.00 44.50 35.00% 28.93 28.93 5.79
+64mm Blue (each)
+43 JLPOWB-06 JORDAN Power Band - 1.00 65.50 35.00% 42.58 42.58 8.52
+83mm Orange (each)
+44 JF-J75-CPR- JORDAN J75 Compact Power 1.00 3,927.76 35.00% 2,553.04 2,553.04 510.61
+BLK-P3 Rack - Black - Package 3
 
-This quotation is valid for 30 days.
-Printed: 09/11/2026 10:00 Page 2 of 4
-
-# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
-25 JTFIX-025
-Anonymised product 25
-1 741.52 0 741.52 741.52 148.30
-26 JTFIX-026
-Anonymised product 26
-2 371.63 0 371.63 743.25 148.65
-27 JTFIX-027
-Anonymised product 27
-3 248.33 0 248.33 744.98 149.00
-28 JTFIX-028
-Anonymised product 28
-4 186.68 0 186.68 746.71 149.34
-29 JTFIX-029
-Anonymised product 29
-1 748.44 0 748.44 748.44 149.69
-30 JTFIX-030
-Anonymised product 30
-2 375.09 0 375.09 750.17 150.03
-31 JTFIX-031
-Anonymised product 31
-3 250.63 0 250.63 751.90 150.38
-32 JTFIX-032
-Anonymised product 32
-4 188.41 0 188.41 753.63 150.73
-33 JTFIX-033
-Anonymised product 33
-1 755.36 0 755.36 755.36 151.07
-34 JTFIX-034
-Anonymised product 34
-2 378.55 0 378.55 757.09 151.42
-35 JTFIX-035
-Anonymised product 35
-3 252.94 0 252.94 758.82 151.76
-36 JTFIX-036
-Anonymised product 36
-4 190.14 0 190.14 760.55 152.11
-
-This quotation is valid for 30 days.
-Printed: 09/11/2026 10:00 Page 3 of 4
-
-# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
-37 JTFIX-037
-Anonymised product 37
-1 762.28 0 762.28 762.28 152.46
-38 JTFIX-038
-Anonymised product 38
-2 382.01 0 382.01 764.01 152.80
-39 JTFIX-039
-Anonymised product 39
-3 255.25 0 255.25 765.74 153.15
-40 JTFIX-040
-Anonymised product 40
-4 191.87 0 191.87 767.47 153.49
-41 JTFIX-041
-Anonymised product 41
-1 769.20 0 769.20 769.20 153.84
-42 JTFIX-042
-Anonymised product 42
-2 385.47 0 385.47 770.93 154.19
-43 JTFIX-043
-Anonymised product 43
-3 257.55 0 257.55 772.66 154.53
-44 JTFIX-044
-Anonymised product 44
-4 3,831.83 0 3,831.83 15,327.33 3,065.47
-
-Goods Net 46,989.52
-Additional Charges Net 0.00
-Total Order Net 46,989.52
-VAT 9,397.90
-Total 56,387.42
-
+Goods Net: 46,989.52
+Additional Charges Net: 0.00
+Total Order Net: 46,989.52
+VAT: 9,397.90
+Total: 56,387.42

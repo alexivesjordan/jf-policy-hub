@@ -81,6 +81,7 @@ export type PriceRequest = {
   lines: QuoteLineInput[];
   postcode: string;
   miles?: number;
+  speedMph?: number;
   segment: Segment | null;
   customerType?: CustomerType;
   profile?: SiteProfile;
@@ -226,7 +227,47 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
     }
   }
 
-  const category = line.category?.trim() ?? "";
+  const category = line.category?.trim() || inferredCategory(line.productName);
+  const fid = table.find((row) => row.productName === "FID Bench");
+  if (fid && /fid bench/i.test(line.productName)) {
+    return {
+      productName: line.productName,
+      qty: line.qty,
+      match: "category_fallback",
+      category: "bench",
+      provisional: true,
+      note: "fallback: FID Bench",
+      row: { ...fid, productName: line.productName, sku: line.sku?.trim() || null },
+    };
+  }
+
+  if (/performance strength/i.test(line.productName) && /pin loaded/i.test(line.productName)) {
+    const standIn = table.find((row) => row.productLine?.startsWith("DHZ-GENERIC") && row.category === "strength-selectorised");
+    if (standIn) {
+      return {
+        productName: line.productName,
+        qty: line.qty,
+        match: "dhz_generic",
+        category: standIn.category,
+        provisional: true,
+        note: "HQ-built Performance Strength pin-loaded, tail-lift lorry",
+        row: { ...standIn, productName: line.productName, sku: line.sku?.trim() || null },
+      };
+    }
+  }
+
+  if (isLooseKit(line.productName)) {
+    return {
+      productName: line.productName,
+      qty: line.qty,
+      match: "handling_only",
+      category: "weights",
+      provisional: true,
+      note: "fallback: no build / handling only",
+      row: handlingRow(line.productName, "weights"),
+    };
+  }
+
   const categoryDefault = defaults.find((item) => item.category === category);
   if (categoryDefault) {
     return {
@@ -284,6 +325,18 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
     note: category ? null : "unknown category",
     row: null,
   };
+}
+
+function inferredCategory(name: string) {
+  if (/treadmill|bike|elliptical|skierg|rowerg|cardio/i.test(name)) return "cardio";
+  if (/rack/i.test(name)) return "rack-rig";
+  if (/bench/i.test(name)) return "bench";
+  return "";
+}
+
+function isLooseKit(name: string) {
+  if (/rack/i.test(name)) return false;
+  return /dumbbell|kettlebell|fixed barbell|bumper|slam ball|battle rope|power band|floor stand/i.test(name);
 }
 
 function defaultRow(productName: string, category: string, effort: CategoryEffortDefault): EffortRow {
@@ -404,13 +457,18 @@ type Costed = {
   consumables: number;
   contingencyRate: number;
   vans: number;
+  days: number;
+  nights: number;
+  hotel: number;
+  food: number;
+  speedMph: number;
   flags: string[];
   provisional: string[];
   bigInstallTriggers: string[];
   manualReasons: string[];
 };
 
-function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Costed {
+function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, speedMph: number = RATES.effectiveSpeedMph): Costed {
   const flags: string[] = [];
   const provisional = new Set<string>();
   const manualReasons: string[] = [];
@@ -422,6 +480,8 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
   flags.push("handover_minutes is UNSET and excluded");
   let carryPersonMinutes = 0;
   let kitKg = 0;
+  let hqKg = 0;
+  let siteKg = 0;
   let unknownWeight = false;
   let high = false;
   let hasFlooring = false;
@@ -458,6 +518,8 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
       flags.push(`weight unknown on ${line.productName}`);
     } else {
       kitKg += weight.kg * line.qty;
+      if (row.buildLocation === "hq") hqKg += weight.kg * line.qty;
+      else siteKg += weight.kg * line.qty;
       if (weight.estimated) {
         flags.push(`weight estimated from band on ${line.productName}`);
         provisional.add("weight_band midpoint");
@@ -501,6 +563,11 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
       consumables: 0,
       contingencyRate: 0,
       vans: 1,
+      days: 0,
+      nights: 0,
+      hotel: 0,
+      food: 0,
+      speedMph,
       flags: ["Subcontractor price pending — crew is above the in-house threshold."],
       provisional: [],
       bigInstallTriggers: [],
@@ -510,17 +577,43 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
 
   const sitePersonMinutes = onSiteMinutes * maxCrew + carryPersonMinutes;
   const wallClockHours = (onSiteMinutes + carryPersonMinutes / maxCrew) / 60;
-  const travelHours = (miles * 2) / RATES.effectiveSpeedMph;
+  const travelHours = (miles * 2) / speedMph;
   const doorToDoor = travelHours + wallClockHours;
   const hourly = effectiveHourlyRate();
-  const ordinary = Math.min(doorToDoor, 8);
-  const overtime = Math.max(0, doorToDoor - 8);
-  const labour = maxCrew * (ordinary * hourly + overtime * hourly * RATES.overtimeMultiplier);
-  const vans = Math.max(1, Math.ceil(kitKg / RATES.vanPayloadKg));
+  const overtimeRate = hourly * RATES.overtimeMultiplier;
+  const vans = siteKg > 0 ? Math.max(1, Math.ceil(siteKg / RATES.vanPayloadKg)) : 1;
   const vehicle = miles * 2 * RATES.vehicleRate * vans;
-  const overflow = Math.max(0, kitKg - RATES.vanPayloadKg);
-  const pallets = overflow > 0 ? Math.ceil(overflow / RATES.palletCapacityKg) : 0;
-  const freight = pallets * RATES.palletRate;
+  const hqPallets = hqKg > 0 ? Math.ceil(hqKg / RATES.palletCapacityKg) : 0;
+  const siteOverflow = Math.max(0, siteKg - vans * RATES.vanPayloadKg);
+  const sitePallets = siteOverflow > 0 ? Math.ceil(siteOverflow / RATES.palletCapacityKg) : 0;
+  const freight = (hqPallets + sitePallets) * RATES.palletRate;
+  let days = 1;
+  let nights = 0;
+  let hotel = 0;
+  let food = 0;
+  let labour = 0;
+  if (doorToDoor <= RATES.dayThresholdHours) {
+    const ordinary = Math.min(doorToDoor, 8);
+    const overtime = Math.max(0, doorToDoor - 8);
+    labour = maxCrew * (ordinary * hourly + overtime * overtimeRate);
+    flags.push("food_trigger is UNSET; food was not applied");
+  } else {
+    const siteHours = wallClockHours;
+    days = Math.max(1, Math.ceil(siteHours / 8 - 1e-9));
+    nights = Math.max(0, days - 1);
+    const oneWay = travelHours / 2;
+    let remaining = siteHours;
+    for (let day = 0; day < days; day += 1) {
+      const site = Math.min(8, remaining);
+      remaining -= site;
+      const travel = day === 0 || day === days - 1 ? oneWay : 0;
+      const hours = site + travel;
+      labour += maxCrew * (Math.min(hours, 8) * hourly + Math.max(0, hours - 8) * overtimeRate);
+    }
+    hotel = nights * maxCrew * RATES.hotelRate;
+    food = days * maxCrew * RATES.foodRate;
+    flags.push(`Overnight stay: ${days} days, ${nights} nights, one round trip.`);
+  }
   const machines = lines.filter((line) => line.row && line.row.category !== "weights" && line.row.category !== "flooring").reduce((sum, line) => sum + line.qty, 0);
   const consumables = machines * RATES.tagCost;
   provisional.add("tag_cost_per_unit");
@@ -537,7 +630,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
     contingency += RATES.contingencyAccess;
     provisional.add("contingency_difficult_access");
   }
-  const siteCost = (labour + vehicle + freight + consumables) * (1 + contingency);
+  const siteCost = (labour + vehicle + freight + consumables + hotel + food) * (1 + contingency);
 
   let hqCost = 0;
   let hqLabour = 0;
@@ -603,7 +696,12 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number): Co
     consumables: roundMoney(consumables),
     contingencyRate: contingency,
     vans,
-    flags,
+    days,
+    nights,
+    hotel: roundMoney(hotel),
+    food: roundMoney(food),
+    speedMph,
+    flags: [...new Set(flags)],
     provisional: [...provisional],
     bigInstallTriggers: triggers,
     manualReasons,
@@ -614,7 +712,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
   const pricing = request.pricing ?? DEFAULT_PRICING;
   const profile = request.mode === "A" ? BEST_CASE_PROFILE : (request.profile ?? BEST_CASE_PROFILE);
   const distance = request.miles != null
-    ? { miles: request.miles, method: "miles supplied with the request" }
+    ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
     : estimateMilesFromKingsLynn(request.postcode);
   const resolved = request.lines.map((line) => matchLine(line, request.table, request.categoryDefaults ?? []));
   const missing = resolved.filter((line) => line.match === "missing");
@@ -660,7 +758,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
     return { ...base, blockedReason: SEGMENT_NOT_SET };
   }
 
-  const costed = costJob(resolved, profile, distance.miles);
+  const costed = costJob(resolved, profile, distance.miles, distance.speedMph);
   if (costed.crew > RATES.dedicatedInstallers + RATES.warehousePullMax) {
     return {
       ...base,
@@ -766,7 +864,7 @@ export function forSales(result: PriceResult) {
 function describeBreakdown(
   lines: ResolvedLine[],
   costed: Costed,
-  distance: { miles: number; method: string },
+  distance: { miles: number; method: string; speedMph: number },
   request: PriceRequest,
   flags: string[],
   gate: string,
@@ -776,6 +874,7 @@ function describeBreakdown(
     onSiteMinutes,
     carryMinutes: costed.carryMinutes,
     miles: distance.miles,
+    speedMph: distance.speedMph,
     crew: costed.crew,
     vans: costed.vans,
     consumables: costed.consumables,
@@ -831,17 +930,22 @@ function describeBreakdown(
     vans: costed.vans,
     licensedDrivers: costed.vans,
     driverCheck: driverCheck(costed.vans),
-    roundTripMiles: distance.miles * 2,
+    roundTripMiles: roundMoney(distance.miles * 2),
     milesMethod: distance.method,
-    travelHours: roundMoney((distance.miles * 2) / RATES.effectiveSpeedMph),
+    speedMph: distance.speedMph,
+    travelHours: roundMoney((distance.miles * 2) / distance.speedMph),
+    days: costed.days,
+    nights: costed.nights,
+    hotel: costed.hotel,
+    food: costed.food,
     doorToDoorHours: stays.singleShift.doorToDoorHours,
-    overnight: stays.singleShift.doorToDoorHours > RATES.dayThresholdHours,
+    overnight: costed.nights > 0,
     labour: costed.labour,
     vehicle: costed.vehicle,
     freight: costed.freight,
     consumables: costed.consumables,
     contingencyRate: costed.contingencyRate,
-    siteContingency: roundMoney((costed.labour + costed.vehicle + costed.freight + costed.consumables) * costed.contingencyRate),
+    siteContingency: roundMoney((costed.labour + costed.vehicle + costed.freight + costed.consumables + costed.hotel + costed.food) * costed.contingencyRate),
     siteCost: roundMoney(costed.cost - costed.hqCost),
     hqCost: costed.hqCost,
     singleShift: stays.singleShift,
@@ -863,6 +967,8 @@ function requirementsFor(lines: ResolvedLine[], crew: number): JobRequirements {
       weightKg: line.row ? lineWeightKg(line.row).kg : null,
       longestMm: longestMillimetre(line.row?.assembledDimsMm ?? null),
       wheeled: line.row?.wheeled ?? null,
+      hq: line.row?.buildLocation === "hq",
+      longLoad: line.row?.category === "rack-rig" || /rack/i.test(line.productName),
     })),
   );
 }

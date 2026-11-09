@@ -49,7 +49,12 @@ export type QuoteBreakdown = {
   driverCheck: string;
   roundTripMiles: number;
   milesMethod: string;
+  speedMph: number;
   travelHours: number;
+  days: number;
+  nights: number;
+  hotel: number;
+  food: number;
   doorToDoorHours: number;
   overnight: boolean;
   labour: number;
@@ -74,6 +79,7 @@ export function compareStays(input: {
   onSiteMinutes: number;
   carryMinutes: number;
   miles: number;
+  speedMph?: number;
   crew: number;
   vans: number;
   consumables: number;
@@ -81,7 +87,7 @@ export function compareStays(input: {
   contingency: number;
 }): { singleShift: StayOption; commute: StayOption; stayOvernight: StayOption } {
   const siteHours = (input.onSiteMinutes + input.carryMinutes) / 60;
-  const roundTripHours = (input.miles * 2) / RATES.effectiveSpeedMph;
+  const roundTripHours = (input.miles * 2) / (input.speedMph ?? RATES.effectiveSpeedMph);
   const hourly = roundMoney(RATES.baseWage * RATES.wageOncost);
   const overtime = hourly * RATES.overtimeMultiplier;
 

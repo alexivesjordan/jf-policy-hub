@@ -8,8 +8,10 @@ function money(value: string): number {
 }
 
 function isSkuFragment(value: string): boolean {
-  return /^[A-Z0-9][A-Z0-9-]{0,16}$/.test(value);
+  return /^[A-Z0-9][A-Z0-9.-]{0,16}$/.test(value);
 }
+
+const NUMERIC_TAIL = /^(.*?)(?:\s+)(\d+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)%?\s+([\d,]+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)$/;
 
 function isNumericRow(line: string): boolean {
   const parts = line.trim().split(/\s+/);
@@ -38,12 +40,26 @@ function party(lines: string[]) {
   };
 }
 
+function takeNumbers(line: string): { head: string; numeric: string[] } | null {
+  if (isNumericRow(line)) return { head: "", numeric: line.trim().split(/\s+/).slice(0, 6) };
+  const tail = line.match(NUMERIC_TAIL);
+  if (!tail) return null;
+  return { head: (tail[1] ?? "").trim(), numeric: tail.slice(2, 8) };
+}
+
 function parseLines(rows: string[]): ExtractedLine[] {
   const lines: ExtractedLine[] = [];
   let index = 0;
   while (index < rows.length) {
-    const start = rows[index]?.match(/^(\d+)\s+(.+)$/);
-    if (!start || isNumericRow(rows[index] ?? "")) {
+    const raw = rows[index] ?? "";
+    const inline = takeNumbers(raw);
+    const head = inline?.head ?? raw;
+    const start = head.match(/^(\d+)\s+(.+)$/);
+    if (!start || (inline && !inline.head && isNumericRow(raw))) {
+      index += 1;
+      continue;
+    }
+    if (/^\d+\s+[\d,]+/.test(head) && isNumericRow(head)) {
       index += 1;
       continue;
     }
@@ -54,28 +70,36 @@ function parseLines(rows: string[]): ExtractedLine[] {
     if (isSkuFragment(firstSku)) {
       sku = firstSku;
       if (firstTokens.length > 1) description.push(firstTokens.slice(1).join(" "));
-    } else {
+    } else if (start[2].trim()) {
       description.push(start[2].trim());
     }
+    let numeric = inline?.numeric ?? null;
     index += 1;
-    let numeric: string[] | null = null;
     while (index < rows.length) {
       const current = rows[index] ?? "";
-      if (isNumericRow(current)) {
-        numeric = current.trim().split(/\s+/).slice(0, 6);
+      if (/^\d+\s+[A-Za-z]/.test(current)) break;
+      const nextNumbers = takeNumbers(current);
+      if (!numeric && nextNumbers && !nextNumbers.head) {
+        numeric = nextNumbers.numeric;
         index += 1;
-        break;
+        continue;
       }
-      if (/^\d+\s+[A-Za-z]/.test(current) && !isNumericRow(current)) break;
-      const tokens = current.trim().split(/\s+/);
+      const text = (nextNumbers?.head || current).trim();
+      if (!text) {
+        index += 1;
+        continue;
+      }
+      const tokens = text.split(/\s+/);
       const fragment = tokens[0] ?? "";
-      const continueSku = isSkuFragment(fragment) && (sku.endsWith("-") || (description.length === 0 && tokens.length === 1));
+      const colourSuffix = /[0-9]$/.test(sku) && /^[A-Z]{2,4}$/.test(fragment);
+      const continueSku = isSkuFragment(fragment) && (sku.endsWith("-") || colourSuffix || (description.length === 0 && tokens.length === 1));
       if (continueSku) {
         sku = `${sku}${fragment}`;
         if (tokens.length > 1) description.push(tokens.slice(1).join(" "));
-      } else if (current.trim()) {
-        description.push(current.trim());
+      } else {
+        description.push(text);
       }
+      if (!numeric && nextNumbers?.numeric) numeric = nextNumbers.numeric;
       index += 1;
     }
     if (!numeric) continue;
@@ -95,7 +119,7 @@ function parseLines(rows: string[]): ExtractedLine[] {
 }
 
 function labelledAmount(text: string, label: string): number | null {
-  const match = text.match(new RegExp(`(?:^|\\n)\\s*${label}\\s+([\\d,]+\\.\\d{2})`, "i"));
+  const match = text.match(new RegExp(`(?:^|\\n)\\s*${label}:?\\s+([\\d,]+\\.\\d{2})`, "i"));
   return match ? money(match[1] ?? "") : null;
 }
 

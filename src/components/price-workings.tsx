@@ -76,7 +76,8 @@ export function PriceWorkings({
             <li key={`build-${line.productName}`}>{line.qty}× {line.productName} → {line.minutes} min</li>
           ))}
         </ul>
-        <p className="mt-3">Crew {breakdown.crew}. Vans {breakdown.vans}. Licensed drivers {breakdown.licensedDrivers}.</p>
+        <p className="mt-3">Crew {breakdown.crew}. Vans {breakdown.vans}. Licensed drivers {breakdown.licensedDrivers}. {breakdown.days} day{breakdown.days === 1 ? "" : "s"} / {breakdown.nights} night{breakdown.nights === 1 ? "" : "s"} at {breakdown.speedMph} mph.</p>
+        <p>Hotel {money(breakdown.hotel)}. Food {money(breakdown.food)}.</p>
         <p>{breakdown.driverCheck}</p>
         <p className="mt-3 font-semibold">Overnight versus commute</p>
         {[breakdown.singleShift, breakdown.commute, breakdown.stayOvernight].map((option) => (
