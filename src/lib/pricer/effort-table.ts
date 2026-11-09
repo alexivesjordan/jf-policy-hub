@@ -30,6 +30,10 @@ export type EffortRow = {
   /** Set on rows loaded from the SKU effort table. Null means the effort is unknown. */
   needsAssembly?: boolean | null;
   status?: "suggested" | "confirmed";
+  /** each keeps the machine repeat rate. tile and m2 are strict quantity × minutes. */
+  effortUnit?: "each" | "tile" | "m2" | null;
+  /** Flooring is laid before sled track. Those phases are never overlapped. */
+  workPhase?: "job" | "floor" | "sled" | null;
 };
 
 function num(value: string): number | null {

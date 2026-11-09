@@ -115,7 +115,7 @@ export default async function SettingsPage({
             <p className="mt-2 max-w-2xl text-sm text-grey">
               One row per Cin7 SKU. Sync fills suggested rows from the category default and never changes a confirmed row.
               Needs review: {effort ? effort.review_count : "—"}.
-              {effort?.name_rule_count ? ` ${effort.name_rule_count} suggested as built at HQ by the pin-loaded name rule.` : ""}
+              {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks at 3 hours) and stay here until confirmed.` : ""}
             </p>
           </div>
           <SyncProductsButton />

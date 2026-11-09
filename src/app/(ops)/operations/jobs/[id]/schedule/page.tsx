@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { PencilCalendar } from "@/components/pencil-calendar";
-import { getJob, getJobRequirements } from "@/features/operations/queries";
+import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
 import type { PoolResource } from "@/lib/pulse/availability";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +14,8 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
   await requireOperationsUser();
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
+  const context = await getOfficeContext();
+  const revealResources = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
   const job = await getJob(id).catch(() => null);
   if (!job) notFound();
   const requirements = await getJobRequirements(id).catch(() => null);
@@ -53,7 +55,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
       <div>
         <h1 className="font-display text-4xl">Pencil a day</h1>
         <p className="mt-2 max-w-2xl text-ink/70">
-          {job.customer.name}. A highlighted day is one where every required resource is free. The booking is a pencil for the office to confirm.
+          {job.customer.name}. {revealResources ? "A highlighted day is one where every required resource is free." : "A highlighted day can be pencilled."} The booking is a pencil for the office to confirm.
         </p>
       </div>
       {requirements ? (
@@ -69,6 +71,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
           resources={resources}
           busyByDay={busyByDay}
           days={days}
+          revealResources={revealResources}
         />
       ) : (
         <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">

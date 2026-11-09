@@ -4,11 +4,13 @@ import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { PriceWorkings } from "@/components/price-workings";
 import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { BookingModal } from "@/components/booking-modal";
 import {
   createPricedJob,
   loadFixtureQuote,
   parseUploadedQuote,
   priceReviewedQuote,
+  priceSalesOrder,
   type PricedQuote,
   type QuoteDraft,
 } from "@/features/operations/price-actions";
@@ -31,6 +33,9 @@ export function PriceQuoteForm({
   const [parsed, parsePdf, parsing] = useActionState(parseUploadedQuote, null);
   const [priced, priceQuote, pricing] = useActionState(priceReviewedQuote, null);
   const [created, createJob, creating] = useActionState(createPricedJob, null);
+  const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
+  const [bookingJob, setBookingJob] = useState<string | null>(null);
+  const [segmentChoice, setSegmentChoice] = useState("");
   const [draft, setDraft] = useState<QuoteDraft | null>(null);
   const [sourceName, setSourceName] = useState<"load" | "pdf" | null>(null);
 
@@ -48,8 +53,77 @@ export function PriceQuoteForm({
     }
   }, [parsed]);
 
-  const quote = (created?.quote ?? priced?.quote) as PricedQuote | undefined;
+  useEffect(() => {
+    if (!showInternal && created?.quote?.jobId) setBookingJob(created.quote.jobId);
+  }, [created, showInternal]);
+
+  const quote = (created?.quote ?? (showInternal ? priced?.quote : sold?.quote)) as PricedQuote | undefined;
   const notice = sourceName === "pdf" ? parsed : sourceName === "load" ? loaded : null;
+  const salesDraft = sold?.draft ?? null;
+
+  if (!showInternal) {
+    const summary = quote?.repSummary;
+    return (
+      <div className="space-y-6">
+        <form action={sellOrder} className="space-y-4">
+          <Field label="Cin7 sales order" hint={cin7Connected ? "For example SO-00490. A saved segment for this customer is used if you leave the segment blank." : "Fixture numbers such as FIXTURE-Q-1001 while Cin7 is not connected."}>
+            <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
+          </Field>
+          <Field label="Segment" hint="Leave this on the saved segment when this customer has been priced before.">
+            <Select name="segment" value={segmentChoice} onChange={(event) => setSegmentChoice(event.target.value)}>
+              <option value="">Use the saved segment</option>
+              {SEGMENTS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </Select>
+          </Field>
+          <Button type="submit" disabled={selling || creating}>{selling ? "Calculating…" : "Submit"}</Button>
+        </form>
+        <form action={sellOrder} className="grid gap-4 md:grid-cols-[1fr_auto]">
+          <input type="hidden" name="segment" value={segmentChoice} />
+          <Field label="Or upload the quote PDF" hint="Text is extracted in the app. The file is not stored.">
+            <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
+          </Field>
+          <div className="md:pt-7">
+            <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
+          </div>
+        </form>
+        {selling ? (
+          <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
+            <p className="font-display text-3xl">Calculating…</p>
+            <p className="mt-2 text-sm text-grey">Fetching the order and pricing the install.</p>
+          </div>
+        ) : null}
+        {sold && !selling ? <Banner tone={sold.ok ? "success" : "error"}>{sold.message}</Banner> : null}
+        {summary && quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
+        {summary ? (
+          <div className="rounded-3xl border border-line bg-card px-6 py-6">
+            <dl className="space-y-3 text-ink">
+              <div>
+                <dt className="text-sm text-grey">Install cost</dt>
+                <dd className="font-display text-4xl">{money(summary.cost)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-grey">Recommended price</dt>
+                <dd className="font-display text-4xl">{money(summary.price)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-grey">Margin</dt>
+                <dd className="text-2xl font-semibold">{summary.margin == null ? "—" : `${Math.round(summary.margin * 1000) / 10}%`}</dd>
+              </div>
+            </dl>
+            {salesDraft ? (
+              <form action={createJob} className="mt-6">
+                <DraftFields draft={salesDraft} />
+                <Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create job"}</Button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+        {bookingJob ? <BookingModal jobId={bookingJob} onClose={() => setBookingJob(null)} /> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -210,6 +284,38 @@ export function PriceQuoteForm({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function money(value: number) {
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
+}
+
+function DraftFields({ draft }: { draft: QuoteDraft }) {
+  return (
+    <>
+      <input type="hidden" name="source" value={draft.source} />
+      <input type="hidden" name="quoteNumber" value={draft.quoteNumber} />
+      <input type="hidden" name="customerReference" value={draft.customerReference} />
+      <input type="hidden" name="customerId" value={draft.customerId} />
+      <input type="hidden" name="saleId" value={draft.saleId} />
+      <input type="hidden" name="internalNote" value={draft.internalNote} />
+      <input type="hidden" name="goodsNet" value={draft.goodsNet ?? ""} />
+      <input type="hidden" name="customerName" value={draft.customerName} />
+      <input type="hidden" name="postcode" value={draft.postcode} />
+      <input type="hidden" name="segment" value={draft.segment} />
+      {draft.lines.map((line, index) => (
+        <span key={`${line.sku}-${index}`}>
+          <input type="hidden" name="lineSku" value={line.sku} />
+          <input type="hidden" name="lineProductId" value={line.productId} />
+          <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
+          <input type="hidden" name="lineDescription" value={line.description} />
+          <input type="hidden" name="lineQty" value={line.qty} />
+          <input type="hidden" name="lineCategory" value={line.category} />
+          <input type="hidden" name="lineTotal" value={line.lineTotal ?? ""} />
+        </span>
+      ))}
+    </>
   );
 }
 

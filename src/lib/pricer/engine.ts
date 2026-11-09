@@ -46,6 +46,8 @@ export type QuoteLineInput = {
   qty: number;
   /** Test-fixture weight when the effort row has none. Not a Cin7 field. */
   unitWeightKg?: number | null;
+  /** Tiles after a m² or pack conversion. Falls back to qty. */
+  billableUnits?: number | null;
 };
 
 /** Build assumption for a Cin7 category. Exact SKU rows still win. needsAssembly null means unknown. */
@@ -102,6 +104,7 @@ export type ResolvedLine = {
   provisional: boolean;
   note: string | null;
   row: EffortRow | null;
+  billableUnits?: number | null;
 };
 
 export type PriceResult = {
@@ -547,13 +550,14 @@ type Costed = {
 };
 
 function applyLineWeight(line: QuoteLineInput, resolved: ResolvedLine): ResolvedLine {
-  if (line.unitWeightKg == null || !resolved.row) return resolved;
-  if (resolved.row.buildLocation === "hq") {
-    if (resolved.row.assembledWeightKg != null) return resolved;
-    return { ...resolved, row: { ...resolved.row, assembledWeightKg: line.unitWeightKg } };
+  const withUnits = line.billableUnits == null ? resolved : { ...resolved, billableUnits: line.billableUnits };
+  if (line.unitWeightKg == null || !withUnits.row) return withUnits;
+  if (withUnits.row.buildLocation === "hq") {
+    if (withUnits.row.assembledWeightKg != null) return withUnits;
+    return { ...withUnits, row: { ...withUnits.row, assembledWeightKg: line.unitWeightKg } };
   }
-  if (resolved.row.unitWeightKg != null) return resolved;
-  return { ...resolved, row: { ...resolved.row, unitWeightKg: line.unitWeightKg } };
+  if (withUnits.row.unitWeightKg != null) return withUnits;
+  return { ...withUnits, row: { ...withUnits.row, unitWeightKg: line.unitWeightKg } };
 }
 
 function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, speedMph: number = RATES.effectiveSpeedMph): Costed {
@@ -562,6 +566,8 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
   const manualReasons: string[] = [];
   let maxCrew = 1;
   let onSiteMinutes = RATES.sitePrepMinutes;
+  let flooringWallMinutes = 0;
+  let sledWallMinutes = 0;
   const buildLines: StageLine[] = [];
   const positionLines: StageLine[] = [];
   provisional.add("site_prep_minutes");
@@ -583,7 +589,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     if (line.provisional && line.note) provisional.add(line.note);
     if (row.reviewFlag && row.reviewFlag !== "needs-review") flags.push(`${row.productName}: ${row.reviewFlag}`);
     if (row.complexity === "high") high = true;
-    if (row.category === "flooring") hasFlooring = true;
+    if (/floor/i.test(row.category)) hasFlooring = true;
     else hasEquipment = true;
     if (row.buildLocation === "hq") hasHq = true;
 
@@ -592,8 +598,11 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     maxCrew = Math.max(maxCrew, effective);
 
     const base = row.buildLocation === "hq" ? (row.sitePositionMinutes ?? 0) : (row.buildMinutes ?? 0);
-    const repeated = base * (1 + (line.qty - 1) * RATES.repeatRate);
-    onSiteMinutes += repeated;
+    const measured = row.effortUnit === "tile" || row.effortUnit === "m2";
+    const repeated = measured ? base * (line.billableUnits ?? line.qty) : base * (1 + (line.qty - 1) * RATES.repeatRate);
+    if (row.workPhase === "sled") sledWallMinutes += repeated;
+    else if (row.workPhase === "floor" || measured || /floor/i.test(row.category)) flooringWallMinutes += repeated;
+    else onSiteMinutes += repeated;
     const stage = { productName: line.productName, qty: line.qty, minutes: roundMoney(repeated) };
     if (row.buildLocation === "hq") positionLines.push(stage);
     else buildLines.push(stage);
@@ -665,6 +674,11 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
       manualReasons,
     };
   }
+
+  if (flooringWallMinutes > 0 && sledWallMinutes > 0) {
+    flags.push("Sled track is sequenced after flooring and is not overlapped with it.");
+  }
+  onSiteMinutes += flooringWallMinutes + sledWallMinutes;
 
   const tripMinutes = profile.stairs === "none" ? 1.5 : profile.stairs === "1" ? 2.25 : 2.75;
   const carryWallMinutes = maxCrew > 0 ? (looseKg / 22) * tripMinutes / maxCrew : 0;
@@ -958,6 +972,8 @@ export function effortRowForSku(input: {
   hqBuildCrew?: number | null;
   sitePositionMinutes?: number | null;
   needsReview?: boolean;
+  effortUnit?: "each" | "tile" | "m2" | null;
+  workPhase?: "job" | "floor" | "sled" | null;
 }): EffortRow {
   const category = input.category || "Other";
   if (input.buildLocation === "hq") {
@@ -984,9 +1000,11 @@ export function effortRowForSku(input: {
       needsAssembly: true,
       reviewFlag: input.needsReview ? "needs-review" : null,
       crateAtHq: false,
+      effortUnit: input.effortUnit ?? "each",
+      workPhase: input.workPhase ?? "job",
     };
   }
-  if (input.needsAssembly === null || /^other$/i.test(category)) {
+  if (input.needsAssembly === null || (/^other$/i.test(category) && input.effortUnit !== "tile" && input.effortUnit !== "m2")) {
     return {
       ...defaultRow(input.productName, category, { category, buildCrew: 2, buildMinutes: 120, note: "Unknown", needsAssembly: null }),
       sku: input.sku,
@@ -1001,8 +1019,11 @@ export function effortRowForSku(input: {
       needsAssembly: false,
       buildCrew: input.crew ?? 1,
       buildMinutes: 0,
+      effortUnit: input.effortUnit ?? "each",
+      workPhase: input.workPhase ?? "job",
     };
   }
+  const phase = input.workPhase ?? (input.effortUnit === "tile" || input.effortUnit === "m2" || /floor/i.test(category) ? "floor" : "job");
   return {
     ...defaultRow(input.productName, category, {
       category,
@@ -1013,6 +1034,10 @@ export function effortRowForSku(input: {
     }),
     sku: input.sku,
     needsAssembly: true,
+    effortUnit: input.effortUnit ?? (phase === "floor" ? "tile" : "each"),
+    workPhase: phase,
+    buildMinutes: input.buildMinutes ?? 120,
+    buildCrew: input.crew ?? 2,
   };
 }
 

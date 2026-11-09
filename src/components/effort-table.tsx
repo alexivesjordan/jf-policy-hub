@@ -30,7 +30,7 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
           <thead>
             <tr className="text-left text-grey">
               <th className="py-2 pr-3">Cin7 category</th>
-              <th className="py-2 pr-3">Needs assembly</th>
+              <th className="py-2 pr-3">Needs install time</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
               <th className="py-2 pr-3">Built at</th>
@@ -89,7 +89,7 @@ export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
             <tr className="text-left text-grey">
               <th className="py-2 pr-3">Cin7 category</th>
               <th className="py-2 pr-3">SKUs</th>
-              <th className="py-2 pr-3">Needs assembly</th>
+              <th className="py-2 pr-3">Needs install time</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
               <th className="py-2 pr-3">Built at</th>
@@ -170,7 +170,7 @@ export function SkuEffortEditor({
       <form action={action} className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
-            <span className="mb-1 block text-grey">Needs assembly</span>
+            <span className="mb-1 block text-grey">Needs install time</span>
             <select name="needsAssembly" defaultValue="" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
               <option value="">Leave</option>
               <option value="yes">Yes</option>

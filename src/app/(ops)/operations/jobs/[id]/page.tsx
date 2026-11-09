@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PriceWorkings } from "@/components/price-workings";
 import { Badge, Card } from "@/components/ui";
 import { AccessLinkButton } from "@/components/access-link-button";
 import { RequirementOverrideForm } from "@/components/requirement-override-form";
 import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
+import { createClient } from "@/lib/supabase/server";
+import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { formatDate, formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
@@ -23,7 +26,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   }
   if (!job) notFound();
   const requirements = await getJobRequirements(id).catch(() => null);
+  const internal = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
   const canOverride = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
+  const workings = internal ? await (await createClient()).rpc("orbit_job_workings", { p_job_id: id }) : { data: null };
+  const saved = workings.data as { breakdown?: QuoteBreakdown; flags?: string[]; notice?: string | null; customerPrice?: number | null; segment?: string | null; markup?: number | null } | null;
 
   const address = [job.site?.address_line1, job.site?.city, job.site?.postcode].filter(Boolean).join(", ");
 
@@ -40,7 +46,24 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <p className="mt-2 text-ink/70">Status is read-only. The server changes it when the rules are met.</p>
       </div>
 
-      {requirements ? (
+      {saved?.breakdown && saved.customerPrice != null ? (
+        <PriceWorkings
+          breakdown={saved.breakdown}
+          notice={saved.notice ?? null}
+          customerPrice={saved.customerPrice}
+          segment={saved.segment ?? null}
+          markup={saved.markup ?? null}
+          flags={saved.flags ?? []}
+        />
+      ) : null}
+
+      {requirements && !internal ? (
+        <Link href={`/operations/jobs/${job.id}/schedule`} className="inline-block text-sm font-semibold text-ink underline decoration-red">
+          Pencil a day
+        </Link>
+      ) : null}
+
+      {requirements && internal ? (
         <Card>
           <h2 className="font-display text-2xl">Required resources</h2>
           <p className="mt-2 text-sm text-grey">

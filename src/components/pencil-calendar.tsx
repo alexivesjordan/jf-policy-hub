@@ -12,12 +12,14 @@ export function PencilCalendar({
   resources,
   busyByDay,
   days,
+  revealResources = true,
 }: {
   jobId: string;
   requirements: JobRequirements;
   resources: PoolResource[];
   busyByDay: Record<string, string[]>;
   days: string[];
+  revealResources?: boolean;
 }) {
   const [state, action, pending] = useActionState(pencilJobDay, null);
 
@@ -33,10 +35,10 @@ export function PencilCalendar({
                 key={day}
                 type="button"
                 className="rounded-2xl border border-line bg-card px-3 py-3 text-left text-sm text-grey"
-                title={plan.summary}
+                title={revealResources ? plan.summary : undefined}
               >
                 <span className="block font-semibold text-ink">{label}</span>
-                <span className="mt-2 block text-xs leading-5">{plan.summary}</span>
+                <span className="mt-2 block text-xs leading-5">{revealResources ? plan.summary : "Unavailable"}</span>
               </button>
             );
           }
@@ -48,10 +50,10 @@ export function PencilCalendar({
                 type="submit"
                 disabled={pending}
                 className="h-full w-full rounded-2xl border border-red bg-card px-3 py-3 text-left text-sm text-ink hover:bg-red hover:text-white"
-                title={plan.summary}
+                title={revealResources ? plan.summary : undefined}
               >
                 <span className="block font-semibold">{label}</span>
-                <span className="mt-2 block text-xs">All resources free</span>
+                <span className="mt-2 block text-xs">{revealResources ? "All resources free" : "Available"}</span>
               </button>
             </form>
           );
