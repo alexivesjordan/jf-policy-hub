@@ -37,6 +37,7 @@ export async function saveCin7CategoryDefaults(_state: ActionState, formData: Fo
     const crews = formData.getAll("crew").map(String);
     const minutes = formData.getAll("minutes").map(String);
     const notes = formData.getAll("notes").map(String);
+    const units = formData.getAll("effortUnit").map(String);
     const locations = formData.getAll("buildLocation").map(String);
     const hqMinutes = formData.getAll("hqMinutes").map(String);
     const hqCrews = formData.getAll("hqCrew").map(String);
@@ -46,6 +47,7 @@ export async function saveCin7CategoryDefaults(_state: ActionState, formData: Fo
       needs_assembly: assembly[index] === "yes" ? true : assembly[index] === "no" ? false : null,
       crew: crews[index] ? Number(crews[index]) : null,
       build_minutes: minutes[index] ? Number(minutes[index]) : null,
+      effort_unit: units[index] === "tile" || units[index] === "m2" ? units[index] : "each",
       build_location: locations[index] === "hq" ? "hq" : "site",
       hq_build_minutes: hqMinutes[index] ? Number(hqMinutes[index]) : null,
       hq_build_crew: hqCrews[index] ? Number(hqCrews[index]) : null,
@@ -70,6 +72,7 @@ export async function saveMissingCategoryDefaults(_state: ActionState, formData:
     const crews = formData.getAll("crew").map(String);
     const minutes = formData.getAll("minutes").map(String);
     const notes = formData.getAll("notes").map(String);
+    const units = formData.getAll("effortUnit").map(String);
     const locations = formData.getAll("buildLocation").map(String);
     const hqMinutes = formData.getAll("hqMinutes").map(String);
     const hqCrews = formData.getAll("hqCrew").map(String);
@@ -80,6 +83,7 @@ export async function saveMissingCategoryDefaults(_state: ActionState, formData:
         needs_assembly: assembly[index] === "yes" ? true : assembly[index] === "no" ? false : null,
         crew: crews[index] ? Number(crews[index]) : null,
         build_minutes: minutes[index] ? Number(minutes[index]) : null,
+        effort_unit: units[index] === "tile" || units[index] === "m2" ? units[index] : "each",
         build_location: locations[index] === "hq" ? "hq" : "site",
         hq_build_minutes: hqMinutes[index] ? Number(hqMinutes[index]) : null,
         hq_build_crew: hqCrews[index] ? Number(hqCrews[index]) : null,
@@ -123,6 +127,7 @@ export async function bulkUpdateSkuEffort(_state: ActionState, formData: FormDat
       p_hq_minutes: hqMinutes ? Number(hqMinutes) : null,
       p_hq_crew: hqCrew ? Number(hqCrew) : null,
       p_position_minutes: placement ? Number(placement) : null,
+      p_effort_unit: ["each", "tile", "m2"].includes(String(formData.get("effortUnit") ?? "")) ? String(formData.get("effortUnit")) : null,
     });
     if (error) throw new Error(messageFromError(error, "Could not update those rows."));
     revalidatePath("/operations/settings");
@@ -150,6 +155,7 @@ export async function importSkuEffort(_state: ActionState, formData: FormData): 
         needs_assembly: column(record, "needs_assembly"),
         crew: column(record, "crew"),
         build_minutes: column(record, "build_minutes"),
+        effort_unit: column(record, "effort_unit"),
         build_location: column(record, "build_location"),
         hq_build_minutes: column(record, "hq_build_minutes"),
         hq_build_crew: column(record, "hq_build_crew"),

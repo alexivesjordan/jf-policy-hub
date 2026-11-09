@@ -33,6 +33,7 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
               <th className="py-2 pr-3">Needs install time</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
+              <th className="py-2 pr-3">Unit</th>
               <th className="py-2 pr-3">Built at</th>
               <th className="py-2 pr-3">HQ minutes</th>
               <th className="py-2 pr-3">HQ crew</th>
@@ -56,7 +57,14 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
                   </select>
                 </td>
                 <td className="py-2 pr-3"><Input name="crew" type="number" min="1" max="6" defaultValue={row.crew ?? ""} /></td>
-                <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" defaultValue={row.build_minutes ?? ""} /></td>
+                <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" step="0.1" defaultValue={row.build_minutes ?? ""} /></td>
+                <td className="py-2 pr-3">
+                  <select name="effortUnit" defaultValue={row.effort_unit === "tile" || row.effort_unit === "m2" ? row.effort_unit : "each"} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+                    <option value="each">Each</option>
+                    <option value="tile">Tile</option>
+                    <option value="m2">m²</option>
+                  </select>
+                </td>
                 <td className="py-2 pr-3">
                   <select name="buildLocation" defaultValue={row.build_location === "hq" ? "hq" : "site"} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
                     <option value="site">Site</option>
@@ -92,6 +100,7 @@ export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
               <th className="py-2 pr-3">Needs install time</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
+              <th className="py-2 pr-3">Unit</th>
               <th className="py-2 pr-3">Built at</th>
               <th className="py-2 pr-3">HQ minutes</th>
               <th className="py-2 pr-3">HQ crew</th>
@@ -115,7 +124,14 @@ export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
                   </select>
                 </td>
                 <td className="py-2 pr-3"><Input name="crew" type="number" min="1" max="6" /></td>
-                <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" /></td>
+                <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" step="0.1" /></td>
+                <td className="py-2 pr-3">
+                  <select name="effortUnit" defaultValue="each" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+                    <option value="each">Each</option>
+                    <option value="tile">Tile</option>
+                    <option value="m2">m²</option>
+                  </select>
+                </td>
                 <td className="py-2 pr-3">
                   <select name="buildLocation" defaultValue="site" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
                     <option value="site">Site</option>
@@ -187,6 +203,15 @@ export function SkuEffortEditor({
             <Input name="minutes" type="number" min="0" max="480" />
           </label>
           <label className="text-sm">
+            <span className="mb-1 block text-grey">Unit</span>
+            <select name="effortUnit" defaultValue="" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+              <option value="">Leave</option>
+              <option value="each">Each</option>
+              <option value="tile">Tile</option>
+              <option value="m2">m²</option>
+            </select>
+          </label>
+          <label className="text-sm">
             <span className="mb-1 block text-grey">Built at</span>
             <select name="buildLocation" defaultValue="" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
               <option value="">Leave</option>
@@ -223,6 +248,7 @@ export function SkuEffortEditor({
                 <th className="py-2 pr-3">Product</th>
                 <th className="py-2 pr-3">Cin7 category</th>
                 <th className="py-2 pr-3">Assembly</th>
+                <th className="py-2 pr-3">Unit</th>
                 <th className="py-2 pr-3">Built at</th>
                 <th className="py-2 pr-3">Crew</th>
                 <th className="py-2 pr-3">Minutes</th>
@@ -237,9 +263,11 @@ export function SkuEffortEditor({
                   <td className="py-2 pr-3">{row.product_name}</td>
                   <td className="py-2 pr-3">
                     {row.cin7_category ?? "—"}
-                    {row.suggestion_rule ? <span className="mt-1 block text-xs text-grey">Name rule: build at HQ</span> : null}
+                    {row.suggestion_rule === "sled-track" ? <span className="mt-1 block text-xs text-grey">Name rule: sled track after flooring</span> : null}
+                    {row.suggestion_rule === "pin-loaded" ? <span className="mt-1 block text-grey text-xs">Name rule: build at HQ</span> : null}
                   </td>
                   <td className="py-2 pr-3">{row.needs_assembly == null ? "Unknown" : row.needs_assembly ? "Yes" : "No"}</td>
+                  <td className="py-2 pr-3">{row.effort_unit === "m2" ? "m²" : row.effort_unit === "tile" ? "Tile" : "Each"}{row.cin7_uom ? <span className="mt-1 block text-xs text-grey">Cin7 {row.cin7_uom}</span> : null}</td>
                   <td className="py-2 pr-3">{row.build_location === "hq" ? "HQ" : "Site"}</td>
                   <td className="py-2 pr-3">{row.crew ?? "—"}</td>
                   <td className="py-2 pr-3">{row.build_location === "hq" ? `HQ ${row.hq_build_minutes ?? "—"} / place ${row.site_position_minutes ?? "—"}` : (row.build_minutes ?? "—")}</td>
