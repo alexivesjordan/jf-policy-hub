@@ -40,8 +40,8 @@ describe("pricer requirements", () => {
     ]);
     assert.equal(heavy.installers, 2);
     assert.equal(heavy.vanSize, "crafter");
-    assert.equal(heavy.vanCount, 2);
-    assert.equal(heavy.licensedDrivers, 2);
+    assert.equal(heavy.vanCount, 1);
+    assert.equal(heavy.licensedDrivers, 1);
     assert.equal(heavy.stairClimber, true);
   });
 

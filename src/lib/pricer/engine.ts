@@ -1,5 +1,5 @@
 import { deriveJobRequirements, type JobRequirements } from "@/lib/orbit/requirements";
-import { compareStays, driverCheck, type QuoteBreakdown } from "@/lib/pricer/breakdown";
+import { compareStays, driverCheck, evaluateCrewPlans, type QuoteBreakdown } from "@/lib/pricer/breakdown";
 import type { EffortRow } from "@/lib/pricer/effort-table";
 import {
   BEST_CASE_NOTICE,
@@ -44,6 +44,8 @@ export type QuoteLineInput = {
   productName: string;
   category?: string | null;
   qty: number;
+  /** Test-fixture weight when the effort row has none. Not a Cin7 field. */
+  unitWeightKg?: number | null;
 };
 
 /** Admin-edited build assumption for a category. Exact product rows still win. */
@@ -244,6 +246,7 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
   if (/performance strength/i.test(line.productName) && /pin loaded/i.test(line.productName)) {
     const standIn = table.find((row) => row.productLine?.startsWith("DHZ-GENERIC") && row.category === "strength-selectorised");
     if (standIn) {
+      const effort = defaults.find((item) => item.category === standIn.category);
       return {
         productName: line.productName,
         qty: line.qty,
@@ -251,7 +254,13 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
         category: standIn.category,
         provisional: true,
         note: "HQ-built Performance Strength pin-loaded, tail-lift lorry",
-        row: { ...standIn, productName: line.productName, sku: line.sku?.trim() || null },
+        row: {
+          ...standIn,
+          productName: line.productName,
+          sku: line.sku?.trim() || null,
+          hqBuildMinutes: effort?.buildMinutes ?? standIn.hqBuildMinutes,
+          hqBuildCrew: effort?.buildCrew ?? standIn.hqBuildCrew,
+        },
       };
     }
   }
@@ -373,7 +382,7 @@ function handlingRow(productName: string, category: string): EffortRow {
     productLine: null,
     category,
     buildLocation: "site",
-    crateAtHq: true,
+    crateAtHq: false,
     buildCrew: 1,
     buildMinutes: 0,
     hqBuildCrew: null,
@@ -462,11 +471,19 @@ type Costed = {
   hotel: number;
   food: number;
   speedMph: number;
+  wallClockHours: number;
   flags: string[];
   provisional: string[];
   bigInstallTriggers: string[];
   manualReasons: string[];
 };
+
+function applyLineWeight(line: QuoteLineInput, resolved: ResolvedLine): ResolvedLine {
+  if (line.unitWeightKg == null || !resolved.row || resolved.row.buildLocation === "hq" || resolved.row.unitWeightKg != null) {
+    return resolved;
+  }
+  return { ...resolved, row: { ...resolved.row, unitWeightKg: line.unitWeightKg } };
+}
 
 function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, speedMph: number = RATES.effectiveSpeedMph): Costed {
   const flags: string[] = [];
@@ -480,8 +497,9 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
   flags.push("handover_minutes is UNSET and excluded");
   let carryPersonMinutes = 0;
   let kitKg = 0;
-  let hqKg = 0;
-  let siteKg = 0;
+  let siteBuildKg = 0;
+  let looseKg = 0;
+  let hqUnits = 0;
   let unknownWeight = false;
   let high = false;
   let hasFlooring = false;
@@ -518,8 +536,9 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
       flags.push(`weight unknown on ${line.productName}`);
     } else {
       kitKg += weight.kg * line.qty;
-      if (row.buildLocation === "hq") hqKg += weight.kg * line.qty;
-      else siteKg += weight.kg * line.qty;
+      if (row.buildLocation === "hq") hqUnits += line.qty;
+      else if (line.match === "handling_only") looseKg += weight.kg * line.qty;
+      else siteBuildKg += weight.kg * line.qty;
       if (weight.estimated) {
         flags.push(`weight estimated from band on ${line.productName}`);
         provisional.add("weight_band midpoint");
@@ -568,6 +587,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
       hotel: 0,
       food: 0,
       speedMph,
+      wallClockHours: 0,
       flags: ["Subcontractor price pending — crew is above the in-house threshold."],
       provisional: [],
       bigInstallTriggers: [],
@@ -575,50 +595,60 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     };
   }
 
+  const tripMinutes = profile.stairs === "none" ? 1.5 : profile.stairs === "1" ? 2.25 : 2.75;
+  const carryWallMinutes = maxCrew > 0 ? (looseKg / 22) * tripMinutes / maxCrew : 0;
+  const unpackWallMinutes = maxCrew > 0 ? (siteBuildKg / 100) * 5 / maxCrew : 0;
+  onSiteMinutes += carryWallMinutes + unpackWallMinutes;
+
   const sitePersonMinutes = onSiteMinutes * maxCrew + carryPersonMinutes;
-  const wallClockHours = (onSiteMinutes + carryPersonMinutes / maxCrew) / 60;
+  const wallClockHours = onSiteMinutes / 60;
   const travelHours = (miles * 2) / speedMph;
   const doorToDoor = travelHours + wallClockHours;
   const hourly = effectiveHourlyRate();
-  const overtimeRate = hourly * RATES.overtimeMultiplier;
-  const vans = siteKg > 0 ? Math.max(1, Math.ceil(siteKg / RATES.vanPayloadKg)) : 1;
-  const vehicle = miles * 2 * RATES.vehicleRate * vans;
-  const hqPallets = hqKg > 0 ? Math.ceil(hqKg / RATES.palletCapacityKg) : 0;
-  const siteOverflow = Math.max(0, siteKg - vans * RATES.vanPayloadKg);
-  const sitePallets = siteOverflow > 0 ? Math.ceil(siteOverflow / RATES.palletCapacityKg) : 0;
-  const freight = (hqPallets + sitePallets) * RATES.palletRate;
+  const vans = 1;
+  const roundTripMiles = miles * 2;
+  const siteKitKg = siteBuildKg + looseKg;
+  const overflowKg = Math.max(0, siteKitKg - vans * RATES.vanPayloadKg);
+  const sitePallets = overflowKg > 0 ? Math.ceil(overflowKg / RATES.palletCapacityKg) : 0;
+  const freight = sitePallets * RATES.palletRate;
+  if (hqUnits > 0) {
+    flags.push(`${hqUnits} assembled units need oversized pallets. oversize_pallet_rate is UNSET — needs a Lynnstar per-job quote.`);
+  }
   let days = 1;
   let nights = 0;
   let hotel = 0;
   let food = 0;
   let labour = 0;
+  let vehicle = roundTripMiles * RATES.vehicleRate * vans;
   if (doorToDoor <= RATES.dayThresholdHours) {
     const ordinary = Math.min(doorToDoor, 8);
     const overtime = Math.max(0, doorToDoor - 8);
-    labour = maxCrew * (ordinary * hourly + overtime * overtimeRate);
+    labour = maxCrew * (ordinary * hourly + overtime * hourly * RATES.overtimeMultiplier);
     flags.push("food_trigger is UNSET; food was not applied");
   } else {
-    const siteHours = wallClockHours;
-    days = Math.max(1, Math.ceil(siteHours / 8 - 1e-9));
-    nights = Math.max(0, days - 1);
-    const oneWay = travelHours / 2;
-    let remaining = siteHours;
-    for (let day = 0; day < days; day += 1) {
-      const site = Math.min(8, remaining);
-      remaining -= site;
-      const travel = day === 0 || day === days - 1 ? oneWay : 0;
-      const hours = site + travel;
-      labour += maxCrew * (Math.min(hours, 8) * hourly + Math.max(0, hours - 8) * overtimeRate);
-    }
-    hotel = nights * maxCrew * RATES.hotelRate;
-    food = days * maxCrew * RATES.foodRate;
-    flags.push(`Overnight stay: ${days} days, ${nights} nights, one round trip.`);
+    const choice = evaluateCrewPlans({
+      siteHours: wallClockHours,
+      travelHours,
+      roundTripMiles,
+      crew: maxCrew,
+      vans,
+      freight: 0,
+      consumables: 0,
+      contingency: 0,
+      hourly,
+    }).chosen;
+    days = choice.days;
+    nights = choice.nights;
+    labour = choice.labour;
+    vehicle = choice.vehicle;
+    hotel = choice.hotel;
+    food = choice.food;
+    flags.push(`Crew plan: ${choice.label}. ${days} days, ${nights} nights.`);
   }
   const machines = lines.filter((line) => line.row && line.row.category !== "weights" && line.row.category !== "flooring").reduce((sum, line) => sum + line.qty, 0);
   const consumables = machines * RATES.tagCost;
   provisional.add("tag_cost_per_unit");
   flags.push("cover_cost_per_unit and leave_behind_pack_cost are UNSET and excluded");
-  flags.push("food_trigger is UNSET; food was not applied");
 
   let contingency = RATES.contingencyBase;
   provisional.add("contingency_base");
@@ -701,6 +731,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     hotel: roundMoney(hotel),
     food: roundMoney(food),
     speedMph,
+    wallClockHours: roundMoney(wallClockHours),
     flags: [...new Set(flags)],
     provisional: [...provisional],
     bigInstallTriggers: triggers,
@@ -714,7 +745,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
   const distance = request.miles != null
     ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
     : estimateMilesFromKingsLynn(request.postcode);
-  const resolved = request.lines.map((line) => matchLine(line, request.table, request.categoryDefaults ?? []));
+  const resolved = request.lines.map((line) => applyLineWeight(line, matchLine(line, request.table, request.categoryDefaults ?? [])));
   const missing = resolved.filter((line) => line.match === "missing");
 
   const base: PriceResult = {
@@ -910,7 +941,7 @@ function describeBreakdown(
     buildLines: costed.buildLines,
     positionLines: costed.positionLines,
     handover: "UNSET",
-    onSiteHours: roundMoney(onSiteMinutes / 60),
+    onSiteHours: costed.wallClockHours,
     carryHours: roundMoney(costed.carryMinutes / 60),
     hq: costed.hqCost > 0 || costed.hqLines.length > 0
       ? {
@@ -951,12 +982,34 @@ function describeBreakdown(
     singleShift: stays.singleShift,
     commute: stays.commute,
     stayOvernight: stays.stayOvernight,
+    crewPlans: crewPlanTable(costed, distance),
     bigInstall: costed.bigInstallTriggers.length > 0,
     bigInstallTriggers: costed.bigInstallTriggers,
     paymentGate: gate,
     assumptions: [...new Set(costed.provisional)],
     unset: [...unset, ...flags.filter((flag) => /UNSET|not set|not configured/i.test(flag))],
   };
+}
+
+function crewPlanTable(
+  costed: Costed,
+  distance: { miles: number; speedMph: number },
+): QuoteBreakdown["crewPlans"] {
+  const ranked = evaluateCrewPlans({
+    siteHours: costed.wallClockHours,
+    travelHours: (distance.miles * 2) / distance.speedMph,
+    roundTripMiles: distance.miles * 2,
+    crew: costed.crew,
+    vans: costed.vans,
+    freight: costed.freight,
+    consumables: costed.consumables,
+    contingency: costed.contingencyRate,
+    hourly: effectiveHourlyRate(),
+  });
+  return ranked.plans.map((plan) => ({
+    ...plan,
+    note: plan.id === ranked.chosen.id ? `${plan.note} Recommended.` : plan.note,
+  }));
 }
 
 function requirementsFor(lines: ResolvedLine[], crew: number): JobRequirements {

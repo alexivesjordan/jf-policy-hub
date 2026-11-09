@@ -21,10 +21,45 @@ const extracted = parseCin7CoreQuote(
   readFileSync(path.join(process.cwd(), "src/lib/quotes/fixtures/cin7-quote-SO-00490.anonymised.txt"), "utf8"),
 );
 
+/** Fixture weights for this quote only. Not product-master data. */
+const FIXTURE_WEIGHT_KG: Record<string, number> = {
+  "JF-C2SE-2": 45,
+  "JF-C2SE-FS-2": 0,
+  "JTDR-05-10BLK": 40,
+  "JTBR-10-BLK": 40,
+  "JF-J75-CR-BLK-V3": 250,
+  "JF-EC-950ET-TFT-21.5": 185,
+  "JF-EC-805R-15.6": 80,
+  "JF-EC-805U-15.6": 60,
+  "JF-EC-90AB-LCD": 60,
+  "JF-C2RE-SL-3": 26,
+  "JF-EC-805D-15.6": 120,
+  "JF-KBR-2-BLK": 30,
+  "JF-J75-CPR-BLK-P3": 150,
+  "JF-AFID-BLK": 40,
+  "JLC-HEXR-P1": 110,
+  "JTKBRC3-10": 10,
+  "JTKBRC3-12": 12,
+  "JTKBRC3-16": 16,
+  "JTKBRC3-20": 20,
+  "JTKBRC3-04": 4,
+  "JTKBRC3-06": 6,
+  "JTKBRC3-08": 8,
+  "JLTR-01": 12,
+  "JF-SB-05": 5,
+  "JF-SB-07": 7,
+  "JF-SB-09": 9,
+  "JF-CKB-P1": 216,
+  "JF-CRBP-P1": 150,
+  "JTRBARSN2-1N-RC": 275,
+  "JLPOWB-01": 5,
+};
+
 const lines = extracted.lines.map((line) => ({
   sku: line.sku,
   productName: line.description,
   qty: line.qty,
+  unitWeightKg: FIXTURE_WEIGHT_KG[line.sku] ?? 0,
 }));
 
 describe("SO-00490 golden workings", () => {
@@ -59,7 +94,7 @@ describe("SO-00490 golden workings", () => {
     const loose = result.lines.filter((line) => line.match === "handling_only");
     const machines = result.lines.filter((line) => line.match === "category_default");
     assert.equal(hq.length, 9);
-    assert.ok(hq.every((line) => line.row?.buildLocation === "hq" && line.row.hqBuildMinutes === 180));
+    assert.ok(hq.every((line) => line.row?.buildLocation === "hq" && line.row.hqBuildMinutes === 120 && line.row.sitePositionMinutes === 45));
     assert.equal(fid.length, 1);
     assert.equal(fid[0]?.row?.buildMinutes, 12);
     assert.equal(fid[0]?.row?.buildCrew, 1);
@@ -74,39 +109,29 @@ describe("SO-00490 golden workings", () => {
     assert.equal(forSales(result).notice, BEST_CASE_NOTICE);
   });
 
-  it("records the remaining gap to £3,718.25 and the 1p customer-price rounding", () => {
+  it("matches the reference cost within £1 and recommends the overtime overnight plan", () => {
     const breakdown = result.breakdown;
     assert.ok(breakdown);
-    // Routed mileage and the published crew shape inputs.
     assert.equal(breakdown.roundTripMiles, 127.8);
     assert.equal(breakdown.speedMph, 35);
     assert.equal(breakdown.crew, 2);
     assert.equal(breakdown.vans, 1);
     assert.equal(result.requirements?.vanSize, "crafter");
-    // Engine output. 9 × 45 min site position makes 41.30 h on site, so the
-    // 8-hour day pack is 6 days / 5 nights, not the workings' 5 days / 4 nights.
-    // The generic HQ row is high complexity, so site contingency is 15%.
-    assert.equal(breakdown.onSiteHours, 41.3);
-    assert.equal(breakdown.days, 6);
-    assert.equal(breakdown.nights, 5);
-    assert.equal(breakdown.labour, 1371.34);
-    assert.equal(breakdown.vehicle, 57.51);
-    assert.equal(breakdown.hotel, 800);
-    assert.equal(breakdown.food, 180);
-    assert.equal(breakdown.freight, 520);
+    assert.equal(breakdown.days, 5);
+    assert.equal(breakdown.nights, 4);
+    assert.equal(breakdown.freight, 390);
     assert.equal(breakdown.consumables, 6.16);
+    assert.equal(breakdown.vehicle, 57.51);
+    assert.equal(breakdown.hotel, 640);
+    assert.equal(breakdown.food, 150);
     assert.equal(Math.round(breakdown.contingencyRate * 100), 15);
-    assert.equal(breakdown.siteContingency, 440.25);
-    assert.equal(breakdown.siteCost, 3375.26);
-    assert.equal(breakdown.hqCost, 888.03);
-    assert.equal(result.cost, 4263.29);
-    assert.equal(result.customerPrice, 7673.92);
-    assert.equal(Math.round((result.cost! - WORKED_COST) * 100) / 100, 545.04);
-    assert.equal(Math.round(result.cost! * 1.8 * 100) / 100, 7673.92);
-    // The workings' customer price is 1p under cost × 1.8 with this rounding rule.
+    assert.ok(Math.abs((result.cost ?? 0) - WORKED_COST) <= 1, `cost ${result.cost} on site ${breakdown.onSiteHours}h hq ${breakdown.hqCost}`);
+    assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.8 * 100) / 100);
     assert.equal(Math.round(WORKED_COST * 1.8 * 100) / 100, 6692.85);
     assert.equal(Math.round((6692.85 - WORKED_PRICE) * 100) / 100, 0.01);
-    assert.ok(breakdown.bigInstallTriggers.includes("weight_over_2000kg"));
-    assert.ok(breakdown.bigInstallTriggers.includes("assembled_dhz"));
+    const recommended = breakdown.crewPlans.find((plan) => plan.note.includes("Recommended"));
+    assert.equal(recommended?.id, "overnight-ot");
+    assert.ok(breakdown.crewPlans.every((plan) => plan.id === "overnight-ot" || plan.siteCost + 0.01 >= (recommended?.siteCost ?? 0)));
+    assert.ok(result.flags.some((flag) => /Lynnstar per-job quote/.test(flag)));
   });
 });

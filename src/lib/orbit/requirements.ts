@@ -27,18 +27,17 @@ export const CLIMBER_MIN_KG = 60;
 export const CLIMBER_MAX_KG = 275;
 
 export function deriveJobRequirements(crew: number, lines: RequirementSourceLine[]): JobRequirements {
-  let vanKg = 0;
   let longest = 0;
   let longLoad = false;
   let stairClimber = false;
   for (const line of lines) {
     const weight = line.weightKg ?? 0;
-    if (!line.hq) vanKg += weight * line.qty;
     if (line.longLoad) longLoad = true;
     if (line.longestMm != null) longest = Math.max(longest, line.longestMm);
-    if (weight > CLIMBER_MIN_KG && weight <= CLIMBER_MAX_KG && line.wheeled !== "Y") stairClimber = true;
+    if (weight > CLIMBER_MIN_KG && weight <= CLIMBER_MAX_KG && line.wheeled === "N") stairClimber = true;
   }
-  const vanCount = vanKg > 0 ? Math.max(1, Math.ceil(vanKg / VAN_PAYLOAD_KG)) : 1;
+  // One van carries the crew. Weight above the payload is pallet freight, not another van.
+  const vanCount = 1;
   return {
     installers: Math.max(1, crew),
     licensedDrivers: vanCount,

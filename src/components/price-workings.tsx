@@ -79,6 +79,14 @@ export function PriceWorkings({
         <p className="mt-3">Crew {breakdown.crew}. Vans {breakdown.vans}. Licensed drivers {breakdown.licensedDrivers}. {breakdown.days} day{breakdown.days === 1 ? "" : "s"} / {breakdown.nights} night{breakdown.nights === 1 ? "" : "s"} at {breakdown.speedMph} mph.</p>
         <p>Hotel {money(breakdown.hotel)}. Food {money(breakdown.food)}.</p>
         <p>{breakdown.driverCheck}</p>
+        <p className="mt-3 font-semibold">Crew plans</p>
+        {breakdown.crewPlans.map((plan) => (
+          <p key={plan.id}>
+            {plan.label}: {plan.days} day{plan.days === 1 ? "" : "s"} / {plan.nights} night{plan.nights === 1 ? "" : "s"}
+            {" · "}labour {money(plan.labour)} · site {money(plan.siteCost)}
+            {plan.note.includes("Recommended") ? " — recommended" : ""}
+          </p>
+        ))}
         <p className="mt-3 font-semibold">Overnight versus commute</p>
         {[breakdown.singleShift, breakdown.commute, breakdown.stayOvernight].map((option) => (
           <p key={option.label}>

@@ -20,6 +20,8 @@ export const RATES = {
   palletRate: 65,
   palletCapacityKg: 400,
   dayThresholdHours: 12,
+  /** Default site window 08:00–17:00. A day may run past 8 h inside this window. */
+  siteWindowHours: 9,
   sitePrepMinutes: 45,
   repeatRate: 0.8,
   contingencyBase: 0.1,

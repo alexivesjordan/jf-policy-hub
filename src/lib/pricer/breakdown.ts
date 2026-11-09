@@ -68,12 +68,124 @@ export type QuoteBreakdown = {
   singleShift: StayOption;
   commute: StayOption;
   stayOvernight: StayOption;
+  crewPlans: CrewPlan[];
   bigInstall: boolean;
   bigInstallTriggers: string[];
   paymentGate: string;
   assumptions: string[];
   unset: string[];
 };
+
+export type CrewPlan = {
+  id: "overnight-ot" | "overnight-straight" | "commute";
+  label: string;
+  days: number;
+  nights: number;
+  ordinaryHours: number;
+  overtimeHours: number;
+  labour: number;
+  vehicle: number;
+  hotel: number;
+  food: number;
+  siteCost: number;
+  fitsWindow: boolean;
+  note: string;
+};
+
+/** Cheapest of: OT inside 08:00–17:00, an extra night with no OT, or commuting each day. */
+export function evaluateCrewPlans(input: {
+  siteHours: number;
+  travelHours: number;
+  roundTripMiles: number;
+  crew: number;
+  vans: number;
+  freight: number;
+  consumables: number;
+  contingency: number;
+  hourly: number;
+}): { plans: CrewPlan[]; chosen: CrewPlan } {
+  const overtimeRate = input.hourly * RATES.overtimeMultiplier;
+  const siteCost = (labour: number, vehicle: number, hotel: number, food: number) =>
+    (labour + vehicle + input.freight + input.consumables + hotel + food) * (1 + input.contingency);
+
+  const overnightDays = Math.max(1, Math.ceil(input.siteHours / RATES.siteWindowHours - 1e-9));
+  const overnightHours = input.siteHours + input.travelHours;
+  const ordinary = Math.min(overnightHours, overnightDays * 8);
+  const overtime = Math.max(0, overnightHours - ordinary);
+  const overnightLabour = input.crew * (ordinary * input.hourly + overtime * overtimeRate);
+  const overnightVehicle = input.roundTripMiles * RATES.vehicleRate * input.vans;
+  const overnightHotel = Math.max(0, overnightDays - 1) * input.crew * RATES.hotelRate;
+  const overnightFood = overnightDays * input.crew * RATES.foodRate;
+
+  const straightDays = Math.max(1, Math.ceil(input.siteHours / 8 - 1e-9));
+  const straightLabour = input.crew * overnightHours * input.hourly;
+  const straightHotel = Math.max(0, straightDays - 1) * input.crew * RATES.hotelRate;
+  const straightFood = straightDays * input.crew * RATES.foodRate;
+
+  const commuteLabourParts = (() => {
+    let labour = 0;
+    let left = input.siteHours;
+    for (let day = 0; day < straightDays; day += 1) {
+      const site = Math.min(8, left);
+      left -= site;
+      const hours = site + input.travelHours;
+      labour += input.crew * (Math.min(hours, 8) * input.hourly + Math.max(0, hours - 8) * overtimeRate);
+    }
+    return labour;
+  })();
+  const commuteVehicle = straightDays * input.roundTripMiles * RATES.vehicleRate * input.vans;
+  const commuteFood = straightDays * input.crew * RATES.foodRate;
+
+  const plans: CrewPlan[] = [
+    {
+      id: "overnight-ot",
+      label: "Overnight, overtime inside 08:00–17:00",
+      days: overnightDays,
+      nights: Math.max(0, overnightDays - 1),
+      ordinaryHours: roundMoney(ordinary),
+      overtimeHours: roundMoney(overtime),
+      labour: roundMoney(overnightLabour),
+      vehicle: roundMoney(overnightVehicle),
+      hotel: roundMoney(overnightHotel),
+      food: roundMoney(overnightFood),
+      siteCost: roundMoney(siteCost(overnightLabour, overnightVehicle, overnightHotel, overnightFood)),
+      fitsWindow: true,
+      note: "Each site day stays inside 08:00–17:00. Travel is one round trip.",
+    },
+    {
+      id: "overnight-straight",
+      label: "Overnight, no overtime",
+      days: straightDays,
+      nights: Math.max(0, straightDays - 1),
+      ordinaryHours: roundMoney(overnightHours),
+      overtimeHours: 0,
+      labour: roundMoney(straightLabour),
+      vehicle: roundMoney(overnightVehicle),
+      hotel: roundMoney(straightHotel),
+      food: roundMoney(straightFood),
+      siteCost: roundMoney(siteCost(straightLabour, overnightVehicle, straightHotel, straightFood)),
+      fitsWindow: true,
+      note: "Packs the site into 8 h days. The extra night costs more than the overtime it saves when the window can absorb the hours.",
+    },
+    {
+      id: "commute",
+      label: "Commute each day",
+      days: straightDays,
+      nights: 0,
+      ordinaryHours: 0,
+      overtimeHours: 0,
+      labour: roundMoney(commuteLabourParts),
+      vehicle: roundMoney(commuteVehicle),
+      hotel: 0,
+      food: roundMoney(commuteFood),
+      siteCost: roundMoney(siteCost(commuteLabourParts, commuteVehicle, 0, commuteFood)),
+      fitsWindow: true,
+      note: "A round trip every day. No hotel.",
+    },
+  ];
+  const chosen = plans.reduce((best, plan) => (plan.siteCost < best.siteCost ? plan : best));
+  return { plans, chosen };
+}
 
 export function compareStays(input: {
   onSiteMinutes: number;
