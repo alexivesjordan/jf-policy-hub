@@ -1,4 +1,4 @@
-import type { JobRequirements, VanSize } from "@/lib/orbit/requirements";
+import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 
 export type PoolResource = {
   id: string;

@@ -4,7 +4,7 @@ import { Badge, Card } from "@/components/ui";
 import { AccessLinkButton } from "@/components/access-link-button";
 import { RequirementOverrideForm } from "@/components/requirement-override-form";
 import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
-import { canOverrideRequirements } from "@/lib/orbit/requirements";
+import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { formatDate, formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 

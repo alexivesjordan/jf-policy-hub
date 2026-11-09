@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const storageKey = "orbit-theme";
+const storageKey = "pulse-theme";
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">("light");

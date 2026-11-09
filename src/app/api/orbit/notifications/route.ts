@@ -1,16 +1,16 @@
 import { connection } from "next/server";
-import { orbitRpcError } from "@/lib/orbit/http";
-import { orbitSession } from "@/lib/orbit/session";
+import { pulseRpcError } from "@/lib/pulse/http";
+import { pulseSession } from "@/lib/pulse/session";
 
 export async function GET(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const unread = new URL(request.url).searchParams.get("unread") === "1";
   const { data, error } = await session.supabase.rpc("orbit_list_notifications", {
     p_unread_only: unread,
   });
-  if (error) return orbitRpcError(error, "Could not load notifications.");
+  if (error) return pulseRpcError(error, "Could not load notifications.");
   return Response.json({ notifications: data ?? [] });
 }

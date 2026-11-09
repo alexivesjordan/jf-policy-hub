@@ -1,4 +1,4 @@
-import { deriveJobRequirements, type JobRequirements } from "@/lib/orbit/requirements";
+import { deriveJobRequirements, type JobRequirements } from "@/lib/pulse/requirements";
 import { compareStays, driverCheck, evaluateCrewPlans, type QuoteBreakdown } from "@/lib/pricer/breakdown";
 import type { EffortRow } from "@/lib/pricer/effort-table";
 import {

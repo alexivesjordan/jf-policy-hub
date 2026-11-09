@@ -35,7 +35,7 @@ async function PasswordContent({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-16">
-      <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Orbit</p>
+      <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
       <h1 className="font-display mt-2 text-4xl">{setup ? "Choose a password" : "Change password"}</h1>
       <p className="mt-3 leading-7 text-grey">
         {setup
@@ -49,7 +49,7 @@ async function PasswordContent({
       {home === null ? (
         <p className="mt-6 text-sm">
           <Link href="/" className="font-semibold text-ink underline decoration-red underline-offset-4">
-            Back to Jordan Orbit
+            Back to Jordan Pulse
           </Link>
         </p>
       ) : null}

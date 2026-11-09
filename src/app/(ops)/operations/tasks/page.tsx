@@ -1,6 +1,6 @@
 import { TaskForm } from "@/components/operations-forms";
 import { Badge, Card } from "@/components/ui";
-import { getOfficeContext, listOrbitTasks } from "@/features/operations/queries";
+import { getOfficeContext, listPulseTasks } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -8,7 +8,7 @@ export const metadata = { title: "Tasks" };
 
 export default async function TasksPage() {
   await requireOperationsUser();
-  const [context, tasks] = await Promise.all([getOfficeContext(), listOrbitTasks()]);
+  const [context, tasks] = await Promise.all([getOfficeContext(), listPulseTasks()]);
   const canCreate = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "hq";
 
   return (

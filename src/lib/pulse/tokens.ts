@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateOrbitToken, hashOrbitToken } from "@/lib/orbit/token-hash";
+import { generatePulseToken, hashPulseToken } from "@/lib/pulse/token-hash";
 
 export type TokenPurpose = "access_form" | "portal" | "subcontractor_job" | "tc_accept";
 
@@ -27,7 +27,7 @@ export async function createTokenLink(input: {
   entityId: string;
   expiresAt?: string | null;
 }) {
-  const issued = generateOrbitToken();
+  const issued = generatePulseToken();
   const admin = adminOrThrow();
   const { data, error } = await admin.rpc("orbit_store_token_link", {
     p_purpose: input.purpose,
@@ -58,7 +58,7 @@ export async function resolveTokenHash(hashHex: string): Promise<ResolvedToken |
 }
 
 export async function resolveTokenLink(token: string): Promise<ResolvedToken | null> {
-  const hashHex = hashOrbitToken(token);
+  const hashHex = hashPulseToken(token);
   if (!hashHex) return null;
   return resolveTokenHash(hashHex);
 }

@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Banner, Button, Field, Input, Select, TextArea } from "@/components/ui";
 import {
   createGateOverride,
-  createOrbitTask,
+  createPulseTask,
   saveCategoryEffort,
   savePricing,
   saveTerms,
@@ -214,7 +214,7 @@ export function GateOverrideForm({ jobs }: { jobs: JobSummary[] }) {
 }
 
 export function TaskForm() {
-  const [state, action, pending] = useActionState(createOrbitTask, null);
+  const [state, action, pending] = useActionState(createPulseTask, null);
   return (
     <form action={action} className="grid gap-4">
       <Field label="Title">

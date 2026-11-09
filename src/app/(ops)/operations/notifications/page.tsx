@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { markAllOrbitNotificationsRead, markOrbitNotificationRead } from "@/features/operations/actions";
-import { listOrbitNotifications } from "@/features/operations/queries";
+import { markAllPulseNotificationsRead, markPulseNotificationRead } from "@/features/operations/actions";
+import { listPulseNotifications } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -8,7 +8,7 @@ export const metadata = { title: "Operations notifications" };
 
 export default async function OperationsNotificationsPage() {
   await requireOperationsUser();
-  const notifications = await listOrbitNotifications(false);
+  const notifications = await listPulseNotifications(false);
   const unread = notifications.some((item) => !item.read_at);
 
   return (
@@ -21,7 +21,7 @@ export default async function OperationsNotificationsPage() {
           </p>
         </div>
         {unread ? (
-          <form action={markAllOrbitNotificationsRead}>
+          <form action={markAllPulseNotificationsRead}>
             <button type="submit" className="text-sm font-semibold text-ink underline decoration-red">
               Mark all read
             </button>
@@ -51,7 +51,7 @@ export default async function OperationsNotificationsPage() {
                   </Link>
                 ) : null}
                 {!item.read_at ? (
-                  <form action={markOrbitNotificationRead}>
+                  <form action={markPulseNotificationRead}>
                     <input type="hidden" name="id" value={item.id} />
                     <button type="submit" className="text-ink/70">
                       Mark read

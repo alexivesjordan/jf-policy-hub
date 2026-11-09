@@ -1,7 +1,7 @@
 import { canUseOperations, canUsePeople, homeRedirect } from "../src/lib/access";
 import type { Profile } from "../src/lib/types";
-import { generateOrbitToken, hashOrbitToken } from "../src/lib/orbit/token-hash";
-import { orbitStoragePath, prepareOrbitUpload } from "../src/lib/orbit/prepare-upload";
+import { generatePulseToken, hashPulseToken } from "../src/lib/pulse/token-hash";
+import { pulseStoragePath, preparePulseUpload } from "../src/lib/pulse/prepare-upload";
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -13,33 +13,33 @@ function assert(condition: boolean, message: string) {
 }
 
 async function main() {
-  const first = generateOrbitToken();
-  const second = generateOrbitToken();
+  const first = generatePulseToken();
+  const second = generatePulseToken();
   assert(first.token.length === 43, "token length");
   assert(first.hashHex.length === 64, "hash length");
-  assert(hashOrbitToken(first.token) === first.hashHex, "hash mismatch");
+  assert(hashPulseToken(first.token) === first.hashHex, "hash mismatch");
   assert(first.token !== second.token, "tokens collided");
   assert(!first.token.includes(first.hashHex), "token contained the hash");
-  assert(hashOrbitToken("not-a-token") === null, "short token was accepted");
+  assert(hashPulseToken("not-a-token") === null, "short token was accepted");
 
-  const image = await prepareOrbitUpload("qc", "image/png", png);
+  const image = await preparePulseUpload("qc", "image/png", png);
   assert(image.mimeType === "image/jpeg", "image was not stored as jpeg");
   assert(image.extension === "jpg", "image extension");
   assert(image.bytes.length > 0, "resized image was empty");
 
-  const pdf = await prepareOrbitUpload("terms", "application/pdf", Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"));
+  const pdf = await preparePulseUpload("terms", "application/pdf", Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"));
   assert(pdf.mimeType === "application/pdf", "pdf mime changed");
   assert(pdf.extension === "pdf", "pdf extension");
 
   let rejected = false;
   try {
-    await prepareOrbitUpload("terms", "image/png", png);
+    await preparePulseUpload("terms", "image/png", png);
   } catch {
     rejected = true;
   }
   assert(rejected, "terms bucket accepted an image");
 
-  const path = orbitStoragePath("ops", "22222222-2222-4222-8222-222222222222", "jpg");
+  const path = pulseStoragePath("ops", "22222222-2222-4222-8222-222222222222", "jpg");
   assert(path.startsWith("ops/22222222-2222-4222-8222-222222222222/"), "storage path shape");
   assert(!path.includes("..") && !path.includes("customer"), "storage path leaked a name");
 
@@ -67,7 +67,7 @@ async function main() {
   };
   assert(homeRedirect(neither) === "/no-access", "no module home");
 
-  console.log("orbit m0 app checks passed");
+  console.log("pulse m0 app checks passed");
 }
 
 main().catch((error: unknown) => {

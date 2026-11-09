@@ -1,15 +1,15 @@
 import { connection } from "next/server";
-import { orbitRpcError, readJson } from "@/lib/orbit/http";
-import { gateOverrideSchema } from "@/lib/orbit/schema";
-import { orbitSession, requireOpsOwner } from "@/lib/orbit/session";
+import { pulseRpcError, readJson } from "@/lib/pulse/http";
+import { gateOverrideSchema } from "@/lib/pulse/schema";
+import { pulseSession, requireOpsOwner } from "@/lib/pulse/session";
 
 export async function POST(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const owner = await requireOpsOwner(session.supabase);
-  if (!owner.ok) return orbitRpcError(owner.error, "Could not check owner access.");
+  if (!owner.ok) return pulseRpcError(owner.error, "Could not check owner access.");
   if (!owner.owner) {
     return Response.json({ error: "Only the owner can override a gate." }, { status: 403 });
   }
@@ -26,6 +26,6 @@ export async function POST(request: Request) {
     p_gate: parsed.data.gate,
     p_reason: parsed.data.reason,
   });
-  if (error) return orbitRpcError(error, "Could not record that override.");
+  if (error) return pulseRpcError(error, "Could not record that override.");
   return Response.json({ id: data }, { status: 201 });
 }

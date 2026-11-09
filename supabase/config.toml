@@ -245,11 +245,11 @@ otp_expiry = 3600
 # sender_name = "Admin"
 
 [auth.email.template.invite]
-subject = "You're invited to Jordan Orbit"
+subject = "You're invited to Jordan Pulse"
 content_path = "./supabase/templates/invite.html"
 
 [auth.email.template.recovery]
-subject = "Choose a password for Jordan Orbit"
+subject = "Choose a password for Jordan Pulse"
 content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template

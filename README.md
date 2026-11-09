@@ -1,25 +1,25 @@
-# Jordan Orbit
+# Jordan Pulse
 
 AI operations and automation platform for Jordan Fitness. It is not a customer-facing site.
 
-The live modules are **Orbit People** (HR and compliance) and the **Orbit Operations** install office (jobs, pricing, tasks, and notifications, without Cin7). The home screen also lists Orbit Service, Orbit Supply, Orbit Sales, and Orbit Finance. Those four show a coming-soon state until their own routes are added.
+The live modules are **Pulse People** (HR and compliance) and the **Pulse Operations** install office (jobs, pricing, tasks, and notifications, without Cin7). The home screen also lists Pulse Service, Pulse Supply, Pulse Sales, and Pulse Finance. Those four show a coming-soon state until their own routes are added.
 
 ## Modules
 
 Modules are registered in `src/modules/registry.ts`. Each entry has a name, tagline, icon, status, and the paths it owns. To add a module:
 
-1. Add an entry to `orbitModules`. Use `status: "coming-soon"` until the screens exist.
+1. Add an entry to `pulseModules`. Use `status: "coming-soon"` until the screens exist.
 2. When it is ready, set `status: "active"`, point `href` at its home route, list its `paths` and `nav`, and add the routes under `src/app`.
 3. The sidebar reads the registry, so a new active module does not need a separate navigation component.
 
-Orbit People keeps the existing policy routes (`/dashboard`, `/policies`, `/amendments`, `/notifications`, `/admin`).
+Pulse People keeps the existing policy routes (`/dashboard`, `/policies`, `/amendments`, `/notifications`, `/admin`).
 
 Production deploys from `main` on Vercel. The four environment variables must be set on the Vercel project before a build. `NEXT_PUBLIC_*` values are read at build time.
 
 ## What v1 includes
 
 - Email and password sign-in. Public registration is off. Forgot password sets a first password or replaces one.
-- Administrators invite `@jordanfitness.com` addresses, change roles, deactivate accounts, and switch the Orbit People licence.
+- Administrators invite `@jordanfitness.com` addresses, change roles, deactivate accounts, and switch the Pulse People licence.
 - `alex.ives@jordanfitness.com` stays an administrator (database trigger). Roles are administrator, editor/HR, and staff.
 - Policy library with category, owner, status, review date, editable text, and an optional PDF or Word file.
 - Blank draft placeholders for a typical UK HR and health & safety set, so the library is not empty.
@@ -45,7 +45,7 @@ Features are grouped so another business area can be added as its own module.
 ```
 src/modules/registry.ts   module list, paths, and navigation
 src/app/                  launcher, sign-in, and module routes
-src/features/policies/    Orbit People policy reads, saves, uploads, Word text extraction
+src/features/policies/    Pulse People policy reads, saves, uploads, Word text extraction
 src/features/amendments/  suggestions and the agent payload check
 src/features/notifications/  in-app delivery and the email hook
 src/features/admin/       invites, roles, module licences, categories
@@ -124,7 +124,7 @@ Later, when DNS for the sending domain is verified, point Supabase at Resend und
 
 - Host `smtp.resend.com`, port `465` (or `587`)
 - Username `resend`, password the Resend API key
-- Sender name `Jordan Orbit`, sender email an address on the verified domain
+- Sender name `Jordan Pulse`, sender email an address on the verified domain
 
 Until that is on, Supabase’s own mailer sends the invite and reset emails. No application code change is required for the switch.
 
@@ -140,7 +140,7 @@ SQL lives in `supabase/migrations` and is applied in filename order:
 6. `20261105120000_orbit_core.sql` — shared Core schema (workflow, audit, tasks, notifications, settings, files, gate overrides, tokens)
 7. `20261105120100_ops_installs.sql` — Operations / Installs tables, status protection, and the manual on-hold / lost stub
 
-Apply 6 and 7 on a **preview** Supabase project first. Do not run them on the production People project until the Orbit Core pull request has been reviewed. They do not rewrite the People tables. A trigger on `public.profiles` gives `alex.ives@jordanfitness.com` the Operations module and the named owner role. `public.audit_log` and `public.notifications` stay as they are; Core adds `core.audit_log` and `core.notifications` beside them.
+Apply 6 and 7 on a **preview** Supabase project first. Do not run them on the production People project until the Pulse Core pull request has been reviewed. They do not rewrite the People tables. A trigger on `public.profiles` gives `alex.ives@jordanfitness.com` the Operations module and the named owner role. `public.audit_log` and `public.notifications` stay as they are; Core adds `core.audit_log` and `core.notifications` beside them.
 
 There is no Cin7 connection in these migrations. Customer segment, customer type, and quote/order numbers are stored as empty columns until that integration is specified.
 
@@ -189,9 +189,9 @@ Direct edits in **Edit text** also create a version. Ask for a short “What cha
 
 | Role | Can do |
 | --- | --- |
-| Staff | Read policies, upload and edit text, send suggestions, see their notifications, when Orbit People is on |
+| Staff | Read policies, upload and edit text, send suggestions, see their notifications, when Pulse People is on |
 | Editor / HR | Everything staff can do, plus approve, edit-then-approve, or reject suggestions. Stored as `approver`. |
-| Administrator | Everything an editor can do, plus Users, roles, deactivation, module licences, and categories. Administrators can open Orbit People even if that licence is off. |
+| Administrator | Everything an editor can do, plus Users, roles, deactivation, module licences, and categories. Administrators can open Pulse People even if that licence is off. |
 
 Deactivated people keep their history but cannot open the app. You cannot deactivate yourself or remove the last active administrator. `alex.ives@jordanfitness.com` cannot be given another role.
 

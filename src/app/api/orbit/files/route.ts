@@ -1,16 +1,16 @@
 import { connection } from "next/server";
-import { OrbitFileError, isOrbitBucket } from "@/lib/orbit/prepare-upload";
-import { storeOrbitFile } from "@/lib/orbit/files";
-import { orbitRpcError } from "@/lib/orbit/http";
-import { orbitSession, requireOpsRole } from "@/lib/orbit/session";
+import { PulseFileError, isPulseBucket } from "@/lib/pulse/prepare-upload";
+import { storePulseFile } from "@/lib/pulse/files";
+import { pulseRpcError } from "@/lib/pulse/http";
+import { pulseSession, requireOpsRole } from "@/lib/pulse/session";
 
 export async function POST(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const allowed = await requireOpsRole(session.supabase, ["install_lead", "admin_owner"]);
-  if (!allowed.ok) return orbitRpcError(allowed.error, "Could not check access.");
+  if (!allowed.ok) return pulseRpcError(allowed.error, "Could not check access.");
   if (!allowed.allowed) {
     return Response.json({ error: "You cannot upload that file." }, { status: 403 });
   }
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const kind = String(form.get("kind") ?? "file");
   const file = form.get("file");
 
-  if (!isOrbitBucket(bucket) || !file || !(file instanceof File)) {
+  if (!isPulseBucket(bucket) || !file || !(file instanceof File)) {
     return Response.json({ error: "Choose a bucket and a file." }, { status: 400 });
   }
   if (!/^(ops|core)$/.test(entitySchema) || !/^[a-z][a-z0-9_]{0,62}$/.test(entityTable)) {
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stored = await storeOrbitFile({
+    const stored = await storePulseFile({
       bucket,
       mimeType: file.type || "application/octet-stream",
       bytes: Buffer.from(await file.arrayBuffer()),
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     });
     return Response.json(stored, { status: 201 });
   } catch (error) {
-    if (error instanceof OrbitFileError) {
+    if (error instanceof PulseFileError) {
       return Response.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof Error && error.message === "Supabase is not configured.") {

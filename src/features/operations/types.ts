@@ -130,7 +130,7 @@ export type StoredRequirements = {
   conflict_detail: string | null;
 };
 
-export type OrbitNotification = {
+export type PulseNotification = {
   id: string;
   title: string;
   body: string;
@@ -141,7 +141,7 @@ export type OrbitNotification = {
   created_at: string;
 };
 
-export type OrbitTask = {
+export type PulseTask = {
   id: string;
   module_id: string;
   kind: string;

@@ -1,7 +1,7 @@
 export type Cin7CustomerType = "credit" | "proforma" | "leasing" | null;
 export type Cin7Segment = "independent" | "franchisee" | "trade" | "big_corporate" | null;
 
-/** A quote as Orbit needs it. Field names are ours. They are not a Cin7 payload map. */
+/** A quote as Pulse needs it. Field names are ours. They are not a Cin7 payload map. */
 export type Cin7QuoteLine = {
   sku: string | null;
   productName: string;

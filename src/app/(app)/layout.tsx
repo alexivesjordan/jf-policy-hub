@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
-import { listOrbitNotifications } from "@/features/operations/queries";
+import { listPulseNotifications } from "@/features/operations/queries";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
@@ -12,8 +12,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
-        <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Orbit</p>
-        <h1 className="font-display mt-2 text-4xl">Jordan Orbit needs a database connection</h1>
+        <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
+        <h1 className="font-display mt-2 text-4xl">Jordan Pulse needs a database connection</h1>
         <p className="mt-3 leading-7 text-ink/80">
           Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, apply the SQL migrations, then restart the app. The README lists every step.
         </p>
@@ -34,7 +34,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
     pendingCount(),
     unreadCount(profile.id),
     listMyNotifications(),
-    listOrbitNotifications(false).catch(() => []),
+    listPulseNotifications(false).catch(() => []),
   ]);
   const notifications: BellItem[] = [
     ...people.map((item) => ({
@@ -70,7 +70,7 @@ function ShellFallback() {
   return (
     <div className="min-h-screen bg-paper md:grid md:grid-cols-[16.5rem_1fr]">
       <div className="min-h-24 bg-pine md:min-h-screen" />
-      <p className="px-8 py-10 text-ink/60">Loading Jordan Orbit...</p>
+      <p className="px-8 py-10 text-ink/60">Loading Jordan Pulse...</p>
     </div>
   );
 }

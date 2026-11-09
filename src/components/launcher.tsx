@@ -4,12 +4,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { canUsePeople } from "@/lib/access";
 import type { Profile } from "@/lib/types";
-import { orbitModules } from "@/modules/registry";
+import { pulseModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
 
 export function Launcher({ profile }: { profile: Profile | null }) {
   return (
-    <div className="orbit-grid min-h-screen text-ink">
+    <div className="pulse-grid min-h-screen text-ink">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-grey">Jordan Fitness</p>
         <div className="flex items-center gap-2">
@@ -19,11 +19,11 @@ export function Launcher({ profile }: { profile: Profile | null }) {
       </header>
       <main className="mx-auto flex w-full max-w-5xl flex-col px-5 pb-16 pt-6 md:pt-10">
         <div className="text-center">
-          <h1 className="font-display text-4xl font-semibold tracking-wide text-ink md:text-5xl">JORDAN ORBIT</h1>
+          <h1 className="font-display text-4xl font-semibold tracking-wide text-ink md:text-5xl">JORDAN PULSE</h1>
           <p className="mt-3 text-base text-grey md:text-lg">AI operations and automation platform</p>
         </div>
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
-          {orbitModules.map((module) => {
+          {pulseModules.map((module) => {
             const soon = module.status === "coming-soon";
             const locked = module.id === "people" && profile ? !canUsePeople(profile) : false;
             if (locked) {
@@ -35,7 +35,7 @@ export function Launcher({ profile }: { profile: Profile | null }) {
                     </span>
                     <span className="min-w-0">
                       <span className="text-lg font-semibold text-ink">{module.name}</span>
-                      <span className="mt-0.5 block text-sm text-grey">Needs an Orbit People licence</span>
+                      <span className="mt-0.5 block text-sm text-grey">Needs an Pulse People licence</span>
                     </span>
                   </div>
                 </li>

@@ -1,6 +1,6 @@
 import { messageFromError } from "@/lib/errors";
 
-export function orbitRpcError(
+export function pulseRpcError(
   error: { message?: string; code?: string } | null | undefined,
   fallback: string,
 ) {

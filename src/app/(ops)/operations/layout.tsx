@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
-import { getOfficeContext, listOrbitNotifications } from "@/features/operations/queries";
+import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
-import { orbitModules } from "@/modules/registry";
+import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
 
@@ -13,7 +13,7 @@ export default function OperationsLayout({ children }: { children: React.ReactNo
   if (!isSupabaseConfigured()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
-        <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Orbit</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
         <h1 className="font-display mt-2 text-4xl">The install office needs a database connection</h1>
         <p className="mt-3 leading-7 text-ink/80">
           Add the Supabase keys to .env.local, apply the migrations on a preview project, then restart. Fixture jobs are marked FIXTURE and are not from Cin7.
@@ -37,7 +37,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   try {
     const [context, operations, people] = await Promise.all([
       getOfficeContext(),
-      listOrbitNotifications(false),
+      listPulseNotifications(false),
       listMyNotifications(),
     ]);
     isOwner = context.is_owner;
@@ -69,7 +69,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
     isOwner = false;
   }
 
-  const nav = (orbitModules.find((module) => module.id === "operations")?.nav ?? []).filter(
+  const nav = (pulseModules.find((module) => module.id === "operations")?.nav ?? []).filter(
     (item) => !item.ownerOnly || isOwner,
   );
 

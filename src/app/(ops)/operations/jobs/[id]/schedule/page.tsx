@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { PencilCalendar } from "@/components/pencil-calendar";
 import { getJob, getJobRequirements } from "@/features/operations/queries";
-import type { PoolResource } from "@/lib/orbit/availability";
+import type { PoolResource } from "@/lib/pulse/availability";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 

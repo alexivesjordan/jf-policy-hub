@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { markOrbitNotificationRead } from "@/features/operations/actions";
+import { markPulseNotificationRead } from "@/features/operations/actions";
 import { markNotificationRead } from "@/features/notifications/actions";
 
 export type BellItem = {
@@ -67,7 +67,7 @@ export function NotificationBell({ items }: { items: BellItem[] }) {
                     </Link>
                   ) : null}
                   {item.read ? null : (
-                    <form action={item.source === "people" ? markNotificationRead : markOrbitNotificationRead}>
+                    <form action={item.source === "people" ? markNotificationRead : markPulseNotificationRead}>
                       <input type="hidden" name="id" value={item.id} />
                       <button type="submit" className="font-semibold text-ink underline decoration-red">Mark read</button>
                     </form>

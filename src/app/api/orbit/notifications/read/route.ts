@@ -1,11 +1,11 @@
 import { connection } from "next/server";
-import { orbitRpcError, readJson } from "@/lib/orbit/http";
-import { markNotificationsSchema } from "@/lib/orbit/schema";
-import { orbitSession } from "@/lib/orbit/session";
+import { pulseRpcError, readJson } from "@/lib/pulse/http";
+import { markNotificationsSchema } from "@/lib/pulse/schema";
+import { pulseSession } from "@/lib/pulse/session";
 
 export async function POST(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const parsed = markNotificationsSchema.safeParse(await readJson(request));
@@ -16,6 +16,6 @@ export async function POST(request: Request) {
   const { data, error } = await session.supabase.rpc("orbit_mark_notifications_read", {
     p_ids: parsed.data.all ? null : parsed.data.ids,
   });
-  if (error) return orbitRpcError(error, "Could not mark those notifications read.");
+  if (error) return pulseRpcError(error, "Could not mark those notifications read.");
   return Response.json({ updated: data ?? 0 });
 }

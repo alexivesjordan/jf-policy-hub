@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { getOfficeContext, listJobs, listOrbitNotifications, listOrbitTasks } from "@/features/operations/queries";
+import { getOfficeContext, listJobs, listPulseNotifications, listPulseTasks } from "@/features/operations/queries";
 import { greetingName } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -20,8 +20,8 @@ export default async function OperationsHomePage() {
     const [context, jobRows, taskRows, notes] = await Promise.all([
       getOfficeContext(),
       listJobs(),
-      listOrbitTasks(),
-      listOrbitNotifications(true),
+      listPulseTasks(),
+      listPulseNotifications(true),
     ]);
     role = context.ops_role ?? "not set";
     owner = context.is_owner;

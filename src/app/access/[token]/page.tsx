@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { AccessForm } from "@/components/access-form";
-import { hashOrbitToken } from "@/lib/orbit/token-hash";
+import { hashPulseToken } from "@/lib/pulse/token-hash";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Site access" };
@@ -27,7 +27,7 @@ function AccessFallback() {
 async function AccessContent({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const hash = hashOrbitToken(token);
+  const hash = hashPulseToken(token);
   const admin = createAdminClient();
   if (!hash || !admin) {
     return <Invalid />;

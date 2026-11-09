@@ -14,14 +14,14 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Jordan Orbit",
-    template: "%s · Jordan Orbit",
+    default: "Jordan Pulse",
+    template: "%s · Jordan Pulse",
   },
-  description: "Jordan Orbit is the AI operations and automation platform for Jordan Fitness. Orbit People is the live module for HR and compliance.",
+  description: "Jordan Pulse is the AI operations and automation platform for Jordan Fitness. Pulse People is the live module for HR and compliance.",
   robots: { index: false, follow: false },
 };
 
-const themeBoot = `(function(){try{var k="orbit-theme";var t=localStorage.getItem(k);if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )orbit-theme=([^;]+)/);t=m?decodeURIComponent(m[1]):"light";}document.documentElement.dataset.theme=t==="dark"?"dark":"light";}catch(e){document.documentElement.dataset.theme="light";}})();`;
+const themeBoot = `(function(){try{var k="pulse-theme";var t=localStorage.getItem(k);if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )pulse-theme=([^;]+)/);t=m?decodeURIComponent(m[1]):"light";}document.documentElement.dataset.theme=t==="dark"?"dark":"light";}catch(e){document.documentElement.dataset.theme="light";}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

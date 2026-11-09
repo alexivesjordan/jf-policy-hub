@@ -37,7 +37,7 @@ export default async function PoliciesPage({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
           <h1 className="font-display mt-2 text-4xl">Policies</h1>
           <p className="mt-2 max-w-2xl text-ink/75">
             Upload a finished Word or PDF file into a placeholder, or open a policy and write it here.

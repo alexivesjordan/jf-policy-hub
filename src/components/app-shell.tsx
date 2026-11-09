@@ -41,7 +41,7 @@ export function AppShell({
       <aside className="flex flex-col border-line bg-pine text-ink md:sticky md:top-0 md:h-screen md:border-r">
         <div className="px-4 py-4 md:px-5 md:py-6">
           <Link href="/" className="block rounded-xl outline-none">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Orbit</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Pulse</p>
             <p className="font-display mt-1 text-xl text-ink">{current?.name ?? "Modules"}</p>
           </Link>
           <p className="mt-1 text-xs text-grey">{current?.tagline}</p>

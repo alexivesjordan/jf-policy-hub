@@ -138,7 +138,7 @@ export async function createGateOverride(_state: ActionState, formData: FormData
   }
 }
 
-export async function createOrbitTask(_state: ActionState, formData: FormData): Promise<ActionState> {
+export async function createPulseTask(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireOperationsUser();
   try {
     const kind = String(formData.get("kind") ?? "exception");
@@ -161,7 +161,7 @@ export async function createOrbitTask(_state: ActionState, formData: FormData): 
   }
 }
 
-export async function markOrbitNotificationRead(formData: FormData) {
+export async function markPulseNotificationRead(formData: FormData) {
   await requireOperationsUser();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -172,7 +172,7 @@ export async function markOrbitNotificationRead(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
-export async function markAllOrbitNotificationsRead() {
+export async function markAllPulseNotificationsRead() {
   await requireOperationsUser();
   const supabase = await createClient();
   await supabase.rpc("orbit_mark_notifications_read", { p_ids: null });

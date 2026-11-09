@@ -10,7 +10,7 @@ export type ModuleNavItem = {
   ownerOnly?: boolean;
 };
 
-export type OrbitModule = {
+export type PulseModule = {
   id: string;
   name: string;
   tagline: string;
@@ -26,10 +26,10 @@ export type OrbitModule = {
  * Add a module here, then add its routes. Active modules need a real `href`.
  * Coming-soon modules open `/modules/[id]` until their routes exist.
  */
-export const orbitModules: OrbitModule[] = [
+export const pulseModules: PulseModule[] = [
   {
     id: "people",
-    name: "Orbit People",
+    name: "Pulse People",
     tagline: "HR & compliance",
     href: "/dashboard",
     status: "active",
@@ -45,7 +45,7 @@ export const orbitModules: OrbitModule[] = [
   },
   {
     id: "service",
-    name: "Orbit Service",
+    name: "Pulse Service",
     tagline: "Aftersales & support",
     href: "/modules/service",
     status: "coming-soon",
@@ -55,7 +55,7 @@ export const orbitModules: OrbitModule[] = [
   },
   {
     id: "supply",
-    name: "Orbit Supply",
+    name: "Pulse Supply",
     tagline: "Procurement",
     href: "/modules/supply",
     status: "coming-soon",
@@ -65,7 +65,7 @@ export const orbitModules: OrbitModule[] = [
   },
   {
     id: "operations",
-    name: "Orbit Operations",
+    name: "Pulse Operations",
     tagline: "Install office",
     href: "/operations",
     status: "active",
@@ -83,7 +83,7 @@ export const orbitModules: OrbitModule[] = [
   },
   {
     id: "sales",
-    name: "Orbit Sales",
+    name: "Pulse Sales",
     tagline: "CRM & commercial",
     href: "/modules/sales",
     status: "coming-soon",
@@ -93,7 +93,7 @@ export const orbitModules: OrbitModule[] = [
   },
   {
     id: "finance",
-    name: "Orbit Finance",
+    name: "Pulse Finance",
     tagline: "Financial workflows",
     href: "/modules/finance",
     status: "coming-soon",
@@ -104,11 +104,11 @@ export const orbitModules: OrbitModule[] = [
 ];
 
 export function getModule(id: string) {
-  return orbitModules.find((module) => module.id === id);
+  return pulseModules.find((module) => module.id === id);
 }
 
 export function moduleFromPath(pathname: string) {
-  return orbitModules.find((module) =>
+  return pulseModules.find((module) =>
     module.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`)),
   );
 }

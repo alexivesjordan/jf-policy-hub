@@ -56,7 +56,7 @@ body {
   letter-spacing: -0.03em;
 }
 
-.orbit-grid {
+.pulse-grid {
   background-color: var(--paper);
   background-image:
     radial-gradient(ellipse 70% 45% at 50% -8%, var(--glow), transparent 58%),

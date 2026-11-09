@@ -7,8 +7,8 @@ import type {
   JobDetail,
   JobSummary,
   OfficeContext,
-  OrbitNotification,
-  OrbitTask,
+  PulseNotification,
+  PulseTask,
   PricingSettings,
   StoredRequirements,
   TermsVersion,
@@ -68,12 +68,12 @@ export async function getJobRequirements(id: string) {
   return rpc<StoredRequirements | null>("orbit_job_requirements", { p_job_id: id });
 }
 
-export async function listOrbitNotifications(unreadOnly = false) {
-  return asArray<OrbitNotification>(
+export async function listPulseNotifications(unreadOnly = false) {
+  return asArray<PulseNotification>(
     await rpc("orbit_list_notifications", { p_unread_only: unreadOnly }),
   );
 }
 
-export async function listOrbitTasks() {
-  return asArray<OrbitTask>(await rpc("orbit_list_tasks"));
+export async function listPulseTasks() {
+  return asArray<PulseTask>(await rpc("orbit_list_tasks"));
 }

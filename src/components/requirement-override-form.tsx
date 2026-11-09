@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { Banner, Button, Field, Input, Select } from "@/components/ui";
 import { overrideJobRequirements } from "@/features/operations/price-actions";
-import type { JobRequirements } from "@/lib/orbit/requirements";
+import type { JobRequirements } from "@/lib/pulse/requirements";
 
 export function RequirementOverrideForm({
   jobId,
