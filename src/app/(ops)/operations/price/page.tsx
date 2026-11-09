@@ -1,13 +1,14 @@
 import { PriceQuoteForm } from "@/components/price-quote-form";
+import { getOfficeContext } from "@/features/operations/queries";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { requireOperationsUser } from "@/lib/auth";
-import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 
 export const metadata = { title: "Price a quote" };
 
 export default async function PricePage() {
   await requireOperationsUser();
-  const categories = [...new Set(loadBundledEffortTable().map((row) => row.category))].sort();
+  const context = await getOfficeContext();
+  const showInternal = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
   const cin7Connected = cin7IsConnected();
 
   return (
@@ -21,7 +22,7 @@ export default async function PricePage() {
             : "Cin7 is not connected, so an order number loads a fixture quote. You can also upload a Cin7 Core quote PDF. Pricing does not create a job."}
         </p>
       </div>
-      <PriceQuoteForm categories={categories} cin7Connected={cin7Connected} />
+      <PriceQuoteForm cin7Connected={cin7Connected} showInternal={showInternal} />
     </div>
   );
 }

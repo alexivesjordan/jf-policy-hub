@@ -48,12 +48,13 @@ export type QuoteLineInput = {
   unitWeightKg?: number | null;
 };
 
-/** Admin-edited build assumption for a category. Exact product rows still win. */
+/** Build assumption for a Cin7 category. Exact SKU rows still win. needsAssembly null means unknown. */
 export type CategoryEffortDefault = {
   category: string;
   buildCrew: number;
   buildMinutes: number;
   note: string;
+  needsAssembly?: boolean | null;
 };
 
 export type PricingConfig = {
@@ -96,7 +97,7 @@ export type PriceRequest = {
 export type ResolvedLine = {
   productName: string;
   qty: number;
-  match: "exact" | "category_fallback" | "category_default" | "handling_only" | "dhz_generic" | "missing";
+  match: "exact" | "category_fallback" | "category_default" | "handling_only" | "dhz_generic" | "unknown" | "missing";
   category: string | null;
   provisional: boolean;
   note: string | null;
@@ -187,14 +188,72 @@ function paymentGate(type: CustomerType, orderValue: number | null, threshold: n
   return parts.join(" ");
 }
 
+function unknownAssembly(line: QuoteLineInput, category: string | null): ResolvedLine {
+  const label = category || "Other";
+  return {
+    productName: line.productName,
+    qty: line.qty,
+    match: "unknown",
+    category: label,
+    provisional: true,
+    note: "Needs review",
+    row: {
+      ...defaultRow(line.productName, label, {
+        category: label,
+        buildCrew: 2,
+        buildMinutes: 120,
+        note: "Unknown effort. Conservative 2-man, 2-hour assembly.",
+      }),
+      reviewFlag: "needs-review",
+    },
+  };
+}
+
+function fromCategoryDefault(line: QuoteLineInput, effort: CategoryEffortDefault): ResolvedLine {
+  if (effort.needsAssembly === false) {
+    return {
+      productName: line.productName,
+      qty: line.qty,
+      match: "handling_only",
+      category: effort.category,
+      provisional: effort.note.length > 0,
+      note: "No assembly. Handling and carry only.",
+      row: handlingRow(line.productName, effort.category),
+    };
+  }
+  if (effort.needsAssembly === null) return unknownAssembly(line, effort.category);
+  return {
+    productName: line.productName,
+    qty: line.qty,
+    match: "category_default",
+    category: effort.category,
+    provisional: true,
+    note: effort.note,
+    row: defaultRow(line.productName, effort.category, effort),
+  };
+}
+
 function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryEffortDefault[] = []): ResolvedLine {
   const sku = line.sku?.trim();
   if (sku) {
     const bySku = table.find((row) => row.sku === sku);
     if (bySku) {
+      if (bySku.reviewFlag === "needs-review" || bySku.needsAssembly === null) return unknownAssembly(line, bySku.category);
+      if (bySku.needsAssembly === false) {
+        return {
+          productName: line.productName,
+          qty: line.qty,
+          match: "handling_only",
+          category: bySku.category,
+          provisional: false,
+          note: "No assembly. Handling and carry only.",
+          row: bySku,
+        };
+      }
       return { productName: line.productName, qty: line.qty, match: "exact", category: bySku.category, provisional: false, note: null, row: bySku };
     }
   }
+
   const name = line.productName.trim().toLowerCase();
   const byName = table.find((row) => row.productName.trim().toLowerCase() === name);
   if (byName) {
@@ -210,6 +269,12 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
     };
   }
 
+  const given = line.category?.trim();
+  if (given) {
+    const cin7Default = defaults.find((item) => item.category === given);
+    if (cin7Default) return fromCategoryDefault(line, cin7Default);
+    if (/^other$/i.test(given)) return unknownAssembly(line, "Other");
+  }
   if (/dhz/i.test(line.productName)) {
     const plate = /plate/i.test(line.productName);
     const standIn = table.find((row) =>
@@ -325,15 +390,7 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
     }
   }
 
-  return {
-    productName: line.productName,
-    qty: line.qty,
-    match: "missing",
-    category: category || null,
-    provisional: true,
-    note: category ? null : "unknown category",
-    row: null,
-  };
+  return unknownAssembly(line, category || null);
 }
 
 function inferredCategory(name: string) {
@@ -510,7 +567,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     const row = line.row;
     if (!row) continue;
     if (line.provisional && line.note) provisional.add(line.note);
-    if (row.reviewFlag) flags.push(`${row.productName}: ${row.reviewFlag}`);
+    if (row.reviewFlag && row.reviewFlag !== "needs-review") flags.push(`${row.productName}: ${row.reviewFlag}`);
     if (row.complexity === "high") high = true;
     if (row.category === "flooring") hasFlooring = true;
     else hasEquipment = true;
@@ -746,7 +803,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
     ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
     : estimateMilesFromKingsLynn(request.postcode);
   const resolved = request.lines.map((line) => applyLineWeight(line, matchLine(line, request.table, request.categoryDefaults ?? [])));
-  const missing = resolved.filter((line) => line.match === "missing");
+  const review = resolved.filter((line) => line.match === "unknown" || line.row?.reviewFlag === "needs-review");
 
   const base: PriceResult = {
     pricerVersion: PRICER_VERSION,
@@ -779,12 +836,6 @@ export function priceInstall(request: PriceRequest): PriceResult {
     variation: null,
   };
 
-  if (missing.length > 0) {
-    return {
-      ...base,
-      blockedReason: `No instant price. ${missing.map((line) => line.productName).join(", ")} ${missing.length === 1 ? "is" : "are"} not in the effort table and ${missing.length === 1 ? "has" : "have"} no category fallback.`,
-    };
-  }
   if (!request.segment) {
     return { ...base, blockedReason: SEGMENT_NOT_SET };
   }
@@ -805,6 +856,11 @@ export function priceInstall(request: PriceRequest): PriceResult {
   const customerPrice = pricing.minJobCharge != null ? Math.max(markedUp, pricing.minJobCharge) : markedUp;
   const floor = pricing.marginFloorPct != null ? roundMoney(costed.cost * (1 + pricing.marginFloorPct)) : null;
   const flags = [...costed.flags];
+  if (review.length > 0) {
+    const names = review.map((line) => line.productName);
+    const shown = names.slice(0, 30).join(", ");
+    flags.push(`Needs review: ${shown}${names.length > 30 ? `, and ${names.length - 30} more` : ""}. Confirm them on the Pricing page.`);
+  }
   if (pricing.minJobCharge == null) flags.push("min job charge not set");
   if (pricing.marginFloorPct == null) flags.push("margin floor not set");
   if (distance.method.includes("120 miles")) flags.push(distance.method);
@@ -876,6 +932,45 @@ function personMinutes(lines: QuoteLineInput[], table: EffortRow[], profile: Sit
 }
 
 /** Sales never receive cost, markup, or the discount floor. */
+export function effortRowForSku(input: {
+  sku: string;
+  productName: string;
+  category: string | null;
+  needsAssembly: boolean | null;
+  crew: number | null;
+  buildMinutes: number | null;
+}): EffortRow {
+  const category = input.category || "Other";
+  if (input.needsAssembly === null || /^other$/i.test(category)) {
+    return {
+      ...defaultRow(input.productName, category, { category, buildCrew: 2, buildMinutes: 120, note: "Unknown", needsAssembly: null }),
+      sku: input.sku,
+      needsAssembly: null,
+      reviewFlag: "needs-review",
+    };
+  }
+  if (input.needsAssembly === false) {
+    return {
+      ...handlingRow(input.productName, category),
+      sku: input.sku,
+      needsAssembly: false,
+      buildCrew: input.crew ?? 1,
+      buildMinutes: 0,
+    };
+  }
+  return {
+    ...defaultRow(input.productName, category, {
+      category,
+      buildCrew: input.crew ?? 2,
+      buildMinutes: input.buildMinutes ?? 120,
+      note: "SKU effort",
+      needsAssembly: true,
+    }),
+    sku: input.sku,
+    needsAssembly: true,
+  };
+}
+
 export function forSales(result: PriceResult) {
   return {
     pricerVersion: result.pricerVersion,

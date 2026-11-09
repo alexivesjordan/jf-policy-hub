@@ -7,6 +7,7 @@ describe("Cin7 GET allowlist", () => {
     assert.equal(assertCin7Get("GET", "sale", { ID: "sale-1" }).path, "sale");
     assert.equal(assertCin7Get("get", "/saleList", { Search: "SO-00490" }).path, "saleList");
     assert.equal(assertCin7Get("GET", "product", { Sku: "JF-C2SE-2" }).path, "product");
+    assert.equal(assertCin7Get("GET", "product", { Page: "2", Limit: "100", IncludeDeprecated: "false" }).path, "product");
     assert.equal(assertCin7Get("GET", "customer", { ID: "cust-1" }).path, "customer");
   });
 

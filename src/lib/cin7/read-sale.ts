@@ -139,6 +139,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     segment: null,
     customerType: null,
     postcode: shippingPostcode(customer, sale),
+    customerId,
     lines: quoteLines,
     usedQuoteLines: fromQuote && quoteLines.length > 0,
     weightIgnored: priced.some((line) => {

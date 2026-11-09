@@ -26,6 +26,8 @@ export type Cin7Quote = {
   segment: Cin7Segment;
   customerType: Cin7CustomerType;
   postcode?: string | null;
+  /** Cin7 CustomerID. Not a name or address. */
+  customerId?: string | null;
   lines: Cin7QuoteLine[];
   /** Order lines were empty, so quote lines were used. */
   usedQuoteLines?: boolean;

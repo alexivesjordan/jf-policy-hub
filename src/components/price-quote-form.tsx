@@ -21,11 +21,11 @@ const SEGMENTS = [
 ] as const;
 
 export function PriceQuoteForm({
-  categories,
   cin7Connected,
+  showInternal,
 }: {
-  categories: string[];
   cin7Connected: boolean;
+  showInternal: boolean;
 }) {
   const [loaded, loadQuote, loading] = useActionState(loadFixtureQuote, null);
   const [parsed, parsePdf, parsing] = useActionState(parseUploadedQuote, null);
@@ -80,6 +80,9 @@ export function PriceQuoteForm({
           <input type="hidden" name="source" value={draft.source} />
           <input type="hidden" name="quoteNumber" value={draft.quoteNumber} />
           <input type="hidden" name="customerReference" value={draft.customerReference} />
+          <input type="hidden" name="customerId" value={draft.customerId} />
+          <input type="hidden" name="saleId" value={draft.saleId} />
+          <input type="hidden" name="internalNote" value={draft.internalNote} />
           <input type="hidden" name="goodsNet" value={draft.goodsNet ?? ""} />
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Customer">
@@ -88,7 +91,7 @@ export function PriceQuoteForm({
             <Field label="Site postcode">
               <Input name="postcode" value={draft.postcode} onChange={(event) => setDraft({ ...draft, postcode: event.target.value })} required autoCapitalize="characters" />
             </Field>
-            <Field label="Segment" hint="Cin7 Core quotes do not include a segment. Pricing stays blocked until you choose one.">
+            <Field label="Segment" hint="Cin7 has no segment. This choice is remembered for the customer. HubSpot segment is still to come.">
               <Select name="segment" required value={draft.segment} onChange={(event) => setDraft({ ...draft, segment: event.target.value })}>
                 <option value="">Choose a segment</option>
                 {SEGMENTS.map(([value, label]) => (
@@ -107,7 +110,7 @@ export function PriceQuoteForm({
                   <th className="px-3 py-2">SKU</th>
                   <th className="px-3 py-2">Description</th>
                   <th className="px-3 py-2">Qty</th>
-                  <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2">Cin7 category</th>
                   <th className="px-3 py-2">Line total</th>
                 </tr>
               </thead>
@@ -136,17 +139,9 @@ export function PriceQuoteForm({
                         onChange={(event) => updateLine(setDraft, draft, index, { qty: Number(event.target.value) })}
                       />
                     </td>
-                    <td className="px-3 py-2">
-                      <Select
-                        name="lineCategory"
-                        value={line.category}
-                        onChange={(event) => updateLine(setDraft, draft, index, { category: event.target.value })}
-                      >
-                        <option value="">Match by name</option>
-                        {categories.map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </Select>
+                    <td className="px-3 py-2 text-ink">
+                      <input type="hidden" name="lineCategory" value={line.category} />
+                      {line.category || "—"}
                     </td>
                     <td className="px-3 py-2 text-ink">
                       <input type="hidden" name="lineTotal" value={line.lineTotal ?? ""} />
@@ -157,12 +152,10 @@ export function PriceQuoteForm({
               </tbody>
             </table>
           </div>
-          {draft.source === "cin7" ? (
-            <p className="text-sm text-grey">This price is read from the Cin7 sale. Creating a Pulse job from a live order is not available yet.</p>
-          ) : null}
+          {showInternal && draft.internalNote ? <p className="text-sm text-grey">{draft.internalNote}</p> : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pricing}>{pricing ? "Pricing..." : "Price best case"}</Button>
-            {priced?.ok && draft.source !== "cin7" ? (
+            {priced?.ok ? (
               <Button type="submit" formAction={createJob} variant="secondary" disabled={creating}>
                 {creating ? "Creating..." : "Create job"}
               </Button>
@@ -179,6 +172,7 @@ export function PriceQuoteForm({
           customerPrice={quote.customerPrice}
           segment={quote.segment ?? null}
           markup={quote.markup ?? null}
+          flags={quote.flags ?? []}
         />
       ) : quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
       {quote?.warnings.map((warning) => <Banner key={warning} tone="warning">{warning}</Banner>)}

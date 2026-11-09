@@ -77,3 +77,49 @@ export async function listPulseNotifications(unreadOnly = false) {
 export async function listPulseTasks() {
   return asArray<PulseTask>(await rpc("orbit_list_tasks"));
 }
+
+export type Cin7CategoryDefault = {
+  category: string;
+  needs_assembly: boolean | null;
+  crew: number | null;
+  build_minutes: number | null;
+  status: string;
+  notes: string | null;
+};
+
+export type SkuEffortRow = {
+  sku: string;
+  product_name: string;
+  cin7_category: string | null;
+  needs_assembly: boolean | null;
+  crew: number | null;
+  build_minutes: number | null;
+  status: string;
+  notes: string | null;
+};
+
+export async function listCin7CategoryDefaults() {
+  return asArray<Cin7CategoryDefault>(await rpc("orbit_cin7_category_defaults"));
+}
+
+export async function listSkuEffort(filters: {
+  search?: string;
+  category?: string;
+  status?: string;
+  needsAssembly?: string;
+  offset?: number;
+}) {
+  return rpc<{
+    review_count: number;
+    total: number;
+    categories: string[];
+    rows: SkuEffortRow[];
+  }>("orbit_list_sku_effort", {
+    p_search: filters.search ?? "",
+    p_category: filters.category ?? "",
+    p_status: filters.status ?? "",
+    p_needs_assembly: filters.needsAssembly ?? "",
+    p_limit: 50,
+    p_offset: filters.offset ?? 0,
+  });
+}

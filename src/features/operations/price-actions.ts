@@ -9,7 +9,7 @@ import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
-import { forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
+import { effortRowForSku, forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
 import { looksLikeUkPostcode, normaliseUkPostcode } from "@/lib/quotes/postcode";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
@@ -41,6 +41,10 @@ export type QuoteDraft = {
   goodsNet: number | null;
   warnings: string[];
   source: "fixture" | "pdf" | "cin7";
+  customerId: string;
+  saleId: string;
+  /** Shown to the install lead only. Not a rep-facing error. */
+  internalNote: string;
 };
 
 export type PricedQuote = ReturnType<typeof forSales> & {
@@ -66,14 +70,35 @@ export type PricedQuote = ReturnType<typeof forSales> & {
 async function categoryDefaults(): Promise<CategoryEffortDefault[]> {
   const admin = createAdminClient();
   if (!admin) return [];
-  const { data, error } = await admin.rpc("orbit_category_effort_defaults");
+  const { data, error } = await admin.rpc("orbit_cin7_category_defaults");
   if (error || !Array.isArray(data)) return [];
-  return (data as { category: string; build_crew: number; build_minutes: number; note: string }[]).map((row) => ({
+  return (data as { category: string; build_crew: number | null; build_minutes: number | null; needs_assembly: boolean | null; notes: string | null }[]).map((row) => ({
     category: row.category,
-    buildCrew: Number(row.build_crew),
-    buildMinutes: Number(row.build_minutes),
-    note: row.note,
+    buildCrew: row.build_crew ?? 2,
+    buildMinutes: row.build_minutes ?? 120,
+    note: row.notes ?? "",
+    needsAssembly: row.needs_assembly,
   }));
+}
+
+async function effortTableFor(lines: { sku: string }[]) {
+  const bundled = loadBundledEffortTable();
+  const admin = createAdminClient();
+  const skus = lines.map((line) => line.sku).filter(Boolean);
+  if (!admin || skus.length === 0) return bundled;
+  const { data, error } = await admin.rpc("orbit_sku_effort_for_pricing", { p_skus: skus });
+  if (error || !Array.isArray(data)) return bundled;
+  const rows = (data as { sku: string; product_name: string; cin7_category: string | null; needs_assembly: boolean | null; crew: number | null; build_minutes: number | null }[]).map((row) =>
+    effortRowForSku({
+      sku: row.sku,
+      productName: row.product_name,
+      category: row.cin7_category,
+      needsAssembly: row.needs_assembly,
+      crew: row.crew,
+      buildMinutes: row.build_minutes,
+    }),
+  );
+  return [...rows, ...bundled];
 }
 
 async function pricingConfig(): Promise<PricingConfig> {
@@ -130,6 +155,9 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
     goodsNet: extracted.goodsNet,
     warnings,
     source,
+    customerId: "",
+    saleId: "",
+    internalNote: "",
   };
 }
 
@@ -189,6 +217,9 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
       goodsNet: goodsNet != null && Number.isFinite(goodsNet) ? goodsNet : null,
       warnings,
       source: formData.get("source") === "pdf" ? "pdf" : formData.get("source") === "cin7" ? "cin7" : "fixture",
+      customerId: String(formData.get("customerId") ?? "").trim(),
+      saleId: String(formData.get("saleId") ?? "").trim(),
+      internalNote: String(formData.get("internalNote") ?? "").trim(),
     },
   };
 }
@@ -204,6 +235,9 @@ function emptyDraft(): QuoteDraft {
     goodsNet: null,
     warnings: [],
     source: "fixture",
+    customerId: "",
+    saleId: "",
+    internalNote: "",
   };
 }
 
@@ -223,7 +257,7 @@ async function priceDraft(draft: QuoteDraft) {
     postcode: draft.postcode,
     segment: draft.segment as Segment,
     pricing,
-    table: loadBundledEffortTable(),
+    table: await effortTableFor(draft.lines),
     categoryDefaults: await categoryDefaults(),
   });
   const view: PricedQuote = {
@@ -256,34 +290,40 @@ function fixtureNumber(draft: QuoteDraft) {
   return `FIXTURE-PDF-${safe}`;
 }
 
-function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"]): QuoteDraft {
-  const known = new Set(loadBundledEffortTable().map((row) => row.category));
+function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], rememberedSegment = ""): QuoteDraft {
   const warnings: string[] = [];
-  if (!quote.segment) warnings.push("This quote has no segment. Choose one before pricing.");
-  if (quote.usedQuoteLines) warnings.push("This sale has no order lines. Quote lines were used.");
   if (quote.weightIgnored) warnings.push("A Cin7 product weight was not in kilograms, so it was left blank.");
-  if (quote.lines.some((line) => line.cin7Category && !known.has(line.cin7Category))) {
-    warnings.push("Cin7 categories are not Pulse categories. Match by product name, or choose a category.");
-  }
   if (source === "cin7" && !quote.postcode) warnings.push("No shipping postcode came back from Cin7. Enter the site postcode.");
   return {
     quoteNumber: quote.number,
     customerName: quote.customerName,
     postcode: quote.postcode ?? "",
-    segment: quote.segment ?? "",
+    segment: quote.segment || rememberedSegment,
     customerReference: quote.customerRef,
     lines: quote.lines.map((line) => ({
       sku: line.sku ?? "",
       description: line.productName,
       qty: line.qty,
-      category: line.cin7Category && known.has(line.cin7Category) ? line.cin7Category : (line.category ?? ""),
+      category: line.cin7Category ?? line.category ?? "",
       lineTotal: null,
       unitWeightKg: line.unitWeightKg ?? null,
     })),
     goodsNet: null,
     warnings,
     source,
+    customerId: quote.customerId ?? "",
+    saleId: quote.id,
+    internalNote: quote.usedQuoteLines ? "This sale has no order lines. Quote lines were used." : "",
   };
+}
+
+async function rememberedSegment(customerId: string) {
+  if (!customerId) return "";
+  const admin = createAdminClient();
+  if (!admin) return "";
+  const { data, error } = await admin.rpc("orbit_customer_segment", { p_cin7_id: customerId });
+  if (error || typeof data !== "string") return "";
+  return data;
 }
 
 export async function loadFixtureQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
@@ -301,7 +341,8 @@ export async function loadFixtureQuote(_state: ActionState, formData: FormData):
           : "That number is not in the fixture adapter. Cin7 not connected. Upload the quote PDF instead.",
       };
     }
-    const draft = draftFromSale(quote, connected ? "cin7" : "fixture");
+    const remembered = connected ? await rememberedSegment(quote.customerId ?? "") : "";
+    const draft = draftFromSale(quote, connected ? "cin7" : "fixture", remembered);
     return {
       ok: true,
       message: quote.segment ? "Quote loaded. Check the lines, then price." : "Quote loaded. Choose a segment before pricing.",
@@ -344,6 +385,16 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
     const { draft, error } = readDraft(formData);
     if (error) return { ok: false, message: error };
     const { result, view } = await priceDraft(draft);
+    if (!result.blockedReason && draft.customerId && draft.segment) {
+      const admin = createAdminClient();
+      if (admin) {
+        await admin.rpc("orbit_remember_segment", {
+          p_cin7_id: draft.customerId,
+          p_name: draft.customerName,
+          p_segment: draft.segment,
+        });
+      }
+    }
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? "Best-case price ready. Create the job when you want it booked.",
@@ -359,9 +410,6 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
   try {
     const { draft, error } = readDraft(formData);
     if (error) return { ok: false, message: error };
-    if (draft.source === "cin7") {
-      return { ok: false, message: "A live Cin7 sale can be priced here. Creating the job still only accepts fixture and PDF quotes." };
-    }
     if (!draft.customerName) return { ok: false, message: "Enter the customer name." };
     const { result, view } = await priceDraft(draft);
     if (result.blockedReason || result.customerPrice == null || !result.requirements) {
@@ -370,9 +418,51 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
     const admin = createAdminClient();
     if (!admin) return { ok: false, message: "Creating a job needs the service role key so resource counts stay on the server." };
 
+    const supabase = await createClient();
+    if (draft.source === "cin7") {
+      const saved = await supabase.rpc("orbit_record_cin7_sale", {
+        p_order_number: draft.quoteNumber,
+        p_sale_id: draft.saleId,
+        p_customer_id: draft.customerId,
+        p_customer_name: draft.customerName,
+        p_segment: draft.segment,
+        p_postcode: draft.postcode,
+        p_mode: "A",
+        p_inputs: { postcode: draft.postcode, lines: draft.lines, profile: "best-case", source: draft.source, quoteNumber: draft.quoteNumber, saleId: draft.saleId },
+        p_finality: result.finality,
+        p_provisional: result.provisionalItems,
+        p_internal_cost: result.cost,
+        p_customer_price: result.customerPrice,
+        p_markup: result.markup,
+        p_lines: result.lines.map((line, index) => ({
+          sku: draft.lines[index]?.sku ?? "",
+          productName: line.productName,
+          qty: line.qty,
+          category: line.category,
+          provisional: line.provisional,
+        })),
+        p_big_install: result.bigInstall,
+        p_triggers: result.bigInstallTriggers,
+      });
+      if (saved.error) throw new Error(messageFromError(saved.error, "Could not create the job."));
+      const jobId = (saved.data as { job_id?: string } | null)?.job_id;
+      if (!jobId) throw new Error("The job was not created.");
+      const stored = await admin.rpc("orbit_save_job_requirements", {
+        p_job_id: jobId,
+        p_installers: result.requirements.installers,
+        p_licensed_drivers: result.requirements.licensedDrivers,
+        p_van_size: result.requirements.vanSize,
+        p_van_count: result.requirements.vanCount,
+        p_stair_climber: result.requirements.stairClimber,
+      });
+      if (stored.error) throw new Error(messageFromError(stored.error, "Could not store required resources."));
+      view.jobId = jobId;
+      revalidatePath("/operations/jobs");
+      return { ok: true, message: "Job created from the Cin7 sale. Required resources are locked for the sales rep.", quote: view };
+    }
+
     const number = fixtureNumber(draft);
     const reference = draft.customerReference.startsWith("FIXTURE-") ? draft.customerReference : `FIXTURE-PDF-${draft.customerReference || number}`;
-    const supabase = await createClient();
     const saved = await supabase.rpc("orbit_record_fixture_quote", {
       p_cin7_number: number,
       p_customer_name: draft.customerName,

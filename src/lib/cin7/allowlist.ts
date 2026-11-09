@@ -8,7 +8,7 @@ export type Cin7AllowedPath = (typeof CIN7_ALLOWED_PATHS)[number];
 const QUERY_KEYS: Record<Cin7AllowedPath, readonly string[]> = {
   sale: ["ID"],
   saleList: ["Search", "Page", "Limit"],
-  product: ["ID", "Sku", "Limit"],
+  product: ["ID", "Sku", "Page", "Limit", "IncludeDeprecated"],
   customer: ["ID", "Limit"],
 };
 
@@ -42,8 +42,10 @@ export function assertCin7Get(method: string, path: string, query: Record<string
   }
   if (name === "sale" && !query.ID) throw new Cin7RequestBlocked("Cin7 sale requires a SaleID.");
   if (name === "saleList" && !query.Search) throw new Cin7RequestBlocked("Cin7 saleList requires an order number search.");
-  if (name === "product" && !query.ID && !query.Sku) throw new Cin7RequestBlocked("Cin7 product requires an ID or SKU.");
   if (name === "product" && query.ID && query.Sku) throw new Cin7RequestBlocked("Cin7 product accepts an ID or a SKU, not both.");
+  if (name === "product" && !query.ID && !query.Sku && !query.Page && !query.Limit) {
+    throw new Cin7RequestBlocked("Cin7 product requires an ID, a SKU, or a page.");
+  }
   if (name === "customer" && !query.ID) throw new Cin7RequestBlocked("Cin7 customer requires an ID.");
 
   return { path: name as Cin7AllowedPath, query };
