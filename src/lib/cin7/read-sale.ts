@@ -104,7 +104,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     const sku = text(line.SKU);
     const key = productId ?? sku;
     if (!key || products.has(key)) continue;
-    const query: Record<string, string> = { Limit: "1" };
+    const query: Record<string, string> = { Limit: "1", IncludeDeprecated: "true" };
     if (productId) query.ID = productId;
     else if (sku) query.Sku = sku;
     products.set(key, productsOf(await get("product", query))[0] ?? {});
@@ -121,6 +121,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       productName: text(line.Name) ?? text(product.Name) ?? sku ?? "Item",
       category: null,
       cin7Category: text(product.Category),
+      productId,
       qty: amount(line.Quantity) ?? 0,
       unitWeightKg: weightKg(product),
       length: amount(product.Length),

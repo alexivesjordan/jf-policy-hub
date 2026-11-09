@@ -119,6 +119,7 @@ export function PriceQuoteForm({
                   <tr key={`${line.sku}-${index}`} className="border-t border-line">
                     <td className="px-3 py-2">
                       <input type="hidden" name="lineSku" value={line.sku} />
+                      <input type="hidden" name="lineProductId" value={line.productId} />
                       <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
                       <span className="font-mono text-xs text-ink">{line.sku || "—"}</span>
                     </td>

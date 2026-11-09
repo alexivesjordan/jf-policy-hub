@@ -102,6 +102,15 @@ export async function listCin7CategoryDefaults() {
   return asArray<Cin7CategoryDefault>(await rpc("orbit_cin7_category_defaults"));
 }
 
+export type CategoryGap = {
+  category: string;
+  sku_count: number;
+};
+
+export async function listCategoriesWithoutDefault() {
+  return asArray<CategoryGap>(await rpc("orbit_categories_without_default"));
+}
+
 export async function listSkuEffort(filters: {
   search?: string;
   category?: string;

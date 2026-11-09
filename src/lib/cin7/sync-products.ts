@@ -25,8 +25,8 @@ function text(value: unknown) {
 }
 
 /**
- * Page through active products. Does not log payloads.
- * 4,337 products at 500 per page is 9 GET /product calls, inside the 60/min limit.
+ * Page through every product, including deprecated. Does not log payloads.
+ * About 4,580 products at 500 per page is 10 GET /product calls, inside the 60/min limit.
  */
 export async function syncCin7Products(target: SyncTarget) {
   const accountId = process.env.CIN7_ACCOUNT_ID?.trim() ?? "";
@@ -45,7 +45,7 @@ export async function syncCin7Products(target: SyncTarget) {
       accountId,
       applicationKey,
       path: "product",
-      query: { Page: String(page), Limit: String(PAGE_SIZE), IncludeDeprecated: "false" },
+      query: { Page: String(page), Limit: String(PAGE_SIZE), IncludeDeprecated: "true" },
     });
     pages += 1;
     const root = record(body);
@@ -56,8 +56,6 @@ export async function syncCin7Products(target: SyncTarget) {
     for (const item of list) {
       const product = record(item);
       if (!product) continue;
-      const status = text(product.Status);
-      if (status && status.toLowerCase() === "deprecated") continue;
       const sku = text(product.SKU);
       if (!sku) continue;
       rows.push({
@@ -79,7 +77,7 @@ export async function syncCin7Products(target: SyncTarget) {
 
   return {
     ok: true as const,
-    message: `Synced ${products} active products in ${pages} pages.`,
+    message: `Synced ${products} products in ${pages} pages.`,
     products,
     pages,
   };

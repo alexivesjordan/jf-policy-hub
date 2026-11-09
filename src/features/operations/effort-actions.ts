@@ -54,6 +54,34 @@ export async function saveCin7CategoryDefaults(_state: ActionState, formData: Fo
   }
 }
 
+export async function saveMissingCategoryDefaults(_state: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const supabase = await ownerClient();
+    const categories = formData.getAll("category").map(String);
+    const assembly = formData.getAll("needsAssembly").map(String);
+    const crews = formData.getAll("crew").map(String);
+    const minutes = formData.getAll("minutes").map(String);
+    const notes = formData.getAll("notes").map(String);
+    const rows = categories
+      .map((category, index) => ({
+        category,
+        needs_assembly: assembly[index] === "yes" ? true : assembly[index] === "no" ? false : null,
+        crew: crews[index] ? Number(crews[index]) : null,
+        build_minutes: minutes[index] ? Number(minutes[index]) : null,
+        status: "suggested",
+        notes: notes[index] ?? "",
+      }))
+      .filter((row) => row.needs_assembly !== null);
+    if (rows.length === 0) return { ok: false, message: "Choose assembly for at least one category." };
+    const { error } = await supabase.rpc("orbit_save_cin7_category_defaults", { p_rows: rows });
+    if (error) throw new Error(messageFromError(error, "Could not save those category defaults."));
+    revalidatePath("/operations/settings");
+    return { ok: true, message: `Saved ${rows.length} category defaults.` };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not save those category defaults." };
+  }
+}
+
 export async function bulkUpdateSkuEffort(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const supabase = await ownerClient();

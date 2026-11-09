@@ -6,9 +6,10 @@ import {
   bulkUpdateSkuEffort,
   importSkuEffort,
   saveCin7CategoryDefaults,
+  saveMissingCategoryDefaults,
   syncProductsFromCin7,
 } from "@/features/operations/effort-actions";
-import type { Cin7CategoryDefault, SkuEffortRow } from "@/features/operations/queries";
+import type { CategoryGap, Cin7CategoryDefault, SkuEffortRow } from "@/features/operations/queries";
 
 export function SyncProductsButton() {
   const [state, action, pending] = useActionState(syncProductsFromCin7, null);
@@ -59,6 +60,52 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
         </table>
       </div>
       <Button type="submit" disabled={pending}>{pending ? "Saving..." : "Save category defaults"}</Button>
+      {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
+    </form>
+  );
+}
+
+export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
+  const [state, action, pending] = useActionState(saveMissingCategoryDefaults, null);
+  if (rows.length === 0) return <p className="text-sm text-grey">Every synced category has a default.</p>;
+  return (
+    <form action={action} className="space-y-4">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem] border-collapse text-sm">
+          <thead>
+            <tr className="text-left text-grey">
+              <th className="py-2 pr-3">Cin7 category</th>
+              <th className="py-2 pr-3">SKUs</th>
+              <th className="py-2 pr-3">Needs assembly</th>
+              <th className="py-2 pr-3">Crew</th>
+              <th className="py-2 pr-3">Minutes</th>
+              <th className="py-2">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.category} className="border-t border-line">
+                <td className="py-2 pr-3 font-semibold">
+                  {row.category}
+                  <input type="hidden" name="category" value={row.category} />
+                </td>
+                <td className="py-2 pr-3">{row.sku_count}</td>
+                <td className="py-2 pr-3">
+                  <select name="needsAssembly" defaultValue="" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+                    <option value="">Leave unknown</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </td>
+                <td className="py-2 pr-3"><Input name="crew" type="number" min="1" max="6" /></td>
+                <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" /></td>
+                <td className="py-2"><Input name="notes" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Button type="submit" disabled={pending}>{pending ? "Saving..." : "Save chosen defaults"}</Button>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
     </form>
   );

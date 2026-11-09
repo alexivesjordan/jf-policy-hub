@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
+import { fillMissingSkuCategories } from "@/lib/cin7/missing-product";
+import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { requireOperationsUser } from "@/lib/auth";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
@@ -29,6 +31,7 @@ export type ReviewLine = {
   category: string;
   lineTotal: number | null;
   unitWeightKg: number | null;
+  productId: string;
 };
 
 export type QuoteDraft = {
@@ -151,6 +154,7 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
       category: "",
       lineTotal: line.lineTotal,
       unitWeightKg: null,
+      productId: "",
     })),
     goodsNet: extracted.goodsNet,
     warnings,
@@ -192,6 +196,7 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
     category: categories[index] ?? "",
     lineTotal: totals[index] ?? null,
     unitWeightKg: weights[index] ?? null,
+    productId: String(formData.getAll("lineProductId")[index] ?? ""),
   }));
   if (lines.some((line) => !line.description || !Number.isFinite(line.qty) || line.qty <= 0)) {
     return { draft: emptyDraft(), error: "Each line needs a description and a quantity." };
@@ -241,13 +246,45 @@ function emptyDraft(): QuoteDraft {
   };
 }
 
+async function withLiveCategories(lines: ReviewLine[]) {
+  if (!cin7IsConnected()) return lines;
+  const admin = createAdminClient();
+  const accountId = process.env.CIN7_ACCOUNT_ID?.trim() ?? "";
+  const applicationKey = process.env.CIN7_APPLICATION_KEY?.trim() ?? "";
+  if (!admin || !accountId || !applicationKey) return lines;
+  const skus = lines.map((line) => line.sku).filter(Boolean);
+  const { data } = skus.length ? await admin.rpc("orbit_sku_effort_for_pricing", { p_skus: skus }) : { data: [] };
+  const known = new Set((Array.isArray(data) ? data : []).map((row) => String((row as { sku?: string }).sku ?? "")));
+  const filled = await fillMissingSkuCategories(lines, known, (productId) =>
+    cin7Get({
+      accountId,
+      applicationKey,
+      path: "product",
+      query: { ID: productId, Limit: "1", IncludeDeprecated: "true" },
+    }),
+  );
+  if (filled.found.length > 0) {
+    await admin.rpc("orbit_sync_sku_effort", {
+      p_rows: filled.found.map((hit) => ({
+        sku: hit.sku,
+        product_name: hit.name,
+        cin7_category: hit.category,
+        cin7_product_id: hit.productId,
+      })),
+    });
+  }
+  return filled.lines;
+}
+
 async function priceDraft(draft: QuoteDraft) {
   const context = await getOfficeContext();
   const showCost = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
   const pricing = await pricingConfig();
+  const lines = await withLiveCategories(draft.lines);
+  draft.lines = lines;
   const result = priceInstall({
     mode: "A",
-    lines: draft.lines.map((line) => ({
+    lines: lines.map((line) => ({
       sku: line.sku || null,
       productName: line.description,
       category: line.category || null,
@@ -307,6 +344,7 @@ function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], remembere
       category: line.cin7Category ?? line.category ?? "",
       lineTotal: null,
       unitWeightKg: line.unitWeightKg ?? null,
+      productId: line.productId ?? "",
     })),
     goodsNet: null,
     warnings,

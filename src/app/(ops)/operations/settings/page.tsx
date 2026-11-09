@@ -1,7 +1,7 @@
-import { CategoryDefaultEditor, SkuEffortEditor, SyncProductsButton } from "@/components/effort-table";
+import { CategoryDefaultEditor, CategoryGapEditor, SkuEffortEditor, SyncProductsButton } from "@/components/effort-table";
 import { PricingForm, TermsForm } from "@/components/operations-forms";
 import { Button, Card, Input } from "@/components/ui";
-import { getOfficeContext, listCin7CategoryDefaults, listSkuEffort, readOwnerSettings, readTerms } from "@/features/operations/queries";
+import { getOfficeContext, listCategoriesWithoutDefault, listCin7CategoryDefaults, listSkuEffort, readOwnerSettings, readTerms } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 
 function one(value: string | string[] | undefined) {
@@ -42,10 +42,11 @@ export default async function SettingsPage({
     );
   }
 
-  const [pricing, terms, categories, effort] = await Promise.all([
+  const [pricing, terms, categories, gaps, effort] = await Promise.all([
     readOwnerSettings(),
     readTerms(),
     listCin7CategoryDefaults().catch(() => []),
+    listCategoriesWithoutDefault().catch(() => []),
     listSkuEffort({ search, category, status, needsAssembly: needs, offset: page * 50 }).catch(() => null),
   ]);
   const lines = terms?.charges_grid.lines ?? [];
@@ -97,6 +98,13 @@ export default async function SettingsPage({
         </p>
         <div className="mt-4">
           {categories.length > 0 ? <CategoryDefaultEditor rows={categories} /> : <p className="text-sm text-ink">Apply the effort migration to seed category defaults.</p>}
+        </div>
+        <h3 className="font-display mt-8 text-xl">Categories with no default</h3>
+        <p className="mt-2 text-sm text-grey">
+          {gaps.length} categories, {gaps.reduce((sum, row) => sum + Number(row.sku_count), 0)} SKUs. These price as a 2-man, 2-hour assembly until you set one. Leave a row unknown to skip it.
+        </p>
+        <div className="mt-4">
+          <CategoryGapEditor rows={gaps} />
         </div>
       </Card>
 

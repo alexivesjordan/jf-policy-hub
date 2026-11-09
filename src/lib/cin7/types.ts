@@ -8,6 +8,8 @@ export type Cin7QuoteLine = {
   category: string | null;
   /** Cin7 product Category text. Not a Pulse category slug. */
   cin7Category?: string | null;
+  /** Cin7 ProductID from the sale line. */
+  productId?: string | null;
   qty: number;
   /** Product.Weight when Cin7 reports kilograms. */
   unitWeightKg?: number | null;
