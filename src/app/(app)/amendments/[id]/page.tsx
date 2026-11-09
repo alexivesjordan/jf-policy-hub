@@ -66,7 +66,7 @@ export default async function AmendmentPage({
           <ul className="mt-3 space-y-1 text-sm">
             {amendment.source_urls.map((url) => (
               <li key={url}>
-                <a href={url} className="text-white underline decoration-red" rel="noreferrer" target="_blank">
+                <a href={url} className="text-ink underline decoration-red" rel="noreferrer" target="_blank">
                   {url}
                 </a>
               </li>

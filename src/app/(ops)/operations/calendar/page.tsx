@@ -28,11 +28,11 @@ export default async function CalendarPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-4xl">Resources</h1>
-        <p className="mt-2 max-w-2xl text-white/70">
+        <p className="mt-2 max-w-2xl text-ink/70">
           Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected.
         </p>
       </div>
-      {calendar.error ? <p className="text-sm text-white">{calendar.error.message}</p> : null}
+      {calendar.error ? <p className="text-sm text-ink">{calendar.error.message}</p> : null}
       <div className="overflow-x-auto rounded-3xl border border-line">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>
@@ -47,7 +47,7 @@ export default async function CalendarPage() {
             {data.resources.map((resource) => (
               <tr key={resource.id} className="border-t border-line">
                 <td className="px-3 py-3">
-                  <p className="font-semibold text-white">{resource.name}</p>
+                  <p className="font-semibold text-ink">{resource.name}</p>
                   <p className="text-xs text-grey">{resource.resource_type}</p>
                 </td>
                 {days.map((day) => {

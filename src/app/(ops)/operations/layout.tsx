@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
+import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listOrbitNotifications } from "@/features/operations/queries";
+import { listMyNotifications } from "@/features/policies/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { orbitModules } from "@/modules/registry";
@@ -31,13 +33,38 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   const profile = await requireOperationsUser();
   let isOwner = false;
   let unread = 0;
+  let notifications: BellItem[] = [];
   try {
-    const [context, notifications] = await Promise.all([
+    const [context, operations, people] = await Promise.all([
       getOfficeContext(),
       listOrbitNotifications(false),
+      listMyNotifications(),
     ]);
     isOwner = context.is_owner;
-    unread = notifications.filter((item) => !item.read_at).length;
+    notifications = [
+      ...people.map((item) => ({
+        id: item.id,
+        source: "people" as const,
+        title: item.title,
+        body: item.body,
+        href: item.link,
+        read: Boolean(item.read_at),
+        createdAt: item.created_at,
+      })),
+      ...operations.map((item) => ({
+        id: item.id,
+        source: "operations" as const,
+        title: item.title,
+        body: item.body,
+        href: item.link,
+        read: Boolean(item.read_at),
+        createdAt: item.created_at,
+      })),
+    ]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 20)
+      .map(({ createdAt: _createdAt, ...item }) => item);
+    unread = notifications.filter((item) => !item.read).length;
   } catch {
     isOwner = false;
   }
@@ -47,7 +74,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav}>
+    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>
       {children}
     </AppShell>
   );

@@ -11,7 +11,7 @@ export function LinkError() {
   const params = useSearchParams();
   if (params.get("error") !== "link") return null;
   return (
-    <p className="rounded-2xl border border-red bg-card px-4 py-3 text-sm text-white">
+    <p className="rounded-2xl border border-red bg-card px-4 py-3 text-sm text-ink">
       That link is invalid or has expired. Ask for a new invite, or request another password email.
     </p>
   );
@@ -59,7 +59,7 @@ export function LoginForm() {
         {pending ? "Please wait..." : "Sign in"}
       </Button>
       <p className="text-sm leading-6 text-grey">
-        <Link href="/login/forgot" className="font-semibold text-white underline decoration-red underline-offset-4">
+        <Link href="/login/forgot" className="font-semibold text-ink underline decoration-red underline-offset-4">
           Forgot password?
         </Link>{" "}
         Use this if you have not chosen a password yet. Invites and sign-in are limited to @jordanfitness.com.

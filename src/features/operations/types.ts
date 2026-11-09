@@ -119,6 +119,17 @@ export type GateOverrideRow = {
   cin7_number: string | null;
 };
 
+export type StoredRequirements = {
+  installers: number;
+  licensed_drivers: number;
+  van_size: "small" | "crafter";
+  van_count: number;
+  stair_climber: boolean;
+  overridden: boolean;
+  conflict: boolean;
+  conflict_detail: string | null;
+};
+
 export type OrbitNotification = {
   id: string;
   title: string;

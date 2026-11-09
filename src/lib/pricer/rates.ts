@@ -26,6 +26,9 @@ export const RATES = {
   contingencyHigh: 0.05,
   contingencyAccess: 0.05,
   tagCost: 0.22,
+  /** SET in install-quoting v2.5. Same-day food stays off while food_trigger is UNSET. */
+  foodRate: 15,
+  hotelRate: 80,
   installerHour: 30,
   installerHourOoh: 45,
   mileageCharge: 0.5,

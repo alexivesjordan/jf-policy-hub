@@ -14,7 +14,7 @@ export default async function AccessReviewPage({ params }: { params: Promise<{ i
   await requireOperationsUser();
   const context = await getOfficeContext();
   if (!context.is_owner && context.ops_role !== "install_lead" && context.ops_role !== "admin_owner") {
-    return <p className="text-white/75">Only the install lead can review an access form.</p>;
+    return <p className="text-ink/75">Only the install lead can review an access form.</p>;
   }
   const { id } = await params;
   const job = await getJob(id);
@@ -69,9 +69,9 @@ export default async function AccessReviewPage({ params }: { params: Promise<{ i
         Back to the job
       </Link>
       <h1 className="font-display text-4xl">Access review</h1>
-      <p className="text-white/70">{job.customer.name}. Mode B compares the form with the best-case price.</p>
+      <p className="text-ink/70">{job.customer.name}. Mode B compares the form with the best-case price.</p>
       {forms.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-white/70">No access form yet.</p>
+        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">No access form yet.</p>
       ) : (
         <Card>
           <p className="font-semibold">Accepted by {latest?.accepted_by_name ?? "—"}</p>
@@ -91,7 +91,7 @@ export default async function AccessReviewPage({ params }: { params: Promise<{ i
             <p className="mt-4 text-sm text-grey">Price the quote first so this job has lines and a segment.</p>
           )}
           {variation?.variation?.belowCost ? (
-            <p className="mt-4 text-sm text-white">The grid charge is below the internal cost delta.</p>
+            <p className="mt-4 text-sm text-ink">The grid charge is below the internal cost delta.</p>
           ) : null}
           {variation?.bigInstall ? <Badge tone="pending">Big install — photos or a walkthrough are required before booking</Badge> : null}
           <p className="mt-3 text-xs text-grey">{variation?.variation?.roundingNote}</p>

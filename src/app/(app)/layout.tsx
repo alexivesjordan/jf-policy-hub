@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
+import type { BellItem } from "@/components/notification-bell";
+import { listOrbitNotifications } from "@/features/operations/queries";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
-import { pendingCount, unreadCount } from "@/features/policies/queries";
+import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
 
 export const instant = false;
 
@@ -28,9 +30,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 async function AuthedShell({ children }: { children: React.ReactNode }) {
   const profile = await requireUser();
-  const [pending, unread] = await Promise.all([pendingCount(), unreadCount(profile.id)]);
+  const [pending, unread, people, operations] = await Promise.all([
+    pendingCount(),
+    unreadCount(profile.id),
+    listMyNotifications(),
+    listOrbitNotifications(false).catch(() => []),
+  ]);
+  const notifications: BellItem[] = [
+    ...people.map((item) => ({
+      id: item.id,
+      source: "people" as const,
+      title: item.title,
+      body: item.body,
+      href: item.link,
+      read: Boolean(item.read_at),
+      createdAt: item.created_at,
+    })),
+    ...operations.map((item) => ({
+      id: item.id,
+      source: "operations" as const,
+      title: item.title,
+      body: item.body,
+      href: item.link,
+      read: Boolean(item.read_at),
+      createdAt: item.created_at,
+    })),
+  ]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20)
+    .map(({ createdAt: _createdAt, ...item }) => item);
   return (
-    <AppShell profile={profile} pending={pending} unread={unread}>
+    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications}>
       {children}
     </AppShell>
   );

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { NotificationBell, type BellItem } from "@/components/notification-bell";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, type ModuleNavItem } from "@/modules/registry";
@@ -14,6 +16,7 @@ export function AppShell({
   unread,
   isOwner = false,
   nav,
+  notifications = [],
   children,
 }: {
   profile: Profile;
@@ -21,6 +24,7 @@ export function AppShell({
   unread: number;
   isOwner?: boolean;
   nav?: ModuleNavItem[];
+  notifications?: BellItem[];
   children: ReactNode;
 }) {
   const path = usePathname();
@@ -34,22 +38,26 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
-      <aside className="flex flex-col border-line bg-pine text-white md:sticky md:top-0 md:h-screen md:border-r">
+      <aside className="flex flex-col border-line bg-pine text-ink md:sticky md:top-0 md:h-screen md:border-r">
         <div className="px-4 py-4 md:px-5 md:py-6">
           <Link href="/" className="block rounded-xl outline-none">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Orbit</p>
-            <p className="font-display mt-1 text-xl text-white">{current?.name ?? "Modules"}</p>
+            <p className="font-display mt-1 text-xl text-ink">{current?.name ?? "Modules"}</p>
           </Link>
           <p className="mt-1 text-xs text-grey">{current?.tagline}</p>
         </div>
         <SideNav items={items} counts={counts} />
-        <div className="mt-auto hidden border-t border-white/10 px-3 py-3 md:block">
+        <div className="mt-auto hidden border-t border-line px-3 py-3 md:block">
           <UserMenu profile={profile} placement="up" />
         </div>
       </aside>
       <div className="min-w-0">
-        <div className="flex justify-end border-b border-line px-3 py-2 md:hidden">
-          <UserMenu profile={profile} placement="down" className="max-w-xs" />
+        <div className="flex items-center justify-end gap-2 border-b border-line px-3 py-2">
+          <NotificationBell items={notifications} />
+          <ThemeToggle />
+          <div className="md:hidden">
+            <UserMenu profile={profile} placement="down" className="max-w-xs" />
+          </div>
         </div>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>
@@ -78,12 +86,12 @@ function SideNav({
             href={item.href}
             className={cn(
               "flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold",
-              active ? "bg-red text-white" : "text-white hover:bg-white/10",
+              active ? "bg-red text-white" : "text-ink hover:bg-ink/5",
             )}
           >
             <span>{item.label}</span>
             {count ? (
-              <span className="font-mono text-xs tabular-nums text-white">{count}</span>
+              <span className="font-mono text-xs tabular-nums">{count}</span>
             ) : null}
           </Link>
         );

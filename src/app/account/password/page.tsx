@@ -42,13 +42,13 @@ async function PasswordContent({
           ? "You will use this password the next time you sign in."
           : "Choose a new password for your Jordan Fitness account."}
       </p>
-      {saved ? <p className="mt-4 text-sm text-white">Password saved.</p> : null}
+      {saved ? <p className="mt-4 text-sm text-ink">Password saved.</p> : null}
       <div className="mt-6">
         <SetPasswordForm next={setup ? "/" : "/account/password?saved=1"} setup={setup} />
       </div>
       {home === null ? (
         <p className="mt-6 text-sm">
-          <Link href="/" className="font-semibold text-white underline decoration-red underline-offset-4">
+          <Link href="/" className="font-semibold text-ink underline decoration-red underline-offset-4">
             Back to Jordan Orbit
           </Link>
         </p>

@@ -23,15 +23,15 @@ async function ModuleGate({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <main className="orbit-grid flex min-h-screen flex-col px-6 py-8 text-ink">
-      <Link href="/" className="text-sm font-semibold text-white underline decoration-red">
+      <Link href="/" className="text-sm font-semibold text-ink underline decoration-red">
         All modules
       </Link>
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 text-white/70">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 text-ink/70">
           <ModuleGlyph name={orbitModule.icon} className="h-7 w-7" />
         </span>
-        <h1 className="font-display mt-5 text-4xl text-white">{orbitModule.name}</h1>
-        <p className="mt-2 text-white/70">{orbitModule.tagline}</p>
+        <h1 className="font-display mt-5 text-4xl text-ink">{orbitModule.name}</h1>
+        <p className="mt-2 text-ink/70">{orbitModule.tagline}</p>
         <p className="mt-6 text-sm uppercase tracking-[0.18em] text-grey">Coming soon</p>
         <p className="mt-3 leading-7 text-grey">
           This part of Jordan Orbit is not open yet. Orbit People is the module you can use today.

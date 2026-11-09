@@ -10,6 +10,7 @@ import type {
   OrbitNotification,
   OrbitTask,
   PricingSettings,
+  StoredRequirements,
   TermsVersion,
 } from "@/features/operations/types";
 
@@ -37,6 +38,16 @@ export async function getJob(id: string) {
   return row;
 }
 
+export async function listCategoryEffortDefaults() {
+  return asArray<{
+    version: number;
+    category: string;
+    build_crew: number;
+    build_minutes: number;
+    note: string;
+  }>(await rpc("orbit_category_effort_defaults"));
+}
+
 export async function readOwnerSettings() {
   const data = await rpc<{
     settings: unknown;
@@ -51,6 +62,10 @@ export async function readTerms() {
 
 export async function listGateOverrides() {
   return asArray<GateOverrideRow>(await rpc("orbit_list_gate_overrides"));
+}
+
+export async function getJobRequirements(id: string) {
+  return rpc<StoredRequirements | null>("orbit_job_requirements", { p_job_id: id });
 }
 
 export async function listOrbitNotifications(unreadOnly = false) {

@@ -125,7 +125,7 @@ export function UploadForm({
       </Field>
 
       {hasContent ? (
-        <label className="flex items-start gap-3 rounded-2xl border border-line bg-card px-3 py-3 text-sm text-white">
+        <label className="flex items-start gap-3 rounded-2xl border border-line bg-card px-3 py-3 text-sm text-ink">
           <input type="checkbox" name="confirmReplace" value="yes" className="mt-1" />
           <span>Replace the current policy text with the text from this file.</span>
         </label>

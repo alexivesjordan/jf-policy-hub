@@ -17,6 +17,7 @@ export async function markNotificationRead(formData: FormData) {
     .is("read_at", null);
   revalidatePath("/notifications");
   revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
 }
 
 export async function markAllNotificationsRead() {
@@ -29,4 +30,5 @@ export async function markAllNotificationsRead() {
     .is("read_at", null);
   revalidatePath("/notifications");
   revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
 }

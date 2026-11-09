@@ -95,7 +95,7 @@ export default async function PoliciesPage({
               <li key={policy.id} className="rounded-3xl border border-line bg-card px-5 py-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-white">
+                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-ink">
                       {policy.title}
                     </Link>
                     <p className="mt-1 text-sm text-ink/70">

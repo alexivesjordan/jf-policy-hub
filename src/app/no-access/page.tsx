@@ -33,7 +33,7 @@ async function NoAccessContent() {
       <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Orbit</p>
       <h1 className="font-display mt-2 text-4xl">No access yet</h1>
       <p className="mt-3 leading-7 text-grey">{message}</p>
-      <p className="mt-2 text-sm text-white">{profile.email}</p>
+      <p className="mt-2 text-sm text-ink">{profile.email}</p>
       <form action={signOut} className="mt-6">
         <button type="submit" className="rounded-full bg-red px-4 py-2 font-semibold text-white">
           Sign out

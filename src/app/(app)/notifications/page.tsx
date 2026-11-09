@@ -20,7 +20,7 @@ export default async function NotificationsPage() {
         </div>
         {unread ? (
           <form action={markAllNotificationsRead}>
-            <button type="submit" className="text-sm font-semibold text-white underline decoration-red">
+            <button type="submit" className="text-sm font-semibold text-ink underline decoration-red">
               Mark all read
             </button>
           </form>
@@ -45,7 +45,7 @@ export default async function NotificationsPage() {
               </div>
               <div className="mt-3 flex gap-4 text-sm font-semibold">
                 {item.link ? (
-                  <Link href={item.link} className="text-white underline decoration-red">
+                  <Link href={item.link} className="text-ink underline decoration-red">
                     Open
                   </Link>
                 ) : null}

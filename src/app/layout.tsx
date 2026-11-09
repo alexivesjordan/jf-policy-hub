@@ -21,9 +21,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+const themeBoot = `(function(){try{var k="orbit-theme";var t=localStorage.getItem(k);if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )orbit-theme=([^;]+)/);t=m?decodeURIComponent(m[1]):"light";}document.documentElement.dataset.theme=t==="dark"?"dark":"light";}catch(e){document.documentElement.dataset.theme="light";}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={`${grotesk.variable} ${mono.variable} h-full`}>
+    <html lang="en-GB" className={`${grotesk.variable} ${mono.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+      </head>
       <body className="min-h-full bg-paper font-sans text-ink antialiased">{children}</body>
     </html>
   );

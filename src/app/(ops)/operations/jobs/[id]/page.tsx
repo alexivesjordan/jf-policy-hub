@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card } from "@/components/ui";
 import { AccessLinkButton } from "@/components/access-link-button";
-import { getJob, getOfficeContext } from "@/features/operations/queries";
+import { RequirementOverrideForm } from "@/components/requirement-override-form";
+import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
+import { canOverrideRequirements } from "@/lib/orbit/requirements";
 import { formatDate, formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -20,12 +22,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     notFound();
   }
   if (!job) notFound();
+  const requirements = await getJobRequirements(id).catch(() => null);
+  const canOverride = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
 
   const address = [job.site?.address_line1, job.site?.city, job.site?.postcode].filter(Boolean).join(", ");
 
   return (
     <div className="space-y-6">
-      <Link href="/operations/jobs" className="text-sm font-semibold text-white underline decoration-red">
+      <Link href="/operations/jobs" className="text-sm font-semibold text-ink underline decoration-red">
         All jobs
       </Link>
       <div>
@@ -33,10 +37,45 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <h1 className="font-display text-4xl">{job.customer.name}</h1>
           {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
         </div>
-        <p className="mt-2 text-white/70">Status is read-only. The server changes it when the rules are met.</p>
+        <p className="mt-2 text-ink/70">Status is read-only. The server changes it when the rules are met.</p>
       </div>
 
-      {context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" ? (
+      {requirements ? (
+        <Card>
+          <h2 className="font-display text-2xl">Required resources</h2>
+          <p className="mt-2 text-sm text-grey">
+            {requirements.overridden ? "Overridden by the office." : "Set by the pricer."} A sales rep cannot edit these.
+          </p>
+          <ul className="mt-3 space-y-1 text-sm text-ink">
+            <li>{requirements.installers} installers</li>
+            <li>{requirements.licensed_drivers} licensed drivers</li>
+            <li>{requirements.van_count} {requirements.van_size === "crafter" ? "Crafter" : "small van"}</li>
+            <li>Stair climber {requirements.stair_climber ? "yes" : "no"}</li>
+          </ul>
+          {requirements.conflict ? (
+            <p className="mt-3 text-sm text-ink">{requirements.conflict_detail ?? "The pencilled day no longer covers these resources."}</p>
+          ) : null}
+          <Link href={`/operations/jobs/${job.id}/schedule`} className="mt-4 inline-block text-sm font-semibold text-ink underline decoration-red">
+            Pencil a day
+          </Link>
+          {canOverride ? (
+            <div className="mt-6">
+              <RequirementOverrideForm
+                jobId={job.id}
+                requirements={{
+                  installers: requirements.installers,
+                  licensedDrivers: requirements.licensed_drivers,
+                  vanSize: requirements.van_size,
+                  vanCount: requirements.van_count,
+                  stairClimber: requirements.stair_climber,
+                }}
+              />
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager" ? (
         <div className="flex flex-wrap gap-4 text-sm font-semibold">
           <Link href={`/operations/jobs/${job.id}/access`} className="underline decoration-red">Review access form</Link>
           <AccessLinkButton jobId={job.id} />
@@ -44,7 +83,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       ) : null}
 
       {job.fixture ? (
-        <p className="rounded-3xl border border-line bg-card px-5 py-4 text-sm leading-6 text-white/80">
+        <p className="rounded-3xl border border-line bg-card px-5 py-4 text-sm leading-6 text-ink/80">
           FIXTURE / not production data. This job was not created from Cin7. The segment and customer type below are demo labels, not a Cin7 field mapping.
         </p>
       ) : null}
@@ -66,12 +105,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <Row label="Big install" value={job.big_install ? "Yes" : "No"} />
           </dl>
           {job.hold_reason ? (
-            <p className="mt-4 text-sm text-white/80">
+            <p className="mt-4 text-sm text-ink/80">
               On hold: {job.hold_reason}
               {job.hold_review_date ? ` Review ${formatDate(job.hold_review_date)}.` : ""}
             </p>
           ) : null}
-          {job.lost_reason ? <p className="mt-4 text-sm text-white/80">Lost / cancelled: {job.lost_reason}</p> : null}
+          {job.lost_reason ? <p className="mt-4 text-sm text-ink/80">Lost / cancelled: {job.lost_reason}</p> : null}
         </Card>
         <Card>
           <h2 className="font-display text-2xl">Customer and site</h2>
@@ -88,7 +127,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       <Card>
         <h2 className="font-display text-2xl">Quote versions</h2>
         {job.quote_versions.length === 0 ? (
-          <p className="mt-3 text-white/70">
+          <p className="mt-3 text-ink/70">
             No quote versions yet. The pricer is not connected, and these fixture jobs were not priced.
           </p>
         ) : (
@@ -127,7 +166,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-grey">{label}</dt>
-      <dd className="text-right text-white">{value}</dd>
+      <dd className="text-right text-ink">{value}</dd>
     </div>
   );
 }

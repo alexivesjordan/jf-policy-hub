@@ -1,0 +1,191 @@
+Anonymised text extracted from a Cin7 Core quote layout.
+Customer name, address, and sales contact are replaced.
+This is not the original PDF and must stay free of real customer details.
+Quote No: SO-00490 is retained so the parser can be checked against that layout.
+Quote No: SO-00490
+
+Customer
+Sample Fitness Ltd
+1 Anonymised Street
+Stowmarket
+IP14NJ
+
+Delivery Address
+Sample Fitness Ltd
+Unit 2, Anonymised Estate
+Stowmarket
+IP14NJ
+
+Sales Contact
+Jordan Example
+sales.example@example.com
+
+Order No
+Date
+Terms
+Customer Reference
+Currency
+SO-00490
+09 Nov 2026
+30 days
+SAMPLE-REF
+GBP
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+1 JTRBARSN2-
+1N-RC
+Jordan snatch bar
+1 700.00 0 700.00 700.00 140.00
+2 JTDR-05-10
+BLK
+Rubber dumbbell
+2 350.87 0 350.87 701.73 140.35
+3 JTFIX-003
+Anonymised product 3
+3 234.49 0 234.49 703.46 140.69
+4 JTFIX-004
+Anonymised product 4
+4 176.30 0 176.30 705.19 141.04
+5 JTFIX-005
+Anonymised product 5
+1 706.92 0 706.92 706.92 141.38
+6 JTFIX-006
+Anonymised product 6
+2 354.33 0 354.33 708.65 141.73
+7 JTFIX-007
+Anonymised product 7
+3 236.79 0 236.79 710.38 142.08
+8 JTFIX-008
+Anonymised product 8
+4 178.03 0 178.03 712.11 142.42
+9 JTFIX-009
+Anonymised product 9
+1 713.84 0 713.84 713.84 142.77
+10 JTFIX-010
+Anonymised product 10
+2 357.79 0 357.79 715.57 143.11
+11 JTRBAR-
+20KG
+Training bar
+3 239.10 0 239.10 717.30 143.46
+12 JTFIX-012
+Anonymised product 12
+4 179.76 0 179.76 719.03 143.81
+
+This quotation is valid for 30 days.
+Printed: 09/11/2026 10:00 Page 1 of 4
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+13 JTFIX-013
+Anonymised product 13
+1 720.76 0 720.76 720.76 144.15
+14 JTFIX-014
+Anonymised product 14
+2 361.25 0 361.25 722.49 144.50
+15 JTFIX-015
+Anonymised product 15
+3 241.41 0 241.41 724.22 144.84
+16 JTFIX-016
+Anonymised product 16
+4 181.49 0 181.49 725.95 145.19
+17 JTFIX-017
+Anonymised product 17
+1 727.68 0 727.68 727.68 145.54
+18 JTFIX-018
+Anonymised product 18
+2 364.71 0 364.71 729.41 145.88
+19 JTFIX-019
+Anonymised product 19
+3 243.71 0 243.71 731.14 146.23
+20 JTFIX-020
+Anonymised product 20
+4 183.22 0 183.22 732.87 146.57
+21 JTFIX-021
+Anonymised product 21
+1 734.60 0 734.60 734.60 146.92
+22 JTFIX-022
+Anonymised product 22
+2 368.17 0 368.17 736.33 147.27
+23 JTFIX-023
+Anonymised product 23
+3 246.02 0 246.02 738.06 147.61
+24 JTFIX-024
+Anonymised product 24
+4 184.95 0 184.95 739.79 147.96
+
+This quotation is valid for 30 days.
+Printed: 09/11/2026 10:00 Page 2 of 4
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+25 JTFIX-025
+Anonymised product 25
+1 741.52 0 741.52 741.52 148.30
+26 JTFIX-026
+Anonymised product 26
+2 371.63 0 371.63 743.25 148.65
+27 JTFIX-027
+Anonymised product 27
+3 248.33 0 248.33 744.98 149.00
+28 JTFIX-028
+Anonymised product 28
+4 186.68 0 186.68 746.71 149.34
+29 JTFIX-029
+Anonymised product 29
+1 748.44 0 748.44 748.44 149.69
+30 JTFIX-030
+Anonymised product 30
+2 375.09 0 375.09 750.17 150.03
+31 JTFIX-031
+Anonymised product 31
+3 250.63 0 250.63 751.90 150.38
+32 JTFIX-032
+Anonymised product 32
+4 188.41 0 188.41 753.63 150.73
+33 JTFIX-033
+Anonymised product 33
+1 755.36 0 755.36 755.36 151.07
+34 JTFIX-034
+Anonymised product 34
+2 378.55 0 378.55 757.09 151.42
+35 JTFIX-035
+Anonymised product 35
+3 252.94 0 252.94 758.82 151.76
+36 JTFIX-036
+Anonymised product 36
+4 190.14 0 190.14 760.55 152.11
+
+This quotation is valid for 30 days.
+Printed: 09/11/2026 10:00 Page 3 of 4
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+37 JTFIX-037
+Anonymised product 37
+1 762.28 0 762.28 762.28 152.46
+38 JTFIX-038
+Anonymised product 38
+2 382.01 0 382.01 764.01 152.80
+39 JTFIX-039
+Anonymised product 39
+3 255.25 0 255.25 765.74 153.15
+40 JTFIX-040
+Anonymised product 40
+4 191.87 0 191.87 767.47 153.49
+41 JTFIX-041
+Anonymised product 41
+1 769.20 0 769.20 769.20 153.84
+42 JTFIX-042
+Anonymised product 42
+2 385.47 0 385.47 770.93 154.19
+43 JTFIX-043
+Anonymised product 43
+3 257.55 0 257.55 772.66 154.53
+44 JTFIX-044
+Anonymised product 44
+4 3,831.83 0 3,831.83 15,327.33 3,065.47
+
+Goods Net 46,989.52
+Additional Charges Net 0.00
+Total Order Net 46,989.52
+VAT 9,397.90
+Total 56,387.42
+
