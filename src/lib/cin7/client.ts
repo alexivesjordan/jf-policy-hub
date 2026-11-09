@@ -1,12 +1,36 @@
 import "server-only";
 
+import { Cin7RequestBlocked } from "@/lib/cin7/allowlist";
 import { createFixtureCin7Client } from "@/lib/cin7/fixture-adapter";
+import { readCin7Sale } from "@/lib/cin7/read-sale";
+import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7ReadClient } from "@/lib/cin7/types";
 
+function credentials() {
+  const accountId = process.env.CIN7_ACCOUNT_ID?.trim() ?? "";
+  const applicationKey = process.env.CIN7_APPLICATION_KEY?.trim() ?? "";
+  if (!accountId || !applicationKey) return null;
+  return { accountId, applicationKey };
+}
+
+/** True only when both server env vars are set. The values are not returned. */
+export function cin7IsConnected() {
+  return credentials() !== null;
+}
+
 /**
- * Always the fixture adapter. A live client would be GET-only and is not
- * implemented. There is no API key and no network call.
+ * Live Cin7 Core when the server env vars are set, otherwise the fixture adapter.
+ * This module is server-only. Do not import it from a client component.
  */
 export function getCin7Client(): Cin7ReadClient {
-  return createFixtureCin7Client();
+  const keys = credentials();
+  if (!keys) return createFixtureCin7Client();
+  return {
+    async listQuotes() {
+      throw new Cin7RequestBlocked("Cin7 blocked listing every sale. Look up one order number.");
+    },
+    async getQuote(id: string) {
+      return readCin7Sale(id, (path, query) => cin7Get({ ...keys, path, query }));
+    },
+  };
 }

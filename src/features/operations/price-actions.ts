@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCin7Client } from "@/lib/cin7/client";
+import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
+import type { Cin7Quote } from "@/lib/cin7/types";
 import { requireOperationsUser } from "@/lib/auth";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
@@ -27,6 +28,7 @@ export type ReviewLine = {
   qty: number;
   category: string;
   lineTotal: number | null;
+  unitWeightKg: number | null;
 };
 
 export type QuoteDraft = {
@@ -38,7 +40,7 @@ export type QuoteDraft = {
   lines: ReviewLine[];
   goodsNet: number | null;
   warnings: string[];
-  source: "fixture" | "pdf";
+  source: "fixture" | "pdf" | "cin7";
 };
 
 export type PricedQuote = ReturnType<typeof forSales> & {
@@ -123,6 +125,7 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
       qty: line.qty,
       category: "",
       lineTotal: line.lineTotal,
+      unitWeightKg: null,
     })),
     goodsNet: extracted.goodsNet,
     warnings,
@@ -137,6 +140,12 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
   const skus = formData.getAll("lineSku").map(String);
   const qtys = formData.getAll("lineQty").map((value) => Number(value));
   const categories = formData.getAll("lineCategory").map(String);
+  const weights = formData.getAll("lineWeight").map((value) => {
+    const text = String(value).trim();
+    if (!text) return null;
+    const parsed = Number(text);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  });
   const totals = formData.getAll("lineTotal").map((value) => {
     const text = String(value).trim();
     if (!text) return null;
@@ -154,6 +163,7 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
     qty: qtys[index] ?? 0,
     category: categories[index] ?? "",
     lineTotal: totals[index] ?? null,
+    unitWeightKg: weights[index] ?? null,
   }));
   if (lines.some((line) => !line.description || !Number.isFinite(line.qty) || line.qty <= 0)) {
     return { draft: emptyDraft(), error: "Each line needs a description and a quantity." };
@@ -178,7 +188,7 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
       lines,
       goodsNet: goodsNet != null && Number.isFinite(goodsNet) ? goodsNet : null,
       warnings,
-      source: formData.get("source") === "pdf" ? "pdf" : "fixture",
+      source: formData.get("source") === "pdf" ? "pdf" : formData.get("source") === "cin7" ? "cin7" : "fixture",
     },
   };
 }
@@ -208,6 +218,7 @@ async function priceDraft(draft: QuoteDraft) {
       productName: line.description,
       category: line.category || null,
       qty: line.qty,
+      unitWeightKg: line.unitWeightKg,
     })),
     postcode: draft.postcode,
     segment: draft.segment as Segment,
@@ -245,38 +256,60 @@ function fixtureNumber(draft: QuoteDraft) {
   return `FIXTURE-PDF-${safe}`;
 }
 
+function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"]): QuoteDraft {
+  const known = new Set(loadBundledEffortTable().map((row) => row.category));
+  const warnings: string[] = [];
+  if (!quote.segment) warnings.push("This quote has no segment. Choose one before pricing.");
+  if (quote.usedQuoteLines) warnings.push("This sale has no order lines. Quote lines were used.");
+  if (quote.weightIgnored) warnings.push("A Cin7 product weight was not in kilograms, so it was left blank.");
+  if (quote.lines.some((line) => line.cin7Category && !known.has(line.cin7Category))) {
+    warnings.push("Cin7 categories are not Pulse categories. Match by product name, or choose a category.");
+  }
+  if (source === "cin7" && !quote.postcode) warnings.push("No shipping postcode came back from Cin7. Enter the site postcode.");
+  return {
+    quoteNumber: quote.number,
+    customerName: quote.customerName,
+    postcode: quote.postcode ?? "",
+    segment: quote.segment ?? "",
+    customerReference: quote.customerRef,
+    lines: quote.lines.map((line) => ({
+      sku: line.sku ?? "",
+      description: line.productName,
+      qty: line.qty,
+      category: line.cin7Category && known.has(line.cin7Category) ? line.cin7Category : (line.category ?? ""),
+      lineTotal: null,
+      unitWeightKg: line.unitWeightKg ?? null,
+    })),
+    goodsNet: null,
+    warnings,
+    source,
+  };
+}
+
 export async function loadFixtureQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
   await requireOperationsUser();
   const number = String(formData.get("quoteNumber") ?? "").trim();
   if (!number) return { ok: false, message: "Enter a quote number." };
-  const quote = await getCin7Client().getQuote(number);
-  if (!quote) {
+  try {
+    const connected = cin7IsConnected();
+    const quote = await getCin7Client().getQuote(number);
+    if (!quote) {
+      return {
+        ok: false,
+        message: connected
+          ? "No Cin7 sale has that order number."
+          : "That number is not in the fixture adapter. Cin7 not connected. Upload the quote PDF instead.",
+      };
+    }
+    const draft = draftFromSale(quote, connected ? "cin7" : "fixture");
     return {
-      ok: false,
-      message: "That number is not in the fixture adapter. Live Cin7 is not connected. Upload the quote PDF instead.",
+      ok: true,
+      message: quote.segment ? "Quote loaded. Check the lines, then price." : "Quote loaded. Choose a segment before pricing.",
+      draft,
     };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not load that quote." };
   }
-  return {
-    ok: true,
-    message: quote.segment ? "Quote loaded. Check the lines, then price." : "Quote loaded. Choose a segment before pricing.",
-    draft: {
-      quoteNumber: quote.number,
-      customerName: quote.customerName,
-      postcode: "",
-      segment: quote.segment ?? "",
-      customerReference: quote.customerRef,
-      lines: quote.lines.map((line) => ({
-        sku: line.sku ?? "",
-        description: line.productName,
-        qty: line.qty,
-        category: line.category ?? "",
-        lineTotal: null,
-      })),
-      goodsNet: null,
-      warnings: quote.segment ? [] : ["This quote has no segment. Choose one before pricing."],
-      source: "fixture",
-    },
-  };
 }
 
 export async function parseUploadedQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
@@ -326,6 +359,9 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
   try {
     const { draft, error } = readDraft(formData);
     if (error) return { ok: false, message: error };
+    if (draft.source === "cin7") {
+      return { ok: false, message: "A live Cin7 sale can be priced here. Creating the job still only accepts fixture and PDF quotes." };
+    }
     if (!draft.customerName) return { ok: false, message: "Enter the customer name." };
     const { result, view } = await priceDraft(draft);
     if (result.blockedReason || result.customerPrice == null || !result.requirements) {

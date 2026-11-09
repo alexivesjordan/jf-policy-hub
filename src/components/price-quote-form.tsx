@@ -22,8 +22,10 @@ const SEGMENTS = [
 
 export function PriceQuoteForm({
   categories,
+  cin7Connected,
 }: {
   categories: string[];
+  cin7Connected: boolean;
 }) {
   const [loaded, loadQuote, loading] = useActionState(loadFixtureQuote, null);
   const [parsed, parsePdf, parsing] = useActionState(parseUploadedQuote, null);
@@ -52,8 +54,11 @@ export function PriceQuoteForm({
   return (
     <div className="space-y-6">
       <form action={loadQuote} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field label="Cin7 quote number" hint="Fixture numbers such as FIXTURE-Q-1001. A live number is not fetched until Cin7 is connected.">
-          <Input name="quoteNumber" placeholder="FIXTURE-Q-1001" />
+        <Field
+          label="Cin7 order number"
+          hint={cin7Connected ? "Looks up the sales order, for example SO-00490." : "Fixture numbers such as FIXTURE-Q-1001. Cin7 not connected."}
+        >
+          <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
         </Field>
         <div className="md:pt-7">
           <Button type="submit" disabled={loading}>{loading ? "Loading..." : "Load quote"}</Button>
@@ -111,6 +116,7 @@ export function PriceQuoteForm({
                   <tr key={`${line.sku}-${index}`} className="border-t border-line">
                     <td className="px-3 py-2">
                       <input type="hidden" name="lineSku" value={line.sku} />
+                      <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
                       <span className="font-mono text-xs text-ink">{line.sku || "—"}</span>
                     </td>
                     <td className="px-3 py-2">
@@ -151,9 +157,12 @@ export function PriceQuoteForm({
               </tbody>
             </table>
           </div>
+          {draft.source === "cin7" ? (
+            <p className="text-sm text-grey">This price is read from the Cin7 sale. Creating a Pulse job from a live order is not available yet.</p>
+          ) : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pricing}>{pricing ? "Pricing..." : "Price best case"}</Button>
-            {priced?.ok ? (
+            {priced?.ok && draft.source !== "cin7" ? (
               <Button type="submit" formAction={createJob} variant="secondary" disabled={creating}>
                 {creating ? "Creating..." : "Create job"}
               </Button>

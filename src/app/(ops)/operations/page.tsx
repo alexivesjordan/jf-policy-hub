@@ -39,7 +39,7 @@ export default async function OperationsHomePage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Release 1A · Office</p>
         <h1 className="font-display mt-2 text-4xl">Hello {greetingName(profile)}</h1>
         <p className="mt-2 max-w-2xl text-lg text-ink/70">
-          Jobs, pricing, exceptions, and notifications. No Cin7 connection, no pricer, and no installer app on this screen.
+          Jobs, pricing, exceptions, and notifications.
         </p>
       </div>
 
