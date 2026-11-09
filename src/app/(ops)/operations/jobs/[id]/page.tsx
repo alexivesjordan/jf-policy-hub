@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card } from "@/components/ui";
-import { getJob } from "@/features/operations/queries";
+import { AccessLinkButton } from "@/components/access-link-button";
+import { getJob, getOfficeContext } from "@/features/operations/queries";
 import { formatDate, formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -9,6 +10,7 @@ export const metadata = { title: "Job" };
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireOperationsUser();
+  const context = await getOfficeContext();
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   let job: Awaited<ReturnType<typeof getJob>> = null;
@@ -33,6 +35,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </div>
         <p className="mt-2 text-white/70">Status is read-only. The server changes it when the rules are met.</p>
       </div>
+
+      {context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" ? (
+        <div className="flex flex-wrap gap-4 text-sm font-semibold">
+          <Link href={`/operations/jobs/${job.id}/access`} className="underline decoration-red">Review access form</Link>
+          <AccessLinkButton jobId={job.id} />
+        </div>
+      ) : null}
 
       {job.fixture ? (
         <p className="rounded-3xl border border-line bg-card px-5 py-4 text-sm leading-6 text-white/80">

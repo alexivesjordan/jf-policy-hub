@@ -14,7 +14,7 @@ export async function storeOrbitFile(input: {
   bucket: OrbitBucket;
   mimeType: string;
   bytes: Buffer;
-  uploadedBy: string;
+  uploadedBy: string | null;
   entitySchema: string;
   entityTable: string;
   entityId: string;

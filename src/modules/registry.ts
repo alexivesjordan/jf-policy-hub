@@ -74,7 +74,9 @@ export const orbitModules: OrbitModule[] = [
     paths: ["/operations"],
     nav: [
       { href: "/operations", label: "Overview" },
+      { href: "/operations/price", label: "Price a quote" },
       { href: "/operations/jobs", label: "Jobs" },
+      { href: "/operations/calendar", label: "Calendar" },
       { href: "/operations/tasks", label: "Tasks" },
       { href: "/operations/notifications", label: "Notifications", count: "unread" },
       { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
