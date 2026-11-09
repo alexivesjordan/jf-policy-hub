@@ -1,10 +1,31 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { AccessForm } from "@/components/access-form";
 import { hashOrbitToken } from "@/lib/orbit/token-hash";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Site access" };
 
-export default async function AccessPage({ params }: { params: Promise<{ token: string }> }) {
+export default function AccessPage({ params }: { params: Promise<{ token: string }> }) {
+  return (
+    <Suspense fallback={<AccessFallback />}>
+      <AccessContent params={params} />
+    </Suspense>
+  );
+}
+
+function AccessFallback() {
+  return (
+    <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Jordan Fitness</p>
+      <h1 className="font-display mt-2 text-4xl">Site access</h1>
+      <p className="mt-6 text-white/70">Loading the form...</p>
+    </main>
+  );
+}
+
+async function AccessContent({ params }: { params: Promise<{ token: string }> }) {
+  await connection();
   const { token } = await params;
   const hash = hashOrbitToken(token);
   const admin = createAdminClient();
