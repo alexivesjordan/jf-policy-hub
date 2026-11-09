@@ -91,7 +91,20 @@ async function effortTableFor(lines: { sku: string }[]) {
   if (!admin || skus.length === 0) return bundled;
   const { data, error } = await admin.rpc("orbit_sku_effort_for_pricing", { p_skus: skus });
   if (error || !Array.isArray(data)) return bundled;
-  const rows = (data as { sku: string; product_name: string; cin7_category: string | null; needs_assembly: boolean | null; crew: number | null; build_minutes: number | null }[]).map((row) =>
+  const rows = (data as {
+    sku: string;
+    product_name: string;
+    cin7_category: string | null;
+    needs_assembly: boolean | null;
+    crew: number | null;
+    build_minutes: number | null;
+    build_location?: "hq" | "site" | null;
+    hq_build_minutes?: number | null;
+    hq_build_crew?: number | null;
+    site_position_minutes?: number | null;
+    suggestion_rule?: string | null;
+    status?: string | null;
+  }[]).map((row) =>
     effortRowForSku({
       sku: row.sku,
       productName: row.product_name,
@@ -99,6 +112,11 @@ async function effortTableFor(lines: { sku: string }[]) {
       needsAssembly: row.needs_assembly,
       crew: row.crew,
       buildMinutes: row.build_minutes,
+      buildLocation: row.build_location,
+      hqBuildMinutes: row.hq_build_minutes,
+      hqBuildCrew: row.hq_build_crew,
+      sitePositionMinutes: row.site_position_minutes,
+      needsReview: row.status === "suggested" || Boolean(row.suggestion_rule),
     }),
   );
   return [...rows, ...bundled];

@@ -238,6 +238,17 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
   if (sku) {
     const bySku = table.find((row) => row.sku === sku);
     if (bySku) {
+      if (bySku.buildLocation === "hq") {
+        return {
+          productName: line.productName,
+          qty: line.qty,
+          match: "exact",
+          category: bySku.category,
+          provisional: bySku.reviewFlag === "needs-review",
+          note: "Built at HQ and shipped assembled. On site: placement only.",
+          row: bySku,
+        };
+      }
       if (bySku.reviewFlag === "needs-review" || bySku.needsAssembly === null) return unknownAssembly(line, bySku.category);
       if (bySku.needsAssembly === false) {
         return {
@@ -536,9 +547,12 @@ type Costed = {
 };
 
 function applyLineWeight(line: QuoteLineInput, resolved: ResolvedLine): ResolvedLine {
-  if (line.unitWeightKg == null || !resolved.row || resolved.row.buildLocation === "hq" || resolved.row.unitWeightKg != null) {
-    return resolved;
+  if (line.unitWeightKg == null || !resolved.row) return resolved;
+  if (resolved.row.buildLocation === "hq") {
+    if (resolved.row.assembledWeightKg != null) return resolved;
+    return { ...resolved, row: { ...resolved.row, assembledWeightKg: line.unitWeightKg } };
   }
+  if (resolved.row.unitWeightKg != null) return resolved;
   return { ...resolved, row: { ...resolved.row, unitWeightKg: line.unitWeightKg } };
 }
 
@@ -939,8 +953,39 @@ export function effortRowForSku(input: {
   needsAssembly: boolean | null;
   crew: number | null;
   buildMinutes: number | null;
+  buildLocation?: "hq" | "site" | null;
+  hqBuildMinutes?: number | null;
+  hqBuildCrew?: number | null;
+  sitePositionMinutes?: number | null;
+  needsReview?: boolean;
 }): EffortRow {
   const category = input.category || "Other";
+  if (input.buildLocation === "hq") {
+    const hqCrew = input.hqBuildCrew ?? 2;
+    const hqMinutes = input.hqBuildMinutes ?? 120;
+    return {
+      ...defaultRow(input.productName, category, {
+        category,
+        buildCrew: hqCrew,
+        buildMinutes: hqMinutes,
+        note: "Built at HQ",
+        needsAssembly: true,
+      }),
+      sku: input.sku,
+      buildLocation: "hq",
+      buildMinutes: null,
+      buildCrew: null,
+      hqBuildMinutes: hqMinutes,
+      hqBuildCrew: hqCrew,
+      sitePositionMinutes: input.sitePositionMinutes ?? 45,
+      complexity: "high",
+      carryCrew: hqCrew,
+      wheeled: "N",
+      needsAssembly: true,
+      reviewFlag: input.needsReview ? "needs-review" : null,
+      crateAtHq: false,
+    };
+  }
   if (input.needsAssembly === null || /^other$/i.test(category)) {
     return {
       ...defaultRow(input.productName, category, { category, buildCrew: 2, buildMinutes: 120, note: "Unknown", needsAssembly: null }),

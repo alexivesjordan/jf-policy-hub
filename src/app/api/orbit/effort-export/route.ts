@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
   const body = data as { rows?: Record<string, unknown>[] } | null;
   const rows = Array.isArray(body?.rows) ? body.rows : [];
-  const header = ["sku", "product_name", "cin7_category", "needs_assembly", "crew", "build_minutes", "status", "notes"];
+  const header = ["sku", "product_name", "cin7_category", "needs_assembly", "crew", "build_minutes", "build_location", "hq_build_minutes", "hq_build_crew", "site_position_minutes", "status", "notes", "suggestion_rule"];
   const lines = [header.join(",")];
   for (const row of rows) {
     lines.push(header.map((key) => csvCell(row[key])).join(","));

@@ -33,6 +33,10 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
               <th className="py-2 pr-3">Needs assembly</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
+              <th className="py-2 pr-3">Built at</th>
+              <th className="py-2 pr-3">HQ minutes</th>
+              <th className="py-2 pr-3">HQ crew</th>
+              <th className="py-2 pr-3">Placement</th>
               <th className="py-2">Notes</th>
             </tr>
           </thead>
@@ -53,6 +57,15 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
                 </td>
                 <td className="py-2 pr-3"><Input name="crew" type="number" min="1" max="6" defaultValue={row.crew ?? ""} /></td>
                 <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" defaultValue={row.build_minutes ?? ""} /></td>
+                <td className="py-2 pr-3">
+                  <select name="buildLocation" defaultValue={row.build_location === "hq" ? "hq" : "site"} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+                    <option value="site">Site</option>
+                    <option value="hq">HQ</option>
+                  </select>
+                </td>
+                <td className="py-2 pr-3"><Input name="hqMinutes" type="number" min="0" max="480" defaultValue={row.hq_build_minutes ?? ""} /></td>
+                <td className="py-2 pr-3"><Input name="hqCrew" type="number" min="1" max="6" defaultValue={row.hq_build_crew ?? ""} /></td>
+                <td className="py-2 pr-3"><Input name="placementMinutes" type="number" min="0" max="480" defaultValue={row.site_position_minutes ?? ""} /></td>
                 <td className="py-2"><Input name="notes" defaultValue={row.notes ?? ""} /></td>
               </tr>
             ))}
@@ -79,6 +92,10 @@ export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
               <th className="py-2 pr-3">Needs assembly</th>
               <th className="py-2 pr-3">Crew</th>
               <th className="py-2 pr-3">Minutes</th>
+              <th className="py-2 pr-3">Built at</th>
+              <th className="py-2 pr-3">HQ minutes</th>
+              <th className="py-2 pr-3">HQ crew</th>
+              <th className="py-2 pr-3">Placement</th>
               <th className="py-2">Notes</th>
             </tr>
           </thead>
@@ -99,6 +116,15 @@ export function CategoryGapEditor({ rows }: { rows: CategoryGap[] }) {
                 </td>
                 <td className="py-2 pr-3"><Input name="crew" type="number" min="1" max="6" /></td>
                 <td className="py-2 pr-3"><Input name="minutes" type="number" min="0" max="480" /></td>
+                <td className="py-2 pr-3">
+                  <select name="buildLocation" defaultValue="site" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+                    <option value="site">Site</option>
+                    <option value="hq">HQ</option>
+                  </select>
+                </td>
+                <td className="py-2 pr-3"><Input name="hqMinutes" type="number" min="0" max="480" /></td>
+                <td className="py-2 pr-3"><Input name="hqCrew" type="number" min="1" max="6" /></td>
+                <td className="py-2 pr-3"><Input name="placementMinutes" type="number" min="0" max="480" /></td>
                 <td className="py-2"><Input name="notes" /></td>
               </tr>
             ))}
@@ -161,6 +187,26 @@ export function SkuEffortEditor({
             <Input name="minutes" type="number" min="0" max="480" />
           </label>
           <label className="text-sm">
+            <span className="mb-1 block text-grey">Built at</span>
+            <select name="buildLocation" defaultValue="" className="min-h-11 rounded-2xl border border-line bg-paper px-3">
+              <option value="">Leave</option>
+              <option value="site">Site</option>
+              <option value="hq">HQ</option>
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">HQ minutes</span>
+            <Input name="hqMinutes" type="number" min="0" max="480" />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">HQ crew</span>
+            <Input name="hqCrew" type="number" min="1" max="6" />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">Placement minutes</span>
+            <Input name="placementMinutes" type="number" min="0" max="480" />
+          </label>
+          <label className="text-sm">
             <span className="mb-1 block text-grey">Notes</span>
             <Input name="notes" />
           </label>
@@ -177,6 +223,7 @@ export function SkuEffortEditor({
                 <th className="py-2 pr-3">Product</th>
                 <th className="py-2 pr-3">Cin7 category</th>
                 <th className="py-2 pr-3">Assembly</th>
+                <th className="py-2 pr-3">Built at</th>
                 <th className="py-2 pr-3">Crew</th>
                 <th className="py-2 pr-3">Minutes</th>
                 <th className="py-2">Status</th>
@@ -188,10 +235,14 @@ export function SkuEffortEditor({
                   <td className="py-2 pr-3"><input type="checkbox" name="sku" value={row.sku} aria-label={`Select ${row.sku}`} /></td>
                   <td className="py-2 pr-3 font-mono text-xs">{row.sku}</td>
                   <td className="py-2 pr-3">{row.product_name}</td>
-                  <td className="py-2 pr-3">{row.cin7_category ?? "—"}</td>
+                  <td className="py-2 pr-3">
+                    {row.cin7_category ?? "—"}
+                    {row.suggestion_rule ? <span className="mt-1 block text-xs text-grey">Name rule: build at HQ</span> : null}
+                  </td>
                   <td className="py-2 pr-3">{row.needs_assembly == null ? "Unknown" : row.needs_assembly ? "Yes" : "No"}</td>
+                  <td className="py-2 pr-3">{row.build_location === "hq" ? "HQ" : "Site"}</td>
                   <td className="py-2 pr-3">{row.crew ?? "—"}</td>
-                  <td className="py-2 pr-3">{row.build_minutes ?? "—"}</td>
+                  <td className="py-2 pr-3">{row.build_location === "hq" ? `HQ ${row.hq_build_minutes ?? "—"} / place ${row.site_position_minutes ?? "—"}` : (row.build_minutes ?? "—")}</td>
                   <td className="py-2">{row.status}</td>
                 </tr>
               ))}
