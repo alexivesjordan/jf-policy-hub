@@ -42,6 +42,14 @@ function optionalMoney(raw: FormDataEntryValue | null, label: string) {
   return value;
 }
 
+function optionalPositive(raw: FormDataEntryValue | null, label: string) {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`Enter ${label} as a number above zero, or leave it blank.`);
+  return value;
+}
+
 function requiredNumber(raw: FormDataEntryValue | null, label: string) {
   const text = String(raw ?? "").trim();
   const value = Number(text);
@@ -63,6 +71,10 @@ export async function savePricing(_state: ActionState, formData: FormData): Prom
       p_large_order_threshold: requiredNumber(formData.get("largeOrder"), "the large-order threshold"),
       p_variation_rounding_hours: requiredNumber(formData.get("roundingHours"), "the variation rounding"),
       p_change_reason: requiredText(formData, "reason", "a short reason"),
+      p_sled_track_width_m: optionalPositive(formData.get("sledTrackWidth"), "the sled track width"),
+      p_sled_base_minutes: requiredNumber(formData.get("sledBaseMinutes"), "the sled track base minutes"),
+      p_sled_base_length_m: requiredNumber(formData.get("sledBaseLength"), "the sled track base length"),
+      p_sled_extra_minutes_per_m: requiredNumber(formData.get("sledExtraMinutes"), "the extra minutes per metre"),
     });
     revalidatePath("/operations/settings");
     return { ok: true, message: "Saved a new pricing version. The previous version is unchanged." };

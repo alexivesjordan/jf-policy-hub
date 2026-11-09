@@ -144,6 +144,10 @@ async function pricingConfig(): Promise<PricingConfig> {
       marginFloorPct: null,
       largeOrderThreshold: 50000,
       variationRoundingHours: 0.5,
+      sledTrackWidthM: null,
+      sledBaseMinutes: 180,
+      sledBaseLengthM: 10,
+      sledExtraMinutesPerMetre: 6,
     };
   }
   const { data, error } = await admin.rpc("orbit_pricing_snapshot");
@@ -160,6 +164,10 @@ async function pricingConfig(): Promise<PricingConfig> {
     marginFloorPct: row.margin_floor_pct == null ? null : Number(row.margin_floor_pct),
     largeOrderThreshold: Number(row.large_order_threshold),
     variationRoundingHours: Number(row.variation_rounding_hours),
+    sledTrackWidthM: row.sled_track_width_m == null ? null : Number(row.sled_track_width_m),
+    sledBaseMinutes: row.sled_base_minutes == null ? 180 : Number(row.sled_base_minutes),
+    sledBaseLengthM: row.sled_base_length_m == null ? 10 : Number(row.sled_base_length_m),
+    sledExtraMinutesPerMetre: row.sled_extra_minutes_per_m == null ? 6 : Number(row.sled_extra_minutes_per_m),
   };
 }
 
@@ -225,6 +233,11 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
     lineTotal: totals[index] ?? null,
     unitWeightKg: weights[index] ?? null,
     productId: String(formData.getAll("lineProductId")[index] ?? ""),
+    uom: String(formData.getAll("lineUom")[index] ?? "").trim() || null,
+    tileLength: optionalMeasure(formData.getAll("lineTileLength")[index]),
+    tileWidth: optionalMeasure(formData.getAll("lineTileWidth")[index]),
+    dimensionUnit: String(formData.getAll("lineDimensionUnit")[index] ?? "").trim() || null,
+    tilesPerPack: optionalMeasure(formData.getAll("lineTilesPerPack")[index]),
   }));
   if (lines.some((line) => !line.description || !Number.isFinite(line.qty) || line.qty <= 0)) {
     return { draft: emptyDraft(), error: "Each line needs a description and a quantity." };
@@ -255,6 +268,13 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
       internalNote: String(formData.get("internalNote") ?? "").trim(),
     },
   };
+}
+
+function optionalMeasure(value: FormDataEntryValue | undefined) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function emptyDraft(): QuoteDraft {
@@ -333,6 +353,9 @@ async function priceDraft(draft: QuoteDraft) {
         qty: line.qty,
         unitWeightKg: line.unitWeightKg,
         billableUnits: measured?.tiles ?? null,
+        uom: line.uom ?? null,
+        productWidth: line.tileWidth ?? null,
+        dimensionUnit: line.dimensionUnit ?? null,
       };
     }),
     postcode: draft.postcode,

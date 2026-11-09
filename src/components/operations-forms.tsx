@@ -50,6 +50,10 @@ export function PricingForm({
   largeOrderThreshold,
   roundingHours,
   version,
+  sledTrackWidthM,
+  sledBaseMinutes,
+  sledBaseLengthM,
+  sledExtraMinutesPerMetre,
 }: {
   markups: { independent: number; franchisee: number; trade: number; corporate: number };
   minJobCharge: number | null;
@@ -58,6 +62,10 @@ export function PricingForm({
   largeOrderThreshold: number;
   roundingHours: number;
   version: number;
+  sledTrackWidthM: number | null;
+  sledBaseMinutes: number;
+  sledBaseLengthM: number;
+  sledExtraMinutesPerMetre: number;
 }) {
   const [state, action, pending] = useActionState(savePricing, null);
   return (
@@ -96,6 +104,18 @@ export function PricingForm({
       </Field>
       <Field label="Variation rounding (hours)" hint="Seeded at 0.5">
         <Input name="roundingHours" inputMode="decimal" required defaultValue={String(roundingHours)} />
+      </Field>
+      <Field label="Sled track width (m)" hint={sledTrackWidthM == null ? "Not set. A filled Cin7 product width is used first. Until this is set, square metres are priced as metres of track." : "A filled Cin7 product width is used first."}>
+        <Input name="sledTrackWidth" inputMode="decimal" placeholder="Not set" defaultValue={sledTrackWidthM ?? ""} />
+      </Field>
+      <Field label="Sled track base minutes" hint="The first stretch of track. Seeded at 180, which is 3 hours for 2 people.">
+        <Input name="sledBaseMinutes" inputMode="decimal" required defaultValue={String(sledBaseMinutes)} />
+      </Field>
+      <Field label="Sled track base length (m)" hint="Seeded at 10. A track this long takes the base minutes.">
+        <Input name="sledBaseLength" inputMode="decimal" required defaultValue={String(sledBaseLengthM)} />
+      </Field>
+      <Field label="Extra minutes per metre" hint="Seeded at 6. A 20 m track is 240 minutes.">
+        <Input name="sledExtraMinutes" inputMode="decimal" required defaultValue={String(sledExtraMinutesPerMetre)} />
       </Field>
       <Field label="Reason for this version">
         <Input name="reason" required maxLength={500} placeholder="Why this version" />

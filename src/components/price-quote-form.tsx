@@ -25,9 +25,11 @@ const SEGMENTS = [
 export function PriceQuoteForm({
   cin7Connected,
   showInternal,
+  canPreviewSales = false,
 }: {
   cin7Connected: boolean;
   showInternal: boolean;
+  canPreviewSales?: boolean;
 }) {
   const [loaded, loadQuote, loading] = useActionState(loadFixtureQuote, null);
   const [parsed, parsePdf, parsing] = useActionState(parseUploadedQuote, null);
@@ -36,6 +38,7 @@ export function PriceQuoteForm({
   const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
   const [bookingJob, setBookingJob] = useState<string | null>(null);
   const [segmentChoice, setSegmentChoice] = useState("");
+  const [viewAsSales, setViewAsSales] = useState(false);
   const [draft, setDraft] = useState<QuoteDraft | null>(null);
   const [sourceName, setSourceName] = useState<"load" | "pdf" | null>(null);
 
@@ -54,17 +57,30 @@ export function PriceQuoteForm({
   }, [parsed]);
 
   useEffect(() => {
-    if (!showInternal && created?.quote?.jobId) setBookingJob(created.quote.jobId);
-  }, [created, showInternal]);
+    if ((!showInternal || viewAsSales) && created?.quote?.jobId) setBookingJob(created.quote.jobId);
+  }, [created, showInternal, viewAsSales]);
 
-  const quote = (created?.quote ?? (showInternal ? priced?.quote : sold?.quote)) as PricedQuote | undefined;
+  const viewingSales = !showInternal || viewAsSales;
+  const quote = (created?.quote ?? (viewingSales ? sold?.quote ?? priced?.quote : priced?.quote)) as PricedQuote | undefined;
   const notice = sourceName === "pdf" ? parsed : sourceName === "load" ? loaded : null;
-  const salesDraft = sold?.draft ?? null;
+  const salesDraft = sold?.draft ?? (viewingSales ? draft : null);
+  const previewToggle = showInternal && canPreviewSales ? (
+    <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-ink">
+      <input
+        type="checkbox"
+        className="size-5 accent-red"
+        checked={viewAsSales}
+        onChange={(event) => setViewAsSales(event.target.checked)}
+      />
+      View as sales rep
+    </label>
+  ) : null;
 
-  if (!showInternal) {
+  if (viewingSales) {
     const summary = quote?.repSummary;
     return (
       <div className="space-y-6">
+        {previewToggle}
         <form action={sellOrder} className="space-y-4">
           <Field label="Cin7 sales order" hint={cin7Connected ? "For example SO-00490. A saved segment for this customer is used if you leave the segment blank." : "Fixture numbers such as FIXTURE-Q-1001 while Cin7 is not connected."}>
             <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
@@ -127,6 +143,7 @@ export function PriceQuoteForm({
 
   return (
     <div className="space-y-6">
+      {previewToggle}
       <form action={loadQuote} className="grid gap-4 md:grid-cols-[1fr_auto]">
         <Field
           label="Cin7 order number"
@@ -195,6 +212,11 @@ export function PriceQuoteForm({
                       <input type="hidden" name="lineSku" value={line.sku} />
                       <input type="hidden" name="lineProductId" value={line.productId} />
                       <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
+                      <input type="hidden" name="lineUom" value={line.uom ?? ""} />
+                      <input type="hidden" name="lineTileLength" value={line.tileLength ?? ""} />
+                      <input type="hidden" name="lineTileWidth" value={line.tileWidth ?? ""} />
+                      <input type="hidden" name="lineDimensionUnit" value={line.dimensionUnit ?? ""} />
+                      <input type="hidden" name="lineTilesPerPack" value={line.tilesPerPack ?? ""} />
                       <span className="font-mono text-xs text-ink">{line.sku || "—"}</span>
                     </td>
                     <td className="px-3 py-2">
@@ -309,6 +331,11 @@ function DraftFields({ draft }: { draft: QuoteDraft }) {
           <input type="hidden" name="lineSku" value={line.sku} />
           <input type="hidden" name="lineProductId" value={line.productId} />
           <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
+          <input type="hidden" name="lineUom" value={line.uom ?? ""} />
+          <input type="hidden" name="lineTileLength" value={line.tileLength ?? ""} />
+          <input type="hidden" name="lineTileWidth" value={line.tileWidth ?? ""} />
+          <input type="hidden" name="lineDimensionUnit" value={line.dimensionUnit ?? ""} />
+          <input type="hidden" name="lineTilesPerPack" value={line.tilesPerPack ?? ""} />
           <input type="hidden" name="lineDescription" value={line.description} />
           <input type="hidden" name="lineQty" value={line.qty} />
           <input type="hidden" name="lineCategory" value={line.category} />

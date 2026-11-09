@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { effortRowForSku, priceInstall, DEFAULT_PRICING } from "./engine";
 import { tilesFromSale, tilesPerPackFromProduct } from "./flooring";
+import { sledTrackLength, sledTrackMinutes } from "./sled";
 
 describe("flooring quantities", () => {
   it("keeps a tile or each quantity", () => {
@@ -67,5 +68,42 @@ describe("floor and sled sequencing", () => {
     const sledMinutes = 180;
     assert.ok(result.breakdown);
     assert.ok(Math.abs(result.breakdown.onSiteHours - (prep + floorMinutes + sledMinutes) / 60) < 0.05);
+  });
+
+  it("prices 10 m at 180 minutes and 20 m at 240 minutes", () => {
+    assert.equal(sledTrackMinutes(10), 180);
+    assert.equal(sledTrackMinutes(20), 240);
+    const ten = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "independent",
+      lines: [{ sku: "JF-TT-CST", productName: "Competition sled track", category: "Sleds", qty: 10, uom: "m" }],
+      table: [],
+      pricing: DEFAULT_PRICING,
+    });
+    const twenty = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "independent",
+      lines: [{ sku: "JF-TT-BST", productName: "Battle sled track", category: "Sleds", qty: 20, uom: "m2", productWidth: 1, dimensionUnit: "m" }],
+      table: [],
+      pricing: { ...DEFAULT_PRICING, sledTrackWidthM: null },
+    });
+    assert.equal(ten.breakdown?.buildLines[0]?.minutes, 180);
+    assert.equal(sledTrackLength({ qty: 20, uom: "m2", productWidth: 1, dimensionUnit: "m", settingsWidthM: null }).lengthM, 20);
+    assert.equal(twenty.breakdown?.buildLines[0]?.minutes, 240);
+    const unset = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "independent",
+      lines: [{ sku: "JF-TT-SST", productName: "Sprint sled track", category: "Sleds", qty: 20, uom: "m2" }],
+      table: [],
+      pricing: DEFAULT_PRICING,
+    });
+    assert.equal(unset.breakdown?.buildLines[0]?.minutes, 240);
+    assert.ok(unset.flags.some((flag) => /width is unset/i.test(flag)));
   });
 });

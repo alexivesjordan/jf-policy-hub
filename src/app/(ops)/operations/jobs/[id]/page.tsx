@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AvailabilityCalendar } from "@/components/availability-calendar";
 import { PriceWorkings } from "@/components/price-workings";
+import { RepViewToggle } from "@/components/rep-view-toggle";
 import { Badge, Card } from "@/components/ui";
 import { AccessLinkButton } from "@/components/access-link-button";
 import { RequirementOverrideForm } from "@/components/requirement-override-form";
@@ -27,84 +29,19 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   if (!job) notFound();
   const requirements = await getJobRequirements(id).catch(() => null);
   const internal = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
+  const canPreviewSales = context.is_owner || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
   const canOverride = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
   const workings = internal ? await (await createClient()).rpc("orbit_job_workings", { p_job_id: id }) : { data: null };
   const saved = workings.data as { breakdown?: QuoteBreakdown; flags?: string[]; notice?: string | null; customerPrice?: number | null; segment?: string | null; markup?: number | null } | null;
 
   const address = [job.site?.address_line1, job.site?.city, job.site?.postcode].filter(Boolean).join(", ");
+  const latestQuote = job.quote_versions[0];
+  const salesPrice = saved?.customerPrice ?? latestQuote?.customer_price ?? null;
+  const salesCost = latestQuote?.internal_cost ?? null;
+  const salesMargin = salesPrice != null && salesCost != null && salesPrice !== 0 ? (salesPrice - salesCost) / salesPrice : null;
 
-  return (
-    <div className="space-y-6">
-      <Link href="/operations/jobs" className="text-sm font-semibold text-ink underline decoration-red">
-        All jobs
-      </Link>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-display text-4xl">{job.customer.name}</h1>
-          {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
-        </div>
-        <p className="mt-2 text-ink/70">Status is read-only. The server changes it when the rules are met.</p>
-      </div>
-
-      {saved?.breakdown && saved.customerPrice != null ? (
-        <PriceWorkings
-          breakdown={saved.breakdown}
-          notice={saved.notice ?? null}
-          customerPrice={saved.customerPrice}
-          segment={saved.segment ?? null}
-          markup={saved.markup ?? null}
-          flags={saved.flags ?? []}
-        />
-      ) : null}
-
-      {requirements && !internal ? (
-        <Link href={`/operations/jobs/${job.id}/schedule`} className="inline-block text-sm font-semibold text-ink underline decoration-red">
-          Pencil a day
-        </Link>
-      ) : null}
-
-      {requirements && internal ? (
-        <Card>
-          <h2 className="font-display text-2xl">Required resources</h2>
-          <p className="mt-2 text-sm text-grey">
-            {requirements.overridden ? "Overridden by the office." : "Set by the pricer."} A sales rep cannot edit these.
-          </p>
-          <ul className="mt-3 space-y-1 text-sm text-ink">
-            <li>{requirements.installers} installers</li>
-            <li>{requirements.licensed_drivers} licensed drivers</li>
-            <li>{requirements.van_count} {requirements.van_size === "crafter" ? "Crafter" : "small van"}</li>
-            <li>Stair climber {requirements.stair_climber ? "yes" : "no"}</li>
-          </ul>
-          {requirements.conflict ? (
-            <p className="mt-3 text-sm text-ink">{requirements.conflict_detail ?? "The pencilled day no longer covers these resources."}</p>
-          ) : null}
-          <Link href={`/operations/jobs/${job.id}/schedule`} className="mt-4 inline-block text-sm font-semibold text-ink underline decoration-red">
-            Pencil a day
-          </Link>
-          {canOverride ? (
-            <div className="mt-6">
-              <RequirementOverrideForm
-                jobId={job.id}
-                requirements={{
-                  installers: requirements.installers,
-                  licensedDrivers: requirements.licensed_drivers,
-                  vanSize: requirements.van_size,
-                  vanCount: requirements.van_count,
-                  stairClimber: requirements.stair_climber,
-                }}
-              />
-            </div>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager" ? (
-        <div className="flex flex-wrap gap-4 text-sm font-semibold">
-          <Link href={`/operations/jobs/${job.id}/access`} className="underline decoration-red">Review access form</Link>
-          <AccessLinkButton jobId={job.id} />
-        </div>
-      ) : null}
-
+  const record = (
+    <>
       {job.fixture ? (
         <p className="rounded-3xl border border-line bg-card px-5 py-4 text-sm leading-6 text-ink/80">
           FIXTURE / not production data. This job was not created from Cin7. The segment and customer type below are demo labels, not a Cin7 field mapping.
@@ -146,31 +83,161 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </dl>
         </Card>
       </div>
+    </>
+  );
 
-      <Card>
-        <h2 className="font-display text-2xl">Quote versions</h2>
-        {job.quote_versions.length === 0 ? (
-          <p className="mt-3 text-ink/70">
-            No quote versions yet. The pricer is not connected, and these fixture jobs were not priced.
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {job.quote_versions.map((quote) => (
-              <li key={quote.id} className="rounded-2xl border border-line px-4 py-3 text-sm">
-                <p className="font-semibold">
-                  Mode {quote.mode} · {quote.finality}
+  return (
+    <div className="space-y-6">
+      <Link href="/operations/jobs" className="text-sm font-semibold text-ink underline decoration-red">
+        All jobs
+      </Link>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-display text-4xl">{job.customer.name}</h1>
+          {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+        </div>
+        <p className="mt-2 text-ink/70">Status is read-only. The server changes it when the rules are met.</p>
+      </div>
+
+      {internal ? <RepViewToggle
+        enabled={canPreviewSales}
+        full={
+          <>
+            {saved?.breakdown && saved.customerPrice != null ? (
+              <PriceWorkings
+                breakdown={saved.breakdown}
+                notice={saved.notice ?? null}
+                customerPrice={saved.customerPrice}
+                segment={saved.segment ?? null}
+                markup={saved.markup ?? null}
+                flags={saved.flags ?? []}
+              />
+            ) : null}
+            {requirements && internal ? (
+              <Card>
+                <h2 className="font-display text-2xl">Required resources</h2>
+                <p className="mt-2 text-sm text-grey">
+                  {requirements.overridden ? "Overridden by the office." : "Set by the pricer."} A sales rep cannot edit these.
                 </p>
-                <p className="mt-1 text-grey">
-                  Customer price {money(quote.customer_price)}
-                  {quote.internal_cost != null ? ` · Internal cost ${money(quote.internal_cost)}` : ""}
-                  {" · "}
-                  {formatTimestamp(quote.created_at)}
+                <ul className="mt-3 space-y-1 text-sm text-ink">
+                  <li>{requirements.installers} installers</li>
+                  <li>{requirements.licensed_drivers} licensed drivers</li>
+                  <li>{requirements.van_count} {requirements.van_size === "crafter" ? "Crafter" : "small van"}</li>
+                  <li>Stair climber {requirements.stair_climber ? "yes" : "no"}</li>
+                </ul>
+                {requirements.conflict ? (
+                  <p className="mt-3 text-sm text-ink">{requirements.conflict_detail ?? "The pencilled day no longer covers these resources."}</p>
+                ) : null}
+                <Link href={`/operations/jobs/${job.id}/schedule`} className="mt-4 inline-block text-sm font-semibold text-ink underline decoration-red">
+                  Pencil a day
+                </Link>
+                {canOverride ? (
+                  <div className="mt-6">
+                    <RequirementOverrideForm
+                      jobId={job.id}
+                      requirements={{
+                        installers: requirements.installers,
+                        licensedDrivers: requirements.licensed_drivers,
+                        vanSize: requirements.van_size,
+                        vanCount: requirements.van_count,
+                        stairClimber: requirements.stair_climber,
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </Card>
+            ) : null}
+            {internal ? (
+              <div className="flex flex-wrap gap-4 text-sm font-semibold">
+                <Link href={`/operations/jobs/${job.id}/access`} className="underline decoration-red">Review access form</Link>
+                <AccessLinkButton jobId={job.id} />
+              </div>
+            ) : null}
+            {record}
+            <Card>
+              <h2 className="font-display text-2xl">Quote versions</h2>
+              {job.quote_versions.length === 0 ? (
+                <p className="mt-3 text-ink/70">
+                  No quote versions yet. The pricer is not connected, and these fixture jobs were not priced.
                 </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {job.quote_versions.map((quote) => (
+                    <li key={quote.id} className="rounded-2xl border border-line px-4 py-3 text-sm">
+                      <p className="font-semibold">Mode {quote.mode} · {quote.finality}</p>
+                      <p className="mt-1 text-grey">
+                        Customer price {money(quote.customer_price)}
+                        {quote.internal_cost != null ? ` · Internal cost ${money(quote.internal_cost)}` : ""}
+                        {" · "}
+                        {formatTimestamp(quote.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </>
+        }
+        sales={
+          <>
+            <div className="rounded-3xl border border-line bg-card px-6 py-6">
+              <dl className="space-y-3 text-ink">
+                <div>
+                  <dt className="text-sm text-grey">Order number</dt>
+                  <dd className="text-2xl font-semibold">{job.cin7_order_number ?? job.cin7_number ?? "Not set"}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-grey">Segment</dt>
+                  <dd className="text-2xl font-semibold">{labelOrStub(saved?.segment ?? job.customer.segment)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-grey">Install cost</dt>
+                  <dd className="font-display text-4xl">{money(salesCost)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-grey">Recommended price</dt>
+                  <dd className="font-display text-4xl">{money(salesPrice)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-grey">Margin</dt>
+                  <dd className="text-2xl font-semibold">{salesMargin == null ? "—" : `${Math.round(salesMargin * 1000) / 10}%`}</dd>
+                </div>
+              </dl>
+            </div>
+            {saved?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{saved.notice}</blockquote> : null}
+            <Card>
+              <h2 className="font-display text-2xl">Book a day</h2>
+              <div className="mt-4">
+                <AvailabilityCalendar jobId={job.id} />
+              </div>
+            </Card>
+          </>
+        }
+      /> : (
+        <>
+          {requirements ? (
+            <Link href={`/operations/jobs/${job.id}/schedule`} className="inline-block text-sm font-semibold text-ink underline decoration-red">
+              Pencil a day
+            </Link>
+          ) : null}
+          {record}
+          <Card>
+            <h2 className="font-display text-2xl">Quote versions</h2>
+            {job.quote_versions.length === 0 ? (
+              <p className="mt-3 text-ink/70">No quote versions yet.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {job.quote_versions.map((quote) => (
+                  <li key={quote.id} className="rounded-2xl border border-line px-4 py-3 text-sm">
+                    <p className="font-semibold">Mode {quote.mode} · {quote.finality}</p>
+                    <p className="mt-1 text-grey">Customer price {money(quote.customer_price)} · {formatTimestamp(quote.created_at)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }

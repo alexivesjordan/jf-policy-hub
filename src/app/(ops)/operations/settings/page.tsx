@@ -78,6 +78,10 @@ export default async function SettingsPage({
               depositFraction={Number(pricing.custom_deposit_fraction)}
               largeOrderThreshold={Number(pricing.large_order_threshold)}
               roundingHours={Number(pricing.variation_rounding_hours)}
+              sledTrackWidthM={pricing.sled_track_width_m == null ? null : Number(pricing.sled_track_width_m)}
+              sledBaseMinutes={pricing.sled_base_minutes == null ? 180 : Number(pricing.sled_base_minutes)}
+              sledBaseLengthM={pricing.sled_base_length_m == null ? 10 : Number(pricing.sled_base_length_m)}
+              sledExtraMinutesPerMetre={pricing.sled_extra_minutes_per_m == null ? 6 : Number(pricing.sled_extra_minutes_per_m)}
             />
           ) : (
             <p className="text-ink/70">Pricing settings are not configured.</p>
@@ -115,7 +119,7 @@ export default async function SettingsPage({
             <p className="mt-2 max-w-2xl text-sm text-grey">
               One row per Cin7 SKU. Sync fills suggested rows from the category default and never changes a confirmed row.
               Needs review: {effort ? effort.review_count : "—"}.
-              {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks at 3 hours) and stay here until confirmed.` : ""}
+              {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks) and stay here until confirmed.` : ""}
             </p>
           </div>
           <SyncProductsButton />
