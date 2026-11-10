@@ -69,7 +69,7 @@ function SideNav({
   items,
   counts,
 }: {
-  items: { href: string; label: string; count?: "pending" | "unread" }[];
+  items: { href: string; label: string; count?: "pending" | "unread"; disabled?: boolean }[];
   counts: { pending: number; unread: number };
 }) {
   const path = usePathname();
@@ -77,7 +77,15 @@ function SideNav({
   return (
     <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-3" aria-label="Module">
       {items.map((item) => {
-        const exact = item.href === "/dashboard" || item.href === "/operations";
+        const exact = item.href === "/dashboard" || item.href === "/operations" || item.href === "/sales";
+        if (item.disabled) {
+          return (
+            <span key={item.href} className="flex min-h-11 shrink-0 items-center rounded-2xl px-3 text-sm font-semibold text-grey" aria-disabled="true">
+              {item.label}
+              <span className="ml-2 text-[11px] uppercase tracking-wide">Soon</span>
+            </span>
+          );
+        }
         const active = exact ? path === item.href : path === item.href || path.startsWith(`${item.href}/`);
         const count = item.count ? counts[item.count] : 0;
         return (

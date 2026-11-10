@@ -39,11 +39,17 @@ export function canUseOperations(profile: Profile) {
   return profile.modules?.some((module) => module.module_id === "operations" && module.enabled) ?? false;
 }
 
+export function canUseSales(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.modules?.some((module) => module.module_id === "sales" && module.enabled)) return true;
+  return canUseOperations(profile);
+}
+
 /** Home screen: People or Operations. People routes still use accessRedirect. */
 export function homeRedirect(profile: Profile | null) {
   if (!profile) return "/login";
   if (!profile.access_granted) return "/no-access";
   if (!profile.is_active) return "/account-inactive";
-  if (canUsePeople(profile) || canUseOperations(profile)) return null;
+  if (canUsePeople(profile) || canUseOperations(profile) || canUseSales(profile)) return null;
   return "/no-access";
 }

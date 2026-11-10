@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { accessRedirect, canUseOperations, canUsePeople } from "@/lib/access";
+import { accessRedirect, canUseOperations, canUsePeople, canUseSales } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
 
@@ -51,6 +51,17 @@ export async function requireOperationsUser() {
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseOperations(profile)) {
     redirect(canUsePeople(profile) ? "/dashboard" : "/no-access");
+  }
+  return profile;
+}
+
+export async function requireSalesUser() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  if (!profile.access_granted) redirect("/no-access");
+  if (!profile.is_active) redirect("/account-inactive");
+  if (!canUseSales(profile)) {
+    redirect(canUsePeople(profile) || canUseOperations(profile) ? "/dashboard" : "/no-access");
   }
   return profile;
 }

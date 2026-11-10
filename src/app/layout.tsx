@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { JetBrains_Mono, Space_Grotesk, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const grotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -21,11 +24,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const themeBoot = `(function(){try{var k="pulse-theme";var t=localStorage.getItem(k);if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )pulse-theme=([^;]+)/);t=m?decodeURIComponent(m[1]):"light";}document.documentElement.dataset.theme=t==="dark"?"dark":"light";}catch(e){document.documentElement.dataset.theme="light";}})();`;
+const themeBoot = `(function(){try{var k="pulse-theme";var t=localStorage.getItem(k);if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )pulse-theme=([^;]+)/);t=m?decodeURIComponent(m[1]):"light";}document.documentElement.dataset.theme=t==="dark"?"dark":"light";document.documentElement.classList.toggle("dark",t==="dark");}catch(e){document.documentElement.dataset.theme="light";}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={`${grotesk.variable} ${mono.variable} h-full`} suppressHydrationWarning>
+    <html lang="en-GB" className={cn("h-full", grotesk.variable, mono.variable, "font-sans", geist.variable)} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>

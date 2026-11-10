@@ -8,6 +8,7 @@ export type ModuleNavItem = {
   count?: "pending" | "unread";
   adminOnly?: boolean;
   ownerOnly?: boolean;
+  disabled?: boolean;
 };
 
 export type PulseModule = {
@@ -73,7 +74,6 @@ export const pulseModules: PulseModule[] = [
     paths: ["/operations"],
     nav: [
       { href: "/operations", label: "Overview" },
-      { href: "/operations/price", label: "Price a quote" },
       { href: "/operations/jobs", label: "Jobs" },
       { href: "/operations/calendar", label: "Resource Availability" },
       { href: "/operations/tasks", label: "Tasks" },
@@ -84,12 +84,17 @@ export const pulseModules: PulseModule[] = [
   {
     id: "sales",
     name: "Pulse Sales",
-    tagline: "CRM & commercial",
-    href: "/modules/sales",
-    status: "coming-soon",
+    tagline: "Quoting",
+    href: "/sales",
+    status: "active",
     icon: "sales",
-    paths: ["/modules/sales"],
-    nav: [],
+    paths: ["/sales"],
+    nav: [
+      { href: "/sales", label: "Overview" },
+      { href: "/sales/quote", label: "Install quoting" },
+      { href: "/sales/maintenance", label: "Proactive maintenance packages", disabled: true },
+      { href: "/sales/warranties", label: "Extended warranties", disabled: true },
+    ],
   },
   {
     id: "finance",

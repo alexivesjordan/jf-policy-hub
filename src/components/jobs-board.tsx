@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { setJobStatus } from "@/features/operations/actions";
 import type { JobSummary } from "@/features/operations/types";
 import { formatDate } from "@/lib/format";
@@ -84,19 +86,21 @@ export function JobsBoard({
             The list is the default. Owners can drag a card to change its status. Sales see their own jobs.
           </p>
         </div>
-        <div role="group" aria-label="Jobs view" className="inline-flex rounded-full border border-line bg-card p-1">
+        <ToggleGroup
+          aria-label="Jobs view"
+          value={[view]}
+          onValueChange={(next) => {
+            const chosen = next[next.length - 1];
+            if (chosen === "list" || chosen === "kanban" || chosen === "calendar") choose(chosen);
+          }}
+          className="rounded-full border border-line bg-card p-1"
+        >
           {VIEWS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={view === value}
-              onClick={() => choose(value)}
-              className={`min-h-11 rounded-full px-4 text-sm font-semibold ${view === value ? "bg-ink text-paper" : "text-ink"}`}
-            >
+            <ToggleGroupItem key={value} value={value} className="min-h-11 rounded-full px-4 text-sm font-semibold">
               {label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
       {error ? <p className="rounded-3xl border border-red bg-card px-5 py-4">{error}</p> : null}
       {notice ? <p className="text-sm text-ink">{notice}</p> : null}
@@ -134,24 +138,33 @@ export function JobsBoard({
 
 function JobList({ jobs }: { jobs: JobSummary[] }) {
   return (
-    <ul className="space-y-3">
-      {jobs.map((job) => (
-        <li key={job.id}>
-          <Link href={`/operations/jobs/${job.id}`} className="block rounded-3xl border border-line bg-card px-5 py-4 hover:border-red">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold">{job.customer_name}</p>
-              {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
-              <Badge tone="active">{job.status_label}</Badge>
-            </div>
-            <p className="mt-2 text-sm text-grey">
-              {job.cin7_order_number || job.cin7_number || "No order number"} · {job.city ?? "Site not set"} {job.postcode ?? ""}
-              {job.requested_date ? ` · ${formatDate(job.requested_date)}${job.requested_end ? ` – ${formatDate(job.requested_end)}` : ""}` : ""}
-              {job.booked_date ? ` · Booked ${formatDate(job.booked_date)}` : ""}
-            </p>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <div className="overflow-hidden rounded-3xl border border-line bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Customer</TableHead>
+            <TableHead>Order</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Dates</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jobs.map((job) => (
+            <TableRow key={job.id}>
+              <TableCell>
+                <Link href={`/operations/jobs/${job.id}`} className="font-semibold text-ink underline decoration-red">
+                  {job.customer_name}
+                </Link>
+                {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+              </TableCell>
+              <TableCell>{job.cin7_order_number || job.cin7_number || "No order number"}</TableCell>
+              <TableCell><Badge tone="active">{job.status_label}</Badge></TableCell>
+              <TableCell className="text-grey">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
