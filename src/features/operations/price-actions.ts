@@ -7,6 +7,7 @@ import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { requireOperationsUser } from "@/lib/auth";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
+import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
@@ -576,6 +577,76 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
   }
 }
 
+export async function loadBookingWindow(jobId: string, month: string): Promise<{
+  ok: boolean;
+  message: string;
+  installDays: number;
+  canAllowWeekends: boolean;
+  requirements: JobRequirements | null;
+  resources: PoolResource[];
+  busyByDay: Record<string, string[]>;
+}> {
+  await requireOperationsUser();
+  const empty = { ok: false, message: "Could not read the calendar.", installDays: 1, canAllowWeekends: false, requirements: null, resources: [], busyByDay: {} };
+  if (!/^[0-9a-f-]{36}$/i.test(jobId)) return { ...empty, message: "That job was not found." };
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ...empty, message: "Choose a month." };
+  const context = await getOfficeContext();
+  const supabase = await createClient();
+  const requirement = await supabase.rpc("orbit_job_requirements", { p_job_id: jobId });
+  if (requirement.error || !requirement.data) return { ...empty, message: "This job has no required resources yet." };
+  const need = requirement.data as {
+    installers: number;
+    licensed_drivers: number;
+    van_size: VanSize;
+    van_count: number;
+    stair_climber: boolean;
+    install_days?: number;
+  };
+  const from = `${month}-01`;
+  const to = addIsoDays(from, 70);
+  const calendar = await supabase.rpc("orbit_calendar", { p_start: from, p_end: to });
+  if (calendar.error || !calendar.data) return { ...empty, message: messageFromError(calendar.error, "Could not read the calendar.") };
+  const data = calendar.data as {
+    resources: { id: string; name: string; resource_type: string; has_licence: boolean; insured: boolean }[];
+    reservations: { resource_id: string; job_id: string; day: string }[];
+    unavailability: { resource_id: string; starts_on: string; ends_on: string }[];
+  };
+  const busyByDay: Record<string, string[]> = {};
+  let cursor = from;
+  while (cursor <= to) {
+    const busy = new Set<string>();
+    for (const row of data.reservations) {
+      if (row.job_id !== jobId && String(row.day).startsWith(cursor)) busy.add(row.resource_id);
+    }
+    for (const row of data.unavailability) {
+      if (cursor >= row.starts_on && cursor <= row.ends_on) busy.add(row.resource_id);
+    }
+    if (busy.size > 0) busyByDay[cursor] = [...busy];
+    cursor = addIsoDays(cursor, 1);
+  }
+  return {
+    ok: true,
+    message: "",
+    installDays: Math.max(1, Number(need.install_days ?? 1)),
+    canAllowWeekends: canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner }),
+    requirements: {
+      installers: need.installers,
+      licensedDrivers: need.licensed_drivers,
+      vanSize: need.van_size,
+      vanCount: need.van_count,
+      stairClimber: need.stair_climber,
+    },
+    resources: data.resources.map((resource) => ({
+      id: resource.id,
+      name: resource.name,
+      resourceType: resource.resource_type,
+      hasLicence: resource.has_licence,
+      insured: resource.insured,
+    })),
+    busyByDay,
+  };
+}
+
 export async function loadBookingDays(jobId: string): Promise<{ ok: boolean; message: string; days: { date: string; available: boolean }[] }> {
   await requireOperationsUser();
   if (!/^[0-9a-f-]{36}$/i.test(jobId)) return { ok: false, message: "That job was not found.", days: [] };
@@ -678,6 +749,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
         p_van_size: result.requirements.vanSize,
         p_van_count: result.requirements.vanCount,
         p_stair_climber: result.requirements.stairClimber,
+        p_install_days: Math.max(1, result.breakdown?.days ?? 1),
       });
       if (stored.error) throw new Error(messageFromError(stored.error, "Could not store required resources."));
       view.jobId = jobId;
@@ -720,6 +792,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
       p_van_size: result.requirements.vanSize,
       p_van_count: result.requirements.vanCount,
       p_stair_climber: result.requirements.stairClimber,
+      p_install_days: Math.max(1, result.breakdown?.days ?? 1),
     });
     if (stored.error) throw new Error(messageFromError(stored.error, "Could not store required resources."));
     view.jobId = jobId;
@@ -735,6 +808,12 @@ export async function pencilJobDay(_state: ActionState, formData: FormData): Pro
   const jobId = String(formData.get("jobId") ?? "");
   const day = String(formData.get("day") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, message: "Choose a day." };
+  const context = await getOfficeContext();
+  const canAllowWeekends = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
+  const allowWeekends = formData.get("allowWeekends") === "yes";
+  if (allowWeekends && !canAllowWeekends) {
+    return { ok: false, message: "Weekend installs can only be pencilled by the owner." };
+  }
   const supabase = await createClient();
   const requirement = await supabase.rpc("orbit_job_requirements", { p_job_id: jobId });
   if (requirement.error || !requirement.data) {
@@ -746,21 +825,32 @@ export async function pencilJobDay(_state: ActionState, formData: FormData): Pro
     van_size: VanSize;
     van_count: number;
     stair_climber: boolean;
+    install_days?: number;
   };
-  const calendar = await supabase.rpc("orbit_calendar", { p_start: day, p_end: day });
+  const installDays = Math.max(1, Number(need.install_days ?? 1));
+  const dates = workingDaysFrom(day, installDays, allowWeekends && canAllowWeekends);
+  const weekendError = weekendBookingError(dates, canAllowWeekends);
+  if (weekendError) return { ok: false, message: weekendError };
+  const calendar = await supabase.rpc("orbit_calendar", { p_start: dates[0], p_end: dates[dates.length - 1] });
   if (calendar.error || !calendar.data) {
     return { ok: false, message: messageFromError(calendar.error, "Could not read the calendar.") };
   }
   const data = calendar.data as {
     resources: { id: string; name: string; resource_type: string; has_licence: boolean; insured: boolean }[];
-    reservations: { resource_id: string; job_id: string }[];
-    unavailability: { resource_id: string }[];
+    reservations: { resource_id: string; job_id: string; day: string }[];
+    unavailability: { resource_id: string; starts_on: string; ends_on: string }[];
   };
-  const busy = new Set<string>();
-  for (const row of data.reservations) {
-    if (row.job_id !== jobId) busy.add(row.resource_id);
+  const busyByDay: Record<string, string[]> = {};
+  for (const date of dates) {
+    const busy = new Set<string>();
+    for (const row of data.reservations) {
+      if (row.job_id !== jobId && String(row.day).startsWith(date)) busy.add(row.resource_id);
+    }
+    for (const row of data.unavailability) {
+      if (date >= row.starts_on && date <= row.ends_on) busy.add(row.resource_id);
+    }
+    busyByDay[date] = [...busy];
   }
-  for (const row of data.unavailability) busy.add(row.resource_id);
   const resources: PoolResource[] = data.resources.map((resource) => ({
     id: resource.id,
     name: resource.name,
@@ -768,26 +858,29 @@ export async function pencilJobDay(_state: ActionState, formData: FormData): Pro
     hasLicence: resource.has_licence,
     insured: resource.insured,
   }));
-  const plan = planDay(
-    {
-      installers: need.installers,
-      licensedDrivers: need.licensed_drivers,
-      vanSize: need.van_size,
-      vanCount: need.van_count,
-      stairClimber: need.stair_climber,
-    },
-    resources,
-    busy,
-  );
-  if (!plan.selectable) return { ok: false, message: plan.summary };
-  const saved = await supabase.rpc("orbit_pencil_day", {
+  const requirements: JobRequirements = {
+    installers: need.installers,
+    licensedDrivers: need.licensed_drivers,
+    vanSize: need.van_size,
+    vanCount: need.van_count,
+    stairClimber: need.stair_climber,
+  };
+  const plan = planRange(requirements, resources, busyByDay, day, installDays, allowWeekends && canAllowWeekends);
+  if (!plan.selectable) {
+    const blocked = plan.lines.find((line) => !line.available);
+    return { ok: false, message: blocked ? `${blocked.label} is ${blocked.detail.toLowerCase()}.` : "That start day does not cover the install." };
+  }
+  const saved = await supabase.rpc("orbit_pencil_range", {
     p_job_id: jobId,
-    p_day: day,
+    p_start: day,
+    p_allow_weekends: allowWeekends && canAllowWeekends,
     p_resource_ids: plan.chosenIds,
   });
   if (saved.error) return { ok: false, message: messageFromError(saved.error, "Could not pencil that day.") };
   revalidatePath(`/operations/jobs/${jobId}`);
   revalidatePath(`/operations/jobs/${jobId}/schedule`);
+  revalidatePath("/operations/jobs");
+  revalidatePath("/operations/calendar");
   return { ok: true, message: "Pencilled for office confirmation. This is not a firm booking." };
 }
 
