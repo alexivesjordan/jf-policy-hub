@@ -161,8 +161,11 @@ begin
   if (select count(*) from pg_policies where schemaname = 'core' and tablename = 'token_links') <> 0 then
     raise exception 'FAIL: token_links has an authenticated policy';
   end if;
-  if exists (select 1 from ops.effort_rows) then
-    raise exception 'FAIL: effort rows were invented';
+  if exists (select 1 from ops.effort_rows where cin7_sku is not null and length(cin7_sku) > 0) then
+    raise exception 'FAIL: effort SKUs were invented';
+  end if;
+  if (select count(*) from ops.effort_rows) < 20 then
+    raise exception 'FAIL: the v2.5 effort table was not loaded';
   end if;
   if exists (select 1 from ops.terms_versions where is_live) then
     raise exception 'FAIL: terms were marked live';
