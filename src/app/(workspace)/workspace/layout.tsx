@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { requireWorkspaceAdmin } from "@/lib/auth";
+import { PageSkeleton } from "@/components/pulse/states";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export const instant = false;
@@ -22,7 +23,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     );
   }
   return (
-    <Suspense fallback={<div className="min-h-screen bg-paper" />}>
+    <Suspense fallback={<div className="min-h-screen bg-paper p-6"><PageSkeleton /></div>}>
       <WorkspaceShell>{children}</WorkspaceShell>
     </Suspense>
   );

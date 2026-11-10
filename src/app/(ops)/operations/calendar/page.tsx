@@ -1,5 +1,7 @@
 import { BookFixtureForm, UnavailabilityForm } from "@/components/calendar-forms";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { ErrorState } from "@/components/pulse/states";
 import { getOfficeContext, listJobs } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -26,13 +28,12 @@ export default async function CalendarPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-4xl">Resource Availability</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected.
-        </p>
-      </div>
-      {calendar.error ? <p className="text-sm text-ink">{calendar.error.message}</p> : null}
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Resource Availability"
+        description="Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected."
+      />
+      {calendar.error ? <ErrorState title="The calendar did not load" description={calendar.error.message} /> : null}
       <div className="overflow-x-auto rounded-3xl border border-line">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>

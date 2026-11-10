@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { readAttachedText, uploadPolicyDocument } from "@/features/policies/actions";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { statusLabel } from "@/lib/format";
 
 type PolicyOption = {
@@ -103,7 +103,7 @@ export function UploadForm({
             <Input name="title" required placeholder="For example, Hybrid Working" />
           </Field>
           <Field label="Category">
-            <Select name="categoryId" required defaultValue="">
+            <Select name="categoryId" searchable required defaultValue="">
               <option value="" disabled>
                 Choose a category
               </option>

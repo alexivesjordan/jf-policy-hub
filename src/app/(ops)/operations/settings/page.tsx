@@ -1,21 +1,13 @@
 import { CategoryDefaultEditor, CategoryGapEditor, SkuEffortEditor, SyncProductsButton } from "@/components/effort-table";
 import { PricingForm, TermsForm } from "@/components/operations-forms";
-import { Button, Card, Input } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState, ErrorState } from "@/components/pulse/states";
 import { getOfficeContext, listCategoriesWithoutDefault, listCin7CategoryDefaults, listSkuEffort, readOwnerSettings, readTerms } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 
 function one(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
-}
-
-function pageHref(params: Record<string, string | string[] | undefined>, page: number) {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    const text = one(value);
-    if (text && key !== "page") query.set(key, text);
-  }
-  query.set("page", String(page));
-  return `/operations/settings?${query.toString()}`;
 }
 
 export const metadata = { title: "Pricing" };
@@ -35,10 +27,11 @@ export default async function SettingsPage({
   const page = Math.max(0, Number(one(params.page)) || 0);
   if (!context.is_owner) {
     return (
-      <div className="space-y-4">
-        <h1 className="font-display text-4xl">Pricing</h1>
-        <p className="max-w-xl text-ink/75">Only the named owner can view and change pricing and the charges grid.</p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Pricing"
+        description="Only the named owner can view and change pricing and the charges grid."
+      />
     );
   }
 
@@ -54,12 +47,12 @@ export default async function SettingsPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-4xl">Pricing</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          Markups live on the pricing settings table. Each save appends a version. Minimum job charge and margin floor stay “not configured” until a number is entered.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Pricing"
+        description="Markups live on the pricing settings table. Each save appends a version. Minimum job charge and margin floor stay “not configured” until a number is entered."
+        actions={<SyncProductsButton />}
+      />
 
       <Card>
         <h2 className="font-display text-2xl">Markups and floors</h2>
@@ -84,7 +77,7 @@ export default async function SettingsPage({
               sledExtraMinutesPerMetre={pricing.sled_extra_minutes_per_m == null ? 6 : Number(pricing.sled_extra_minutes_per_m)}
             />
           ) : (
-            <p className="text-ink/70">Pricing settings are not configured.</p>
+            <EmptyState title="Pricing settings are not configured" description="Ask the owner to apply the pricing migration, then reload this page." />
           )}
         </div>
         {pricing ? (
@@ -113,63 +106,27 @@ export default async function SettingsPage({
       </Card>
 
       <Card>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="font-display text-2xl">Effort table</h2>
-            <p className="mt-2 max-w-2xl text-sm text-grey">
-              One row per Cin7 SKU. Sync fills suggested rows from the category default and never changes a confirmed row.
-              Needs review: {effort ? effort.review_count : "—"}.
-              {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks) and stay here until confirmed.` : ""}
-            </p>
-          </div>
-          <SyncProductsButton />
+        <div>
+          <h2 className="font-display text-2xl">Effort table</h2>
+          <p className="mt-2 max-w-2xl text-sm text-grey">
+            One row per Cin7 SKU. Sync fills suggested rows from the category default and never changes a confirmed row.
+            Needs review: {effort ? effort.review_count : "—"}.
+            {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks) and stay here until confirmed.` : ""}
+          </p>
         </div>
-        <form className="mt-4 flex flex-wrap items-end gap-3" method="get">
-          <label className="text-sm">
-            <span className="mb-1 block text-grey">Search</span>
-            <Input name="search" defaultValue={search} />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-grey">Cin7 category</span>
-            <select name="category" defaultValue={category} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
-              <option value="">All</option>
-              {(effort?.categories ?? categories.map((row) => row.category)).map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-grey">Status</span>
-            <select name="status" defaultValue={status} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
-              <option value="">All</option>
-              <option value="suggested">Suggested</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="name-rule">Name rule</option>
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-grey">Needs assembly</span>
-            <select name="needs" defaultValue={needs} className="min-h-11 rounded-2xl border border-line bg-paper px-3">
-              <option value="">All</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </label>
-          <Button type="submit" variant="secondary">Filter</Button>
-        </form>
         <div className="mt-4">
           {effort ? (
-            <SkuEffortEditor rows={effort.rows ?? []} page={page} filters={{ search, category, status, needsAssembly: needs }} />
+            <SkuEffortEditor
+              rows={effort.rows ?? []}
+              page={page}
+              total={effort.total ?? 0}
+              filters={{ search, category, status, needsAssembly: needs }}
+              categories={effort.categories ?? categories.map((row) => row.category)}
+            />
           ) : (
-            <p className="text-sm text-ink">The effort table is not available until the new migration is applied.</p>
+            <ErrorState title="The effort table is not available" description="Apply the effort migration, then reload this page." />
           )}
         </div>
-        {effort && effort.total > (page + 1) * 50 ? (
-          <p className="mt-3 text-sm">
-            <a className="font-semibold underline decoration-red" href={pageHref(params, page + 1)}>Next page</a>
-          </p>
-        ) : null}
       </Card>
 
       <Card>

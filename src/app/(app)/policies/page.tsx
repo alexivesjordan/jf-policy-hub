@@ -2,7 +2,9 @@ import Link from "next/link";
 import { listCategories, listPolicies } from "@/features/policies/queries";
 import { formatDate, londonToday, needsDocument, plusDays, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
-import { Badge, TextLink } from "@/components/ui";
+import { Badge, Button, Input, Select, TextLink } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { requireUser } from "@/lib/auth";
 
 export const instant = false;
@@ -35,58 +37,52 @@ export default async function PoliciesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
-          <h1 className="font-display mt-2 text-4xl">Policies</h1>
-          <p className="mt-2 max-w-2xl text-ink/75">
-            Upload a finished Word or PDF file into a placeholder, or open a policy and write it here.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <TextLink href="/policies/upload">Upload a policy document</TextLink>
-          <TextLink href="/policies/new" variant="secondary">
-            Write a new policy
-          </TextLink>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Pulse People"
+        title="Policies"
+        description="Upload a finished Word or PDF file into a placeholder, or open a policy and write it here."
+        actions={
+          <>
+            <TextLink href="/policies/upload">Upload a policy document</TextLink>
+            <TextLink href="/policies/new" variant="secondary">Write a new policy</TextLink>
+          </>
+        }
+      />
 
       <form className="grid gap-3 rounded-3xl border border-line bg-card p-4 md:grid-cols-4" method="get">
         <label className="space-y-1 text-sm font-semibold md:col-span-2">
           Search
-          <input name="q" defaultValue={q} placeholder="Search titles and text" className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal" />
+          <Input name="q" defaultValue={q} placeholder="Search titles and text" />
         </label>
         <label className="space-y-1 text-sm font-semibold">
           Category
-          <select name="category" defaultValue={category} className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal">
+          <Select name="category" searchable defaultValue={category} aria-label="Category">
             <option value="">All categories</option>
             {categories.map((item) => (
-              <option key={item.id} value={item.slug}>
-                {item.name}
-              </option>
+              <option key={item.id} value={item.slug}>{item.name}</option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="space-y-1 text-sm font-semibold">
           Status
-          <select name="status" defaultValue={status} className="w-full rounded-2xl border border-line bg-field px-3 py-2.5 font-normal">
+          <Select name="status" defaultValue={status} aria-label="Status">
             <option value="">All statuses</option>
             <option value="draft">Draft</option>
             <option value="active">Active</option>
             <option value="archived">Archived</option>
-          </select>
+          </Select>
         </label>
         <div className="md:col-span-4">
-          <button type="submit" className="rounded-full bg-red px-4 py-2 text-sm font-semibold text-white">
-            Apply filters
-          </button>
+          <Button type="submit">Apply filters</Button>
         </div>
       </form>
 
       {policies.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
-          No policies match those filters.
-        </p>
+        <EmptyState
+          title="No policies match those filters"
+          description="Clear the search, or write a new policy if the library is still empty."
+          action={<TextLink href="/policies/new">Write a new policy</TextLink>}
+        />
       ) : (
         <ul className="space-y-3">
           {policies.map((policy) => {

@@ -1,4 +1,7 @@
 import { DiffView } from "@/components/diff-view";
+import { Button, Select } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { getPolicy, listVersions } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 import { actorName, formatTimestamp } from "@/lib/format";
@@ -27,35 +30,30 @@ export default async function HistoryPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-4xl">History</h1>
-        <p className="mt-2 text-ink/75">{policy.title}</p>
-      </div>
+      <PageHeader eyebrow="Pulse People" title="History" description={policy.title} />
 
       <form method="get" className="flex flex-col gap-3 rounded-3xl border border-line bg-card p-4 md:flex-row md:items-end">
         <label className="text-sm font-semibold">
           From
-          <select name="from" defaultValue={String(from)} className="mt-1 block w-full rounded-2xl border border-line bg-field px-3 py-2 font-normal">
+          <Select name="from" defaultValue={String(from)} aria-label="From version">
             {versions.map((version) => (
               <option key={version.id} value={version.version_number}>
                 Version {version.version_number}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="text-sm font-semibold">
           To
-          <select name="to" defaultValue={String(to)} className="mt-1 block w-full rounded-2xl border border-line bg-field px-3 py-2 font-normal">
+          <Select name="to" defaultValue={String(to)} aria-label="To version">
             {versions.map((version) => (
-              <option key={version.id} value={version.version_number}>
+              <option key={`to-${version.id}`} value={version.version_number}>
                 Version {version.version_number}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <button type="submit" className="rounded-full bg-red px-4 py-2 text-sm font-semibold text-white">
-          Show the difference
-        </button>
+        <Button type="submit">Show the difference</Button>
       </form>
 
       {left && right ? (
@@ -66,7 +64,7 @@ export default async function HistoryPage({
           rightLabel={`Version ${right.version_number}`}
         />
       ) : (
-        <p className="text-sm text-ink/70">Choose two versions to compare.</p>
+        <EmptyState title="Choose two versions to compare" description="Pick a from and to version, then show the difference." />
       )}
 
       <ol className="space-y-3">

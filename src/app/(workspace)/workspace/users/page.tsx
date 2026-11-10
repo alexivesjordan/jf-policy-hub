@@ -1,4 +1,7 @@
-import { Button, Input, Select } from "@/components/ui";
+import { Button, Input, Select } from "@/components/pulse/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { inviteWorkspaceUser, saveWorkspaceUser } from "@/features/workspace/actions";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -32,12 +35,11 @@ export default async function WorkspaceUsersPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-4xl">Users</h1>
-        <p className="mt-2 max-w-2xl text-grey">
-          Invite with a Jordan Fitness email. Access follows the person’s teams and role unless you choose custom access. The row shows the effective level for each Pulse.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Users"
+        description="Invite with a Jordan Fitness email. Access follows the person’s teams and role unless you choose custom access. The row shows the effective level for each Pulse."
+      />
       <form action={inviteWorkspaceUser} className="grid gap-3 rounded-3xl border border-line bg-card p-5 md:grid-cols-4">
         <label className="text-sm md:col-span-2">
           <span className="mb-1 block text-grey">Email</span>
@@ -57,6 +59,7 @@ export default async function WorkspaceUsersPage() {
           <Button type="submit">Send invite</Button>
         </div>
       </form>
+      {people.length === 0 ? <EmptyState title="No users yet" description="Send an invite with a Jordan Fitness email to add the first person." /> : null}
       <ul className="space-y-4">
         {people.map((person) => (
           <li key={person.id} className="rounded-3xl border border-line bg-card p-5">
@@ -89,7 +92,7 @@ export default async function WorkspaceUsersPage() {
                 <div className="flex flex-wrap gap-3">
                   {teams.map((team) => (
                     <label key={team.id} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" name="teamId" value={team.id} defaultChecked={person.teams.includes(team.name)} />
+                      <Checkbox name="teamId" value={team.id} defaultChecked={person.teams.includes(team.name)} aria-label={team.name} />
                       {team.name}
                     </label>
                   ))}

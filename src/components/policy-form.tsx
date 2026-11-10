@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { savePolicyForm } from "@/features/policies/actions";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import type { Category, Person, PolicyRecord } from "@/lib/types";
 
 export function PolicyForm({
@@ -27,7 +27,7 @@ export function PolicyForm({
           <Input name="title" required defaultValue={policy?.title ?? ""} />
         </Field>
         <Field label="Category">
-          <Select name="categoryId" required defaultValue={policy?.category_id ?? ""}>
+          <Select name="categoryId" searchable required defaultValue={policy?.category_id ?? ""}>
             <option value="" disabled>
               Choose a category
             </option>
@@ -49,7 +49,7 @@ export function PolicyForm({
           <Input name="reviewDate" type="date" defaultValue={policy?.review_date ?? ""} />
         </Field>
         <Field label="Owner">
-          <Select name="ownerId" defaultValue={policy?.owner_id ?? ""}>
+          <Select name="ownerId" searchable defaultValue={policy?.owner_id ?? ""}>
             <option value="">Unassigned</option>
             {people.map((person) => (
               <option key={person.id} value={person.id}>

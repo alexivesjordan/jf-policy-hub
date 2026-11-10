@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
 import { PriceWorkings } from "@/components/price-workings";
 import { RepViewToggle } from "@/components/rep-view-toggle";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
 import { AccessLinkButton } from "@/components/access-link-button";
 import { RequirementOverrideForm } from "@/components/requirement-override-form";
 import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
@@ -91,13 +92,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       <Link href="/operations/jobs" className="text-sm font-semibold text-ink underline decoration-red">
         All jobs
       </Link>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-display text-4xl">{job.customer.name}</h1>
-          {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
-        </div>
-        <p className="mt-2 text-ink/70">Status is read-only. The server changes it when the rules are met.</p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title={job.customer.name}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+            <span>Status is read-only. The server changes it when the rules are met.</span>
+          </span>
+        }
+      />
 
       {internal ? <RepViewToggle
         enabled={canPreviewSales}

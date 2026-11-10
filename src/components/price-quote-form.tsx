@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { PriceWorkings } from "@/components/price-workings";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { BookingModal } from "@/components/booking-modal";
 import {
   createPricedJob,

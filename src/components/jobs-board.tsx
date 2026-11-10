@@ -2,14 +2,39 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState, ErrorState } from "@/components/pulse/states";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { setJobStatus } from "@/features/operations/actions";
 import type { JobSummary } from "@/features/operations/types";
 import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "pulse-jobs-view";
 const VIEWS = [
@@ -79,35 +104,35 @@ export function JobsBoard({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl">Jobs</h1>
-          <p className="mt-2 max-w-2xl text-ink/70">
-            The list is the default. Owners can drag a card to change its status. Sales see their own jobs.
-          </p>
-        </div>
-        <ToggleGroup
-          aria-label="Jobs view"
-          value={[view]}
-          onValueChange={(next) => {
-            const chosen = next[next.length - 1];
-            if (chosen === "list" || chosen === "kanban" || chosen === "calendar") choose(chosen);
-          }}
-          className="rounded-full border border-line bg-card p-1"
-        >
-          {VIEWS.map(([value, label]) => (
-            <ToggleGroupItem key={value} value={value} className="min-h-11 rounded-full px-4 text-sm font-semibold">
-              {label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
-      {error ? <p className="rounded-3xl border border-red bg-card px-5 py-4">{error}</p> : null}
-      {notice ? <p className="text-sm text-ink">{notice}</p> : null}
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Jobs"
+        description="The list is the default. Owners can drag a card, or use Move, to change its status. Sales see their own jobs."
+        actions={
+          <ToggleGroup
+            aria-label="Jobs view"
+            value={[view]}
+            onValueChange={(next) => {
+              const chosen = next[next.length - 1];
+              if (chosen === "list" || chosen === "kanban" || chosen === "calendar") choose(chosen);
+            }}
+            className="w-full flex-wrap rounded-full border border-line bg-card p-1 sm:w-auto"
+          >
+            {VIEWS.map(([value, label]) => (
+              <ToggleGroupItem key={value} value={value} className="min-h-11 flex-1 rounded-full px-4 text-sm font-semibold sm:flex-none">
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        }
+      />
+      {error ? <ErrorState title="Jobs did not load" description={error} /> : null}
+      {notice ? <p className="text-sm text-foreground" role="status">{notice}</p> : null}
       {rows.length === 0 && !error ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
-          No jobs for this role. Fixture jobs are visible to the install lead, HQ, and the owner. A sales role only sees jobs they own.
-        </p>
+        <EmptyState
+          title="No jobs for this role"
+          description="Fixture jobs are visible to the install lead, HQ, and the owner. A sales role only sees jobs they own."
+        />
       ) : null}
       {view === "list" ? <JobList jobs={rows} /> : null}
       {view === "kanban" ? (
@@ -124,9 +149,12 @@ export function JobsBoard({
                 delete next[jobId];
                 return next;
               });
-              setNotice(result?.message ?? "Could not move that job.");
+              const message = result?.message ?? "Could not move that job.";
+              setNotice(message);
+              toast.error(message);
             } else {
               setNotice(null);
+              toast.success(`Moved to ${label}.`);
             }
           }}
         />
@@ -138,33 +166,52 @@ export function JobsBoard({
 
 function JobList({ jobs }: { jobs: JobSummary[] }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Customer</TableHead>
-            <TableHead>Order</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Dates</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {jobs.map((job) => (
-            <TableRow key={job.id}>
-              <TableCell>
-                <Link href={`/operations/jobs/${job.id}`} className="font-semibold text-ink underline decoration-red">
-                  {job.customer_name}
-                </Link>
+    <>
+      <ul className="space-y-3 md:hidden">
+        {jobs.map((job) => (
+          <li key={job.id}>
+            <Link href={`/operations/jobs/${job.id}`} className="block rounded-3xl border border-border bg-card px-4 py-4">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-foreground">{job.customer_name}</span>
                 {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
-              </TableCell>
-              <TableCell>{job.cin7_order_number || job.cin7_number || "No order number"}</TableCell>
-              <TableCell><Badge tone="active">{job.status_label}</Badge></TableCell>
-              <TableCell className="text-grey">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</TableCell>
+              </span>
+              <span className="mt-1 block text-sm text-muted-foreground">{job.cin7_order_number || job.cin7_number || "No order number"}</span>
+              <span className="mt-2 flex items-center justify-between gap-2 text-sm">
+                <Badge tone="active">{job.status_label}</Badge>
+                <span className="text-muted-foreground">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-hidden rounded-3xl border border-line bg-card md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Customer</TableHead>
+              <TableHead>Order</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Dates</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {jobs.map((job) => (
+              <TableRow key={job.id}>
+                <TableCell>
+                  <Link href={`/operations/jobs/${job.id}`} className="font-semibold text-ink underline decoration-red">
+                    {job.customer_name}
+                  </Link>
+                  {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+                </TableCell>
+                <TableCell>{job.cin7_order_number || job.cin7_number || "No order number"}</TableCell>
+                <TableCell><Badge tone="active">{job.status_label}</Badge></TableCell>
+                <TableCell className="text-grey">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -177,47 +224,167 @@ function JobKanban({
   canEdit: boolean;
   onMove: (jobId: string, status: string) => Promise<void>;
 }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+  const active = jobs.find((job) => job.id === activeId) ?? null;
+  const dragReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  function onDragEnd(event: DragEndEvent) {
+    setActiveId(null);
+    if (!canEdit || !event.over) return;
+    const jobId = String(event.active.id);
+    const overId = String(event.over.id);
+    const status = JOB_PIPELINE.some(([code]) => code === overId) ? overId : jobs.find((job) => job.id === overId)?.status;
+    const current = jobs.find((job) => job.id === jobId)?.status;
+    if (status && current && status !== current) void onMove(jobId, status);
+  }
+
+  if (!dragReady) {
+    return (
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2" aria-label="Job pipeline">
+        {JOB_PIPELINE.map(([status, label]) => (
+          <KanbanColumn key={status} status={status} label={label} jobs={jobs.filter((job) => job.status === status)} canEdit={false} onMove={onMove} />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {JOB_PIPELINE.map(([status, label]) => {
-        const column = jobs.filter((job) => job.status === status);
-        return (
-          <section
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={(event: DragStartEvent) => setActiveId(String(event.active.id))}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={onDragEnd}
+      accessibility={{
+        announcements: {
+          onDragStart({ active: dragged }) {
+            const job = jobs.find((item) => item.id === dragged.id);
+            return `Picked up ${job?.customer_name ?? "job"}. Use the arrow keys to choose a column, then space to drop.`;
+          },
+          onDragOver({ over }) {
+            if (!over) return "Not over a column.";
+            const label = JOB_PIPELINE.find(([code]) => code === String(over.id))?.[1];
+            return label ? `Over ${label}.` : "Over another job.";
+          },
+          onDragEnd({ over }) {
+            const label = over ? JOB_PIPELINE.find(([code]) => code === String(over.id))?.[1] : null;
+            return label ? `Dropped in ${label}.` : "Move cancelled.";
+          },
+          onDragCancel() {
+            return "Move cancelled.";
+          },
+        },
+      }}
+    >
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2" aria-label="Job pipeline">
+        {JOB_PIPELINE.map(([status, label]) => (
+          <KanbanColumn
             key={status}
-            className="w-72 shrink-0 rounded-3xl border border-line bg-mist p-3"
-            onDragOver={(event) => {
-              if (!canEdit) return;
-              event.preventDefault();
-            }}
-            onDrop={(event) => {
-              if (!canEdit) return;
-              event.preventDefault();
-              const jobId = event.dataTransfer.getData("text/plain");
-              if (jobId) void onMove(jobId, status);
-            }}
-          >
-            <h2 className="px-1 text-sm font-semibold text-ink">{label}</h2>
-            <p className="px-1 text-xs text-grey">{column.length}</p>
-            <ul className="mt-3 space-y-2">
-              {column.map((job) => (
-                <li
-                  key={job.id}
-                  draggable={canEdit}
-                  onDragStart={(event) => event.dataTransfer.setData("text/plain", job.id)}
-                  className={canEdit ? "cursor-grab" : undefined}
-                >
-                  <Link href={`/operations/jobs/${job.id}`} className="block rounded-2xl border border-line bg-card px-3 py-3">
-                    <p className="font-semibold text-ink">{job.customer_name}</p>
-                    <p className="mt-1 text-xs text-grey">{job.cin7_order_number || job.cin7_number || "No order number"}</p>
-                    <p className="mt-1 text-xs text-grey">{jobDate(job)}</p>
-                  </Link>
-                </li>
+            status={status}
+            label={label}
+            jobs={jobs.filter((job) => job.status === status)}
+            canEdit={canEdit}
+            onMove={onMove}
+          />
+        ))}
+      </div>
+      <DragOverlay>{active ? <JobKanbanCard job={active} canEdit={false} overlay /> : null}</DragOverlay>
+    </DndContext>
+  );
+}
+
+function KanbanColumn({
+  status,
+  label,
+  jobs,
+  canEdit,
+  onMove,
+}: {
+  status: string;
+  label: string;
+  jobs: JobSummary[];
+  canEdit: boolean;
+  onMove: (jobId: string, status: string) => Promise<void>;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canEdit });
+  return (
+    <section className={cn("w-[min(18rem,82vw)] shrink-0 snap-start rounded-3xl border border-line bg-muted p-3", isOver && "ring-2 ring-ring")} aria-labelledby={`column-${status}`}>
+      <h2 id={`column-${status}`} className="px-1 text-sm font-semibold text-foreground">{label}</h2>
+      <p className="px-1 text-xs text-muted-foreground">{jobs.length}</p>
+      <ul ref={setNodeRef} className="mt-3 min-h-28 space-y-2">
+        {jobs.map((job) => (
+          <li key={job.id}>
+            <JobKanbanCard job={job} canEdit={canEdit} onMove={onMove} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function JobKanbanCard({
+  job,
+  canEdit,
+  onMove,
+  overlay = false,
+}: {
+  job: JobSummary;
+  canEdit: boolean;
+  onMove?: (jobId: string, status: string) => Promise<void>;
+  overlay?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: job.id, disabled: !canEdit || overlay });
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  return (
+    <Card
+      ref={overlay ? undefined : setNodeRef}
+      style={style}
+      className={cn("gap-0 rounded-2xl bg-card py-0 shadow-sm", isDragging && "opacity-40", overlay && "shadow-lg")}
+    >
+      <CardContent className="space-y-2 p-3">
+        <div className="flex items-start gap-2">
+          {canEdit ? (
+            <button
+              type="button"
+              className="mt-0.5 inline-flex size-11 shrink-0 cursor-grab items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
+              aria-label={`Drag ${job.customer_name}. Space to pick up, arrow keys to move, space to drop.`}
+              suppressHydrationWarning
+              {...listeners}
+              {...attributes}
+            >
+              <GripVertical className="size-4" />
+            </button>
+          ) : null}
+          <Link href={`/operations/jobs/${job.id}`} className="min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+            <p className="font-semibold text-foreground">{job.customer_name}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{job.cin7_order_number || job.cin7_number || "No order number"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{jobDate(job)}</p>
+          </Link>
+        </div>
+        {canEdit && onMove ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex min-h-11 items-center rounded-full px-2 text-sm font-semibold text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+              Move
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-72 w-56">
+              {JOB_PIPELINE.map(([code, label]) => (
+                <DropdownMenuItem key={code} disabled={code === job.status} onClick={() => void onMove(job.id, code)}>
+                  {label}
+                </DropdownMenuItem>
               ))}
-            </ul>
-          </section>
-        );
-      })}
-    </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -226,31 +393,65 @@ function JobsMonth({ jobs }: { jobs: JobSummary[] }) {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   });
+  const [activeDay, setActiveDay] = useState<string | null>(null);
   const title = cursor.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
   const weeks = useMemo(() => monthWeeks(cursor.getUTCFullYear(), cursor.getUTCMonth()), [cursor]);
   const placed = jobs.filter((job) => jobSpan(job));
+  const flat = weeks.flat();
+
+  function moveFocus(from: string, offset: number) {
+    const next = flat[flat.indexOf(from) + offset];
+    if (!next) return;
+    setActiveDay(next);
+    document.getElementById(`job-day-${next}`)?.focus();
+  }
 
   return (
-    <div className="rounded-3xl border border-line bg-card px-4 py-5">
-      <div className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center">
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-mist" aria-label="Previous month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1)))}>
+    <div className="rounded-3xl border border-line bg-card px-3 py-5 sm:px-4">
+      <div className="grid grid-cols-[2.75rem_1fr_2.75rem] items-center">
+        <button type="button" className="flex size-11 items-center justify-center rounded-full outline-none hover:bg-mist focus-visible:ring-3 focus-visible:ring-ring/50" aria-label="Previous month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1)))}>
           <ChevronLeft aria-hidden="true" className="size-5" />
         </button>
         <h2 className="text-center font-display text-2xl">{title}</h2>
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-mist" aria-label="Next month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)))}>
+        <button type="button" className="flex size-11 items-center justify-center rounded-full outline-none hover:bg-mist focus-visible:ring-3 focus-visible:ring-ring/50" aria-label="Next month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)))}>
           <ChevronRight aria-hidden="true" className="size-5" />
         </button>
       </div>
-      <div className="mt-4 grid grid-cols-7 text-center text-xs font-semibold text-grey">
-        {["M", "T", "W", "T", "F", "S", "S"].map((label, index) => <div key={`${label}-${index}`} className="py-2">{label}</div>)}
+      <div className="mt-4 grid grid-cols-7 text-center text-xs font-semibold text-grey" aria-hidden="true">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => <div key={label} className="py-2">{label.slice(0, 1)}</div>)}
       </div>
-      <div className="space-y-3">
+      <div className="space-y-3" role="grid" aria-label={`${title} jobs`}>
         {weeks.map((week) => (
-          <div key={week[0]}>
+          <div key={week[0]} role="row">
             <div className="grid grid-cols-7 text-center text-sm">
-              {week.map((iso) => (
-                <div key={iso} className={`py-1 ${iso.slice(0, 7) === monthKey(cursor) ? "text-ink" : "text-grey"}`}>{Number(iso.slice(8))}</div>
-              ))}
+              {week.map((iso) => {
+                const inMonth = iso.slice(0, 7) === monthKey(cursor);
+                const dayJobs = placed.filter((job) => jobTouches(job, iso));
+                return (
+                  <button
+                    key={iso}
+                    id={`job-day-${iso}`}
+                    type="button"
+                    role="gridcell"
+                    aria-selected={activeDay === iso}
+                    aria-label={`${iso}, ${dayJobs.length} jobs`}
+                    className={cn(
+                      "mx-auto flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      inMonth ? "text-ink" : "text-grey",
+                      activeDay === iso && "bg-primary text-primary-foreground",
+                    )}
+                    onClick={() => setActiveDay(iso)}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowRight") { event.preventDefault(); moveFocus(iso, 1); }
+                      if (event.key === "ArrowLeft") { event.preventDefault(); moveFocus(iso, -1); }
+                      if (event.key === "ArrowDown") { event.preventDefault(); moveFocus(iso, 7); }
+                      if (event.key === "ArrowUp") { event.preventDefault(); moveFocus(iso, -7); }
+                    }}
+                  >
+                    {Number(iso.slice(8))}
+                  </button>
+                );
+              })}
             </div>
             <div className="mt-1 space-y-1">
               {placed.map((job) => {
@@ -272,6 +473,26 @@ function JobsMonth({ jobs }: { jobs: JobSummary[] }) {
         ))}
       </div>
       {placed.length === 0 ? <p className="mt-4 text-sm text-grey">No pencilled dates in this list yet.</p> : null}
+      {activeDay ? (
+        <div className="mt-4 space-y-2">
+          <p className="text-sm font-semibold">{activeDay}</p>
+          {placed.filter((job) => jobTouches(job, activeDay)).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing pencilled on this day.</p>
+          ) : (
+            <ul className="space-y-2">
+              {placed.filter((job) => jobTouches(job, activeDay)).map((job) => (
+                <li key={job.id}>
+                  <Link href={`/operations/jobs/${job.id}`} className="block rounded-2xl bg-primary px-3 py-3 text-sm font-semibold text-primary-foreground">
+                    {job.customer_name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">Tap a day, or use the arrow keys, to see the jobs on it.</p>
+      )}
     </div>
   );
 }
@@ -293,6 +514,12 @@ function monthWeeks(year: number, month: number) {
     if (cursor.slice(0, 7) > `${year}-${String(month + 1).padStart(2, "0")}` && week >= 3) break;
   }
   return weeks;
+}
+
+function jobTouches(job: JobSummary, iso: string) {
+  const span = jobSpan(job);
+  if (!span) return false;
+  return iso >= span.start && iso <= span.end;
 }
 
 function jobSpan(job: JobSummary) {

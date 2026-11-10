@@ -4,6 +4,7 @@ import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
+import { PageSkeleton } from "@/components/pulse/states";
 import { isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
 
@@ -19,7 +20,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
     );
   }
   return (
-    <Suspense fallback={<div className="min-h-screen bg-paper" />}>
+    <Suspense fallback={<div className="min-h-screen bg-paper p-6"><PageSkeleton /></div>}>
       <SalesShell>{children}</SalesShell>
     </Suspense>
   );

@@ -39,7 +39,7 @@ export function Launcher({ profile }: { profile: Profile | null }) {
                     </span>
                     <span className="min-w-0">
                       <span className="text-lg font-semibold text-ink">{module.name}</span>
-                      <span className="mt-0.5 block text-sm text-grey">Needs an Pulse People licence</span>
+                      <span className="mt-0.5 block text-sm text-grey">Needs a Pulse People licence</span>
                     </span>
                   </div>
                 </li>

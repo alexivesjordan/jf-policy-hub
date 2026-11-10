@@ -5,6 +5,7 @@ import { getOfficeContext, listPulseNotifications } from "@/features/operations/
 import { listMyNotifications } from "@/features/policies/queries";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { requireOperationsUser } from "@/lib/auth";
+import { PageSkeleton } from "@/components/pulse/states";
 import { isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
 
@@ -24,7 +25,7 @@ export default function OperationsLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-paper" />}>
+    <Suspense fallback={<div className="min-h-screen bg-paper p-6"><PageSkeleton /></div>}>
       <OperationsShell>{children}</OperationsShell>
     </Suspense>
   );

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { markAllPulseNotificationsRead, markPulseNotificationRead } from "@/features/operations/actions";
 import { listPulseNotifications } from "@/features/operations/queries";
+import { Button } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -13,25 +16,20 @@ export default async function OperationsNotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl">Notifications</h1>
-          <p className="mt-2 text-ink/70">
-            Operations notes only. HR suggestions stay on the People notifications screen.
-          </p>
-        </div>
-        {unread ? (
-          <form action={markAllPulseNotificationsRead}>
-            <button type="submit" className="text-sm font-semibold text-ink underline decoration-red">
-              Mark all read
-            </button>
-          </form>
-        ) : null}
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Notifications"
+        description="Operations notes only. HR suggestions stay on the People notifications screen."
+        actions={
+          unread ? (
+            <form action={markAllPulseNotificationsRead}>
+              <Button type="submit" variant="secondary">Mark all read</Button>
+            </form>
+          ) : null
+        }
+      />
       {notifications.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
-          No operations notifications yet. If Alex already had an account when the fixture migration ran, one fixture note is waiting here.
-        </p>
+        <EmptyState title="No operations notifications yet" description="If a fixture note was seeded for the owner, it will show up here." />
       ) : (
         <ul className="space-y-3">
           {notifications.map((item) => (

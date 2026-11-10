@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { getJob, getOfficeContext } from "@/features/operations/queries";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 import { priceVariation, type SiteProfile } from "@/lib/pricer/engine";
@@ -68,10 +70,9 @@ export default async function AccessReviewPage({ params }: { params: Promise<{ i
       <Link href={`/operations/jobs/${id}`} className="text-sm font-semibold underline decoration-red">
         Back to the job
       </Link>
-      <h1 className="font-display text-4xl">Access review</h1>
-      <p className="text-ink/70">{job.customer.name}. Mode B compares the form with the best-case price.</p>
+      <PageHeader eyebrow="Pulse Operations" title="Access review" description={`${job.customer.name}. Mode B compares the form with the best-case price.`} />
       {forms.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">No access form yet.</p>
+        <EmptyState title="No access form yet" description="The customer link collects site access before this review can compare it with the price." />
       ) : (
         <Card>
           <p className="font-semibold">Accepted by {latest?.accepted_by_name ?? "—"}</p>

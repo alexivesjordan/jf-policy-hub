@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button } from "@/components/ui";
+import { Banner, Button } from "@/components/pulse/ui";
 import { createAccessLink } from "@/features/operations/access-actions";
 
 export function AccessLinkButton({ jobId }: { jobId: string }) {

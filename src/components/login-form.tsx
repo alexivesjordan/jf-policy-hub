@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Banner, Button, Field, Input } from "@/components/ui";
+import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { safeNextPath } from "@/lib/access";
 
 export function LinkError() {

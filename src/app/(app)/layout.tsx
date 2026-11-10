@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
 import { listPulseNotifications } from "@/features/operations/queries";
 import { requireUser } from "@/lib/auth";
+import { PageSkeleton } from "@/components/pulse/states";
 import { isSupabaseConfigured } from "@/lib/env";
 import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
 
@@ -22,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Suspense fallback={<ShellFallback />}>
+    <Suspense fallback={<div className="min-h-screen bg-paper p-6"><PageSkeleton /></div>}>
       <AuthedShell>{children}</AuthedShell>
     </Suspense>
   );
@@ -63,14 +64,5 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
     <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications}>
       {children}
     </AppShell>
-  );
-}
-
-function ShellFallback() {
-  return (
-    <div className="min-h-screen bg-paper md:grid md:grid-cols-[16.5rem_1fr]">
-      <div className="min-h-24 bg-pine md:min-h-screen" />
-      <p className="px-8 py-10 text-ink/60">Loading Jordan Pulse...</p>
-    </div>
   );
 }

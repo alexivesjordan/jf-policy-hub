@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/pulse/page-header";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 
 export const metadata = { title: "Roles" };
@@ -14,10 +15,11 @@ export default async function RolesPage() {
   await requireWorkspaceAdmin();
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-4xl">Roles</h1>
-      <p className="max-w-2xl text-ink/70">
-        These five roles are fixed. Access is the most permissive grant across a person’s teams, then raised or capped by the role. A user can instead be set to custom access.
-      </p>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Roles"
+        description="These five roles are fixed. Access is the most permissive grant across a person’s teams, then raised or capped by the role. A user can instead be set to custom access."
+      />
       <ul className="space-y-3">
         {ROLES.map(([name, detail]) => (
           <li key={name} className="rounded-3xl border border-line bg-card px-5 py-4">

@@ -2,6 +2,9 @@ import Link from "next/link";
 import { markAllNotificationsRead, markNotificationRead } from "@/features/notifications/actions";
 import { listNotifications } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
+import { Button } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { formatTimestamp } from "@/lib/format";
 
 export const metadata = { title: "Notifications" };
@@ -13,24 +16,20 @@ export default async function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl">Notifications</h1>
-          <p className="mt-2 text-ink/75">New suggestions and automatic updates appear here. Email can be added later in one place in the code.</p>
-        </div>
-        {unread ? (
-          <form action={markAllNotificationsRead}>
-            <button type="submit" className="text-sm font-semibold text-ink underline decoration-red">
-              Mark all read
-            </button>
-          </form>
-        ) : null}
-      </div>
-
+      <PageHeader
+        eyebrow="Pulse People"
+        title="Notifications"
+        description="New suggestions and automatic updates appear here. Email can be added later in one place in the code."
+        actions={
+          unread ? (
+            <form action={markAllNotificationsRead}>
+              <Button type="submit" variant="secondary">Mark all read</Button>
+            </form>
+          ) : null
+        }
+      />
       {notifications.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
-          You are up to date. Approvers see a note here when a suggestion arrives.
-        </p>
+        <EmptyState title="You are up to date" description="Approvers see a note here when a suggestion arrives." />
       ) : (
         <ul className="space-y-3">
           {notifications.map((item) => (
