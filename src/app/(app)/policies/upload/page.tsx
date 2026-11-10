@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { UploadForm } from "@/components/upload-form";
 import { findPolicy, listCategories, listPolicies } from "@/features/policies/queries";
+import { PageHeader } from "@/components/pulse/page-header";
 import { requireUser } from "@/lib/auth";
 import { needsDocument } from "@/lib/format";
 import type { PolicyRecord } from "@/lib/types";
@@ -38,13 +39,11 @@ export default async function UploadPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
-        <h1 className="font-display mt-2 text-4xl">Upload a policy document</h1>
-        <p className="mt-2 text-grey">
-          Choose any draft or active policy, including one that already has a file. Word and PDF files are read into the policy text, and the original file stays attached. Saving creates a new version.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse People"
+        title="Upload a policy document"
+        description="Choose any draft or active policy, including one that already has a file. Word and PDF files are read into the policy text, and the original file stays attached. Saving creates a new version."
+      />
       <div className="rounded-3xl border border-line bg-card p-5">
         <UploadForm policies={options} categories={categories} initialPolicyId={initialPolicyId} />
       </div>

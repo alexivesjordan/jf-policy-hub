@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { createCategory, inviteUser, setAutoApply, updateUser } from "@/features/admin/actions";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { formatTimestamp, memberStatus, roleLabel } from "@/lib/format";
 import type { Category, DirectoryUser } from "@/lib/types";
 import { pulseModules } from "@/modules/registry";
@@ -29,7 +29,7 @@ export function InviteForm() {
       </Field>
       <Field label="Role">
         <Select name="role" defaultValue="staff">
-          <RoleOptions />
+          {RoleOptions()}
         </Select>
       </Field>
       <div className="flex items-end">
@@ -79,7 +79,7 @@ export function UserForm({ person }: { person: DirectoryUser }) {
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
         <Field label="Role">
           <Select name="role" defaultValue={person.role} aria-label={`Role for ${person.email}`}>
-            <RoleOptions />
+            {RoleOptions()}
           </Select>
         </Field>
         <Field label="Status">

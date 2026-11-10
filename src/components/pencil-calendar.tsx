@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button } from "@/components/ui";
+import { Banner } from "@/components/pulse/ui";
 import { pencilJobDay } from "@/features/operations/price-actions";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import type { JobRequirements } from "@/lib/pulse/requirements";

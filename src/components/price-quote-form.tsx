@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Upload } from "lucide-react";
+import { toast } from "sonner";
 import { PriceWorkings } from "@/components/price-workings";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { QuoteNotice } from "@/components/quote-notice";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { BookingModal } from "@/components/booking-modal";
 import {
   createPricedJob,
@@ -60,6 +63,13 @@ export function PriceQuoteForm({
     if ((!showInternal || viewAsSales) && created?.quote?.jobId) setBookingJob(created.quote.jobId);
   }, [created, showInternal, viewAsSales]);
 
+  const toastedSale = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sold?.ok || !sold.message || toastedSale.current === sold.message) return;
+    toastedSale.current = sold.message;
+    toast.success(sold.message);
+  }, [sold]);
+
   const viewingSales = !showInternal || viewAsSales;
   const quote = (created?.quote ?? (viewingSales ? sold?.quote ?? priced?.quote : priced?.quote)) as PricedQuote | undefined;
   const notice = sourceName === "pdf" ? parsed : sourceName === "load" ? loaded : null;
@@ -82,7 +92,7 @@ export function PriceQuoteForm({
       <div className="space-y-6">
         {previewToggle}
         <form action={sellOrder} className="space-y-4">
-          <Field label="Cin7 sales order" hint={cin7Connected ? "For example SO-00490. A saved segment for this customer is used if you leave the segment blank." : "Fixture numbers such as FIXTURE-Q-1001 while Cin7 is not connected."}>
+          <Field label="Order number" hint="For example SO-00490. Leave the segment if this customer has been priced before.">
             <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
           </Field>
           <Field label="Segment" hint="Leave this on the saved segment when this customer has been priced before.">
@@ -95,14 +105,12 @@ export function PriceQuoteForm({
           </Field>
           <Button type="submit" disabled={selling || creating}>{selling ? "Calculating…" : "Submit"}</Button>
         </form>
-        <form action={sellOrder} className="grid gap-4 md:grid-cols-[1fr_auto]">
+        <form action={sellOrder} className="space-y-4">
           <input type="hidden" name="segment" value={segmentChoice} />
-          <Field label="Or upload the quote PDF" hint="Text is extracted in the app. The file is not stored.">
-            <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
+          <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
+            <QuoteFileDrop />
           </Field>
-          <div className="md:pt-7">
-            <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
-          </div>
+          <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
         </form>
         {selling ? (
           <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
@@ -110,8 +118,9 @@ export function PriceQuoteForm({
             <p className="mt-2 text-sm text-grey">Fetching the order and pricing the install.</p>
           </div>
         ) : null}
-        {sold && !selling ? <Banner tone={sold.ok ? "success" : "error"}>{sold.message}</Banner> : null}
-        {summary && quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
+        {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
+        {created && !created.ok ? <Banner tone="error">{created.message}</Banner> : null}
+        {summary && quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
         {summary ? (
           <div className="rounded-3xl border border-line bg-card px-6 py-6">
             <dl className="space-y-3 text-ink">
@@ -145,23 +154,18 @@ export function PriceQuoteForm({
     <div className="space-y-6">
       {previewToggle}
       <form action={loadQuote} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field
-          label="Cin7 order number"
-          hint={cin7Connected ? "Looks up the sales order, for example SO-00490." : "Fixture numbers such as FIXTURE-Q-1001. Cin7 not connected."}
-        >
+        <Field label="Order number" hint="For example SO-00490.">
           <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
         </Field>
         <div className="md:pt-7">
           <Button type="submit" disabled={loading}>{loading ? "Loading..." : "Load quote"}</Button>
         </div>
       </form>
-      <form action={parsePdf} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field label="Or upload the quote PDF" hint="Text is extracted in the app. The file is not stored.">
-          <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
+      <form action={parsePdf} className="space-y-4">
+        <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
+          <QuoteFileDrop />
         </Field>
-        <div className="md:pt-7">
-          <Button type="submit" variant="secondary" disabled={parsing}>{parsing ? "Reading..." : "Read PDF"}</Button>
-        </div>
+        <Button type="submit" variant="secondary" disabled={parsing}>{parsing ? "Reading..." : "Read PDF"}</Button>
       </form>
 
       {notice && !draft ? <Banner tone={notice.ok ? "success" : "error"}>{notice.message}</Banner> : null}
@@ -182,7 +186,7 @@ export function PriceQuoteForm({
             <Field label="Site postcode">
               <Input name="postcode" value={draft.postcode} onChange={(event) => setDraft({ ...draft, postcode: event.target.value })} required autoCapitalize="characters" />
             </Field>
-            <Field label="Segment" hint="Cin7 has no segment. This choice is remembered for the customer. HubSpot segment is still to come.">
+            <Field label="Segment" hint="We remember this for the customer next time.">
               <Select name="segment" required value={draft.segment} onChange={(event) => setDraft({ ...draft, segment: event.target.value })}>
                 <option value="">Choose a segment</option>
                 {SEGMENTS.map(([value, label]) => (
@@ -271,7 +275,7 @@ export function PriceQuoteForm({
           markup={quote.markup ?? null}
           flags={quote.flags ?? []}
         />
-      ) : quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
+      ) : quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
       {quote?.warnings.map((warning) => <Banner key={warning} tone="warning">{warning}</Banner>)}
       {quote?.requirements ? (
         <div className="rounded-3xl border border-line bg-card px-5 py-4 text-sm text-ink">
@@ -305,6 +309,39 @@ export function PriceQuoteForm({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function QuoteFileDrop() {
+  const [fileName, setFileName] = useState("");
+
+  function assign(input: HTMLInputElement, file: File | null) {
+    const transfer = new DataTransfer();
+    if (file) transfer.items.add(file);
+    input.files = transfer.files;
+    setFileName(file?.name ?? "");
+  }
+
+  return (
+    <div
+      className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-field px-4 py-6 text-center"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const input = event.currentTarget.querySelector("input");
+        if (input) assign(input, event.dataTransfer.files?.[0] ?? null);
+      }}
+    >
+      <Upload className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+      <span className="text-sm font-semibold">{fileName || "Drop a PDF here, or choose a file"}</span>
+      <input
+        name="quotePdf"
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
+      />
     </div>
   );
 }

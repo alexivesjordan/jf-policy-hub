@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { reviewAmendment } from "@/features/amendments/actions";
-import { Banner, Button, Field, TextArea } from "@/components/ui";
+import { Banner, Button, Field, TextArea } from "@/components/pulse/ui";
 
 export function ReviewForm({ amendmentId, proposed }: { amendmentId: string; proposed: string }) {
   const [state, action, pending] = useActionState(reviewAmendment, null);

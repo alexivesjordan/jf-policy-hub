@@ -1,5 +1,7 @@
 import { TaskForm } from "@/components/operations-forms";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState } from "@/components/pulse/states";
 import { getOfficeContext, listPulseTasks } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
 import { hasLevel } from "@/lib/module-guard";
@@ -14,12 +16,11 @@ export default async function TasksPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-4xl">Tasks</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          Exceptions, fleet, and countdown items. The list starts empty until someone adds one. Installs does not write tasks yet.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Tasks"
+        description="Open follow-ups for the install office."
+      />
       {canCreate ? (
         <Card>
           <h2 className="font-display text-2xl">Add a task</h2>
@@ -31,9 +32,7 @@ export default async function TasksPage() {
         <p className="text-sm text-grey">Your role can read tasks assigned to you. Creating them is for the install lead, HQ, or the owner.</p>
       )}
       {tasks.length === 0 ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
-          No tasks yet.
-        </p>
+        <EmptyState title="No tasks yet" description="Add an exception, fleet, or countdown item when the office needs one tracked." />
       ) : (
         <ul className="space-y-3">
           {tasks.map((task) => (

@@ -4,13 +4,14 @@ import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import { PageSkeleton } from "@/components/pulse/states";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
 
 export default function SalesLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
@@ -19,7 +20,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
     );
   }
   return (
-    <Suspense fallback={<div className="min-h-screen bg-paper" />}>
+    <Suspense fallback={<div className="min-h-screen bg-paper p-6"><PageSkeleton /></div>}>
       <SalesShell>{children}</SalesShell>
     </Suspense>
   );

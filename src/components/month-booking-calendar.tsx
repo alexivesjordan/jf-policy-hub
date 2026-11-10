@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useActionState } from "react";
-import { Banner } from "@/components/ui";
+import { Banner } from "@/components/pulse/ui";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -147,9 +147,27 @@ export function MonthBookingCalendar({ jobId }: { jobId: string }) {
             );
           },
         }}
-        className="mx-auto"
+        className="mx-auto w-full max-w-md [--cell-size:2.75rem]"
       />
       {note ? <p className="mt-4 text-sm text-grey">{note}</p> : null}
+      <div className="mt-4" aria-live="polite">
+        {chosen ? (
+          <ul className="space-y-1">
+            {chosen.lines.map((line) => (
+              <li key={line.id} className="flex items-start gap-2 py-1 text-sm">
+                <span className={line.available ? "text-[#146c36]" : "text-red"} aria-hidden="true">{line.available ? "✓" : "✕"}</span>
+                <span>
+                  <span className="font-semibold">{line.label}</span>
+                  <span className="mt-0.5 block text-muted-foreground">{line.detail}</span>
+                </span>
+              </li>
+            ))}
+            {chosen.lines.length === 0 ? <li className="text-sm text-muted-foreground">No resources are on the calendar yet.</li> : null}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">Tap a green day to see who is free. Arrow keys move between days.</p>
+        )}
+      </div>
       <form action={action} className="mt-5">
         <input type="hidden" name="jobId" value={jobId} />
         <input type="hidden" name="day" value={selected ?? ""} />
@@ -174,7 +192,7 @@ function CalendarDay({
     <button
       type="button"
       className={cn(
-        "flex size-9 items-center justify-center rounded-full text-sm",
+        "flex size-11 min-h-11 min-w-11 items-center justify-center rounded-full text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         bookable && !inRange && "day-bookable",
         inRange && "day-selected",
         today && "day-today",

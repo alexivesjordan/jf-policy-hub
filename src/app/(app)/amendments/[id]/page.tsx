@@ -1,6 +1,7 @@
 import { DiffView } from "@/components/diff-view";
 import { ReviewForm } from "@/components/review-form";
-import { Banner, Badge, Card } from "@/components/ui";
+import { Banner, Badge, Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getAmendment } from "@/features/policies/queries";
 import { canReviewSuggestions } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
@@ -26,16 +27,18 @@ export default async function AmendmentPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold text-grey">{amendment.policy?.title}</p>
-        <h1 className="font-display mt-1 text-4xl">{amendment.summary}</h1>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge tone={amendment.status === "pending" ? "pending" : amendment.status === "rejected" ? "bad" : "good"}>
-            {statusLabel(amendment.status)}
-          </Badge>
-          <Badge>{severityLabel(amendment.severity)} severity</Badge>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow={amendment.policy?.title ?? "Pulse People"}
+        title={amendment.summary}
+        description={
+          <span className="flex flex-wrap gap-2">
+            <Badge tone={amendment.status === "pending" ? "pending" : amendment.status === "rejected" ? "bad" : "good"}>
+              {statusLabel(amendment.status)}
+            </Badge>
+            <Badge>{severityLabel(amendment.severity)} severity</Badge>
+          </span>
+        }
+      />
 
       {done ? <Banner tone="success">Decision saved.</Banner> : null}
 

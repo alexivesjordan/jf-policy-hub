@@ -1,4 +1,5 @@
-import { Button, Input } from "@/components/ui";
+import { Button, Input } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
 import { deleteWorkspaceTeam, saveWorkspaceTeam } from "@/features/workspace/actions";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -13,10 +14,11 @@ export default async function TeamsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-4xl">Teams</h1>
-      <p className="max-w-2xl text-ink/70">
-        Starter teams are Sales, Installs, Aftersales, Operations, Office, and Management. Rename or add a team here. Deleting a team removes its memberships.
-      </p>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Teams"
+        description="Groups of people who share the same access."
+      />
       <form action={saveWorkspaceTeam} className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="mb-1 block text-grey">New team</span>

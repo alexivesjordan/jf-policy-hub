@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button, Field, Input, Select, TextArea } from "@/components/ui";
+import { Banner, Button, Field, Input, Select, TextArea } from "@/components/pulse/ui";
 import {
   createGateOverride,
   createPulseTask,
@@ -205,7 +205,7 @@ export function GateOverrideForm({ jobs }: { jobs: JobSummary[] }) {
   return (
     <form action={action} className="grid gap-4">
       <Field label="Job">
-        <Select name="jobId" required defaultValue={jobs[0]?.id ?? ""}>
+        <Select name="jobId" searchable required defaultValue={jobs[0]?.id ?? ""}>
           {jobs.map((job) => (
             <option key={job.id} value={job.id}>
               {job.cin7_number ?? job.id.slice(0, 8)} — {job.customer_name}

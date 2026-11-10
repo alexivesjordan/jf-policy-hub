@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QuoteNotice } from "@/components/quote-notice";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 
 function money(value: number) {
@@ -24,7 +25,7 @@ export function PriceWorkings({
 
   return (
     <div className="space-y-4 text-sm text-ink">
-      {notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 leading-6">{notice}</blockquote> : null}
+      {notice ? <QuoteNotice>{notice}</QuoteNotice> : null}
       {flags.filter((flag) => flag.startsWith("Needs review:")).map((flag) => (
         <p key={flag} className="rounded-2xl border border-line bg-card px-4 py-3 text-sm text-grey">
           {flag}{" "}

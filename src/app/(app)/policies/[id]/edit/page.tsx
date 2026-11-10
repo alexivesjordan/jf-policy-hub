@@ -1,4 +1,5 @@
 import { PolicyForm } from "@/components/policy-form";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getPolicy, listCategories, listPeople } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -11,10 +12,7 @@ export default async function EditPolicyPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="font-display text-4xl">Edit {policy.title}</h1>
-        <p className="mt-2 text-ink/75">Saving keeps the previous text in the history and adds a new version.</p>
-      </div>
+      <PageHeader eyebrow="Pulse People" title={`Edit ${policy.title}`} description="Saving keeps the previous text in the history and adds a new version." />
       <PolicyForm policy={policy} categories={categories} people={people} />
     </div>
   );

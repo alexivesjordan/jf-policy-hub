@@ -1,4 +1,5 @@
 import { PolicyForm } from "@/components/policy-form";
+import { PageHeader } from "@/components/pulse/page-header";
 import { listCategories, listPeople } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -10,10 +11,7 @@ export default async function NewPolicyPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="font-display text-4xl">Write a new policy</h1>
-        <p className="mt-2 text-ink/75">Saving creates the first version. You can also upload a Word file instead.</p>
-      </div>
+      <PageHeader eyebrow="Pulse People" title="Write a new policy" description="Saving creates the first version. You can also upload a Word file instead." />
       <PolicyForm categories={categories} people={people} />
     </div>
   );

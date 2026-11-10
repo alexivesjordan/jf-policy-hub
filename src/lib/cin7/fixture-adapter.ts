@@ -6,6 +6,7 @@ export const FIXTURE_QUOTES: Cin7Quote[] = [
     id: "fixture-quote-1001",
     number: "FIXTURE-Q-1001",
     customerName: "FIXTURE — Riverside Gym",
+    postcode: "LS1 4DY",
     customerRef: "FIXTURE-CUST-1",
     segment: "independent",
     customerType: "proforma",

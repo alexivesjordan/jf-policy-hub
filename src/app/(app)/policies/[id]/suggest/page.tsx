@@ -1,4 +1,5 @@
 import { SuggestForm } from "@/components/suggest-form";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getPolicy } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -11,12 +12,11 @@ export default async function SuggestPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="font-display text-4xl">Suggest a change</h1>
-        <p className="mt-2 text-ink/75">
-          {policy.title}. Approvers will see your text next to the current policy. If this category allows automatic updates, a low-severity suggestion is applied straight away.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse People"
+        title="Suggest a change"
+        description={`${policy.title}. Approvers will see your text next to the current policy. If this category allows automatic updates, a low-severity suggestion is applied straight away.`}
+      />
       <SuggestForm policyId={policy.id} content={policy.current_content} />
     </div>
   );

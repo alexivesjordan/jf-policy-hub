@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { bookFixture, recordUnavailability } from "@/features/operations/calendar-actions";
 
 export function UnavailabilityForm({ resources }: { resources: { id: string; name: string }[] }) {
@@ -9,7 +9,7 @@ export function UnavailabilityForm({ resources }: { resources: { id: string; nam
   return (
     <form action={action} className="grid gap-3 md:grid-cols-2">
       <Field label="Resource">
-        <Select name="resourceId" required>
+        <Select name="resourceId" searchable required>
           {resources.map((resource) => (
             <option key={resource.id} value={resource.id}>{resource.name}</option>
           ))}
@@ -44,14 +44,14 @@ export function BookFixtureForm({
   return (
     <form action={action} className="grid gap-3 md:grid-cols-2">
       <Field label="Fixture job">
-        <Select name="jobId" required>
+        <Select name="jobId" searchable required>
           {jobs.map((job) => (
             <option key={job.id} value={job.id}>{job.label}</option>
           ))}
         </Select>
       </Field>
       <Field label="Resource">
-        <Select name="resourceId" required>
+        <Select name="resourceId" searchable required>
           {resources.map((resource) => (
             <option key={resource.id} value={resource.id}>{resource.name}</option>
           ))}
@@ -60,8 +60,8 @@ export function BookFixtureForm({
       <Field label="Day"><Input name="day" type="date" required /></Field>
       <Field label="Hold">
         <Select name="kind" defaultValue="pencil">
-          <option value="pencil">Pencil</option>
-          <option value="firm">Firm — sets the fixture job to booked</option>
+          <option value="pencil">Hold</option>
+          <option value="firm">Booked</option>
         </Select>
       </Field>
       <Button type="submit" disabled={pending || jobs.length === 0}>{pending ? "Booking..." : "Book"}</Button>

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ReadAttachedTextForm, UploadForm } from "@/components/upload-form";
 import { DiffView } from "@/components/diff-view";
 import { PolicyContent } from "@/components/policy-content";
-import { Banner, Badge, Card, TextLink } from "@/components/ui";
+import { Banner, Badge, Card, TextLink } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getPolicy, listPolicyAudit, listVersions } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 import { actorName, displayName, formatDate, formatTimestamp, needsDocument, statusLabel } from "@/lib/format";
@@ -38,25 +39,23 @@ export default async function PolicyPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-        <div>
-          <p className="text-sm font-semibold text-grey">{policy.category?.name}</p>
-          <h1 className="font-display mt-1 text-4xl">{policy.title}</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
+      <PageHeader
+        eyebrow={policy.category?.name ?? "Pulse People"}
+        title={policy.title}
+        description={
+          <span className="flex flex-wrap gap-2">
             <Badge tone={policy.status}>{statusLabel(policy.status)}</Badge>
             {empty ? <Badge tone="pending">Needs a document</Badge> : null}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <TextLink href={`/policies/${policy.id}/edit`}>Edit text</TextLink>
-          <TextLink href={`/policies/${policy.id}/suggest`} variant="secondary">
-            Suggest a change
-          </TextLink>
-          <TextLink href={`/policies/${policy.id}/history`} variant="ghost">
-            History
-          </TextLink>
-        </div>
-      </div>
+          </span>
+        }
+        actions={
+          <>
+            <TextLink href={`/policies/${policy.id}/edit`}>Edit text</TextLink>
+            <TextLink href={`/policies/${policy.id}/suggest`} variant="secondary">Suggest a change</TextLink>
+            <TextLink href={`/policies/${policy.id}/history`} variant="ghost">History</TextLink>
+          </>
+        }
+      />
 
       {uploaded === "docx" ? (
         <Banner tone="success">

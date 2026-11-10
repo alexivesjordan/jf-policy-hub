@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { changePassword, requestPasswordReset } from "@/features/auth/actions";
-import { Banner, Button, Field, Input } from "@/components/ui";
+import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 
 export function ForgotPasswordForm() {
   const [state, action, pending] = useActionState(requestPasswordReset, null);

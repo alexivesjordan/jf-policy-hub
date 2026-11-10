@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { ErrorState } from "@/components/pulse/states";
 import { getOfficeContext, listJobs, listPulseNotifications, listPulseTasks } from "@/features/operations/queries";
 import { greetingName } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
@@ -35,16 +37,14 @@ export default async function OperationsHomePage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Release 1A · Office</p>
-        <h1 className="font-display mt-2 text-4xl">Hello {greetingName(profile)}</h1>
-        <p className="mt-2 max-w-2xl text-lg text-ink/70">
-          Jobs, pricing, exceptions, and notifications.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title={`Hello ${greetingName(profile)}`}
+        description="Today’s installs, tasks, and notes."
+      />
 
       {contextError ? (
-        <p className="rounded-3xl border border-red bg-card px-5 py-4 text-sm">{contextError}</p>
+        <ErrorState title="The office did not load" description={contextError} />
       ) : (
         <p className="text-sm text-grey">
           Operations role: <span className="text-ink">{roleLabel(role)}</span>

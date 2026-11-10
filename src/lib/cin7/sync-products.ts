@@ -33,7 +33,7 @@ export async function syncCin7Products(target: SyncTarget) {
   const accountId = process.env.CIN7_ACCOUNT_ID?.trim() ?? "";
   const applicationKey = process.env.CIN7_APPLICATION_KEY?.trim() ?? "";
   if (!accountId || !applicationKey) {
-    return { ok: false as const, message: "Cin7 not connected.", products: 0, pages: 0 };
+    return { ok: false as const, message: "Live orders are not connected yet.", products: 0, pages: 0 };
   }
 
   let page = 1;

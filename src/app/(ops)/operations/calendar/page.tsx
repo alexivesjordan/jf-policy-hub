@@ -1,5 +1,9 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { BookFixtureForm, UnavailabilityForm } from "@/components/calendar-forms";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { ErrorState, PageSkeleton } from "@/components/pulse/states";
 import { getOfficeContext, listJobs } from "@/features/operations/queries";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
@@ -7,7 +11,16 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Resource Availability" };
 
-export default async function CalendarPage() {
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CalendarBody />
+    </Suspense>
+  );
+}
+
+async function CalendarBody() {
+  await connection();
   await requireOperationsUser();
   const context = await getOfficeContext();
   const canEdit = hasLevel(context.operations, "edit", context.is_owner);
@@ -20,21 +33,49 @@ export default async function CalendarPage() {
   });
   const data = (calendar.data ?? { resources: [], reservations: [], unavailability: [] }) as {
     resources: { id: string; name: string; resource_type: string; notes: string | null }[];
-    reservations: { resource_id: string; day: string; kind: string; cin7_number: string | null }[];
+    reservations: { resource_id: string; day: string; kind: string; cin7_number: string | null; job_id?: string }[];
     unavailability: { resource_id: string; starts_on: string; ends_on: string; reason: string }[];
   };
-  const jobs = (await listJobs()).filter((job) => job.fixture);
+  const allJobs = await listJobs();
+  const jobs = allJobs.filter((job) => job.fixture);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-4xl">Resource Availability</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected.
-        </p>
+      <PageHeader
+        eyebrow="Pulse Operations"
+        title="Resource Availability"
+        description="Who is free to install this week."
+      />
+      {calendar.error ? <ErrorState title="The calendar did not load" description={calendar.error.message} /> : null}
+      <div className="space-y-4 md:hidden">
+        {days.map((day) => {
+          const key = iso(day);
+          const label = day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
+          return (
+            <section key={key} className="rounded-3xl border border-line bg-card px-4 py-4">
+              <h2 className="font-semibold">{label}</h2>
+              <ul className="mt-3 space-y-2">
+                {data.resources.map((resource) => {
+                  const held = data.reservations.filter((item) => item.resource_id === resource.id && item.day.startsWith(key));
+                  const off = data.unavailability.some((item) => item.resource_id === resource.id && key >= item.starts_on && key <= item.ends_on);
+                  const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
+                  const detail = off || weekendCrew ? "Unavailable" : held.map((item) => holdLabel(item, allJobs)).join(", ") || "Free";
+                  return (
+                    <li key={resource.id} className="flex items-start justify-between gap-3 text-sm">
+                      <span>
+                        <span className="block font-semibold">{resource.name}</span>
+                        <span className="text-xs text-grey">{resourceTypeLabel(resource.resource_type)}</span>
+                      </span>
+                      <span className="text-right text-grey">{detail}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
       </div>
-      {calendar.error ? <p className="text-sm text-ink">{calendar.error.message}</p> : null}
-      <div className="overflow-x-auto rounded-3xl border border-line">
+      <div className="hidden overflow-x-auto rounded-3xl border border-line md:block">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>
             <tr className="text-left text-grey">
@@ -49,7 +90,7 @@ export default async function CalendarPage() {
               <tr key={resource.id} className="border-t border-line">
                 <td className="px-3 py-3">
                   <p className="font-semibold text-ink">{resource.name}</p>
-                  <p className="text-xs text-grey">{resource.resource_type}</p>
+                  <p className="text-xs text-grey">{resourceTypeLabel(resource.resource_type)}</p>
                 </td>
                 {days.map((day) => {
                   const key = iso(day);
@@ -58,7 +99,7 @@ export default async function CalendarPage() {
                   const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
                   return (
                     <td key={key} className="px-3 py-3 align-top text-grey">
-                      {off || weekendCrew ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "—"}
+                      {off || weekendCrew ? "Unavailable" : held.map((item) => holdLabel(item, allJobs)).join(", ") || "—"}
                     </td>
                   );
                 })}
@@ -86,6 +127,22 @@ export default async function CalendarPage() {
       ) : null}
     </div>
   );
+}
+
+function resourceTypeLabel(type: string) {
+  if (type === "installer") return "Installer";
+  if (type === "van") return "Van";
+  if (type === "stair_climber") return "Stair climber";
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : type;
+}
+
+function holdLabel(
+  item: { kind: string; cin7_number: string | null; job_id?: string },
+  jobs: { id: string; customer_name: string; cin7_number: string | null; cin7_order_number?: string | null }[],
+) {
+  const job = jobs.find((row) => row.id === item.job_id || (item.cin7_number && (row.cin7_number === item.cin7_number || row.cin7_order_number === item.cin7_number)));
+  const who = job?.customer_name ?? "Install";
+  return `${item.kind === "firm" ? "Booked" : "Held"} · ${who}`;
 }
 
 function monday(date: Date) {

@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { suggestAmendment } from "@/features/amendments/actions";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { Banner, Button, Field, Input, Select, TextArea } from "@/components/ui";
+import { Banner, Button, Field, Input, Select, TextArea } from "@/components/pulse/ui";
 
 export function SuggestForm({ policyId, content }: { policyId: string; content: string }) {
   const [state, action, pending] = useActionState(suggestAmendment, null);

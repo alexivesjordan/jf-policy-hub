@@ -1,5 +1,6 @@
 import { GateOverrideForm } from "@/components/operations-forms";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getOfficeContext, listGateOverrides, listJobs } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
@@ -12,8 +13,7 @@ export default async function OverridesPage() {
   if (!context.is_owner) {
     return (
       <div className="space-y-4">
-        <h1 className="font-display text-4xl">Gate overrides</h1>
-        <p className="max-w-xl text-ink/75">Only the named owner can record or read gate overrides.</p>
+        <PageHeader eyebrow="Pulse Operations" title="Gate overrides" description="Only the named owner can record or read gate overrides." />
       </div>
     );
   }
@@ -23,10 +23,11 @@ export default async function OverridesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-4xl">Gate overrides</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          A reason is required. The row cannot be edited afterwards. This does not change the job status by itself.
-        </p>
+        <PageHeader
+          eyebrow="Pulse Operations"
+          title="Gate overrides"
+          description="A reason is required. The row cannot be edited afterwards. This does not change the job status by itself."
+        />
       </div>
       <Card>
         <GateOverrideForm jobs={jobs} />

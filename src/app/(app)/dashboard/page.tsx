@@ -1,12 +1,25 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { dashboardCounts, listPolicies, listRecentVersions } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 import { actorName, formatDate, formatTimestamp, greetingName, londonToday, plusDays } from "@/lib/format";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/pulse/ui";
+import { PageHeader } from "@/components/pulse/page-header";
+import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 
 export const metadata = { title: "Pulse People" };
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardBody />
+    </Suspense>
+  );
+}
+
+async function DashboardBody() {
+  await connection();
   const profile = await requireUser();
   const today = londonToday();
   const horizon = plusDays(today, 30);
@@ -18,13 +31,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
-        <h1 className="font-display mt-2 text-4xl">Hello {greetingName(profile)}</h1>
-        <p className="mt-2 max-w-2xl text-lg text-ink/70">
-          Suggestions waiting for a decision, policies that need a review, and the latest edits.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse People"
+        title={`Hello ${greetingName(profile)}`}
+        description="What needs a decision, and what changed recently."
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Stat href="/amendments?status=pending" label="Suggestions waiting" value={counts.pending} />
@@ -36,7 +47,7 @@ export default async function DashboardPage() {
         <Card>
           <h2 className="font-display text-2xl">Due for review</h2>
           {due.length === 0 ? (
-            <p className="mt-3 text-sm text-ink/70">Nothing is due in the next 30 days.</p>
+            <EmptyState title="Nothing is due in the next 30 days" description="Policies with a review date in the next month will show up here." />
           ) : (
             <ul className="mt-4 space-y-3">
               {due.slice(0, 8).map((policy) => (
@@ -55,7 +66,7 @@ export default async function DashboardPage() {
         <Card>
           <h2 className="font-display text-2xl">Recent changes</h2>
           {recent.length === 0 ? (
-            <p className="mt-3 text-sm text-ink/70">No edits yet.</p>
+            <EmptyState title="No edits yet" description="The latest policy versions will show up here." />
           ) : (
             <ul className="mt-4 space-y-4">
               {recent.map((version) => (

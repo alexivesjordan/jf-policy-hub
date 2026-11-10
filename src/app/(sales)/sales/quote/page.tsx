@@ -1,4 +1,5 @@
 import { PriceQuoteForm } from "@/components/price-quote-form";
+import { PageHeader } from "@/components/pulse/page-header";
 import { getOfficeContext } from "@/features/operations/queries";
 import { hasLevel } from "@/lib/module-guard";
 import { requireSalesUser } from "@/lib/auth";
@@ -15,15 +16,11 @@ export default async function SalesQuotePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">{cin7Connected ? "Mode A · Cin7 Core" : "Mode A · fixture quotes"}</p>
-        <h1 className="font-display mt-2 text-4xl">Install quoting</h1>
-        <p className="mt-2 max-w-2xl text-ink/70">
-          {cin7Connected
-            ? "Enter a Cin7 order number, such as SO-00490, or upload a quote PDF. Create job opens the booking calendar."
-            : "Cin7 is not connected, so an order number loads a fixture quote. You can also upload a Cin7 Core quote PDF."}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Pulse Sales"
+        title="Install quoting"
+        description="Enter an order number or upload a quote. Then book the install."
+      />
       <PriceQuoteForm cin7Connected={cin7Connected} showInternal={showInternal} canPreviewSales={canPreviewSales} />
     </div>
   );

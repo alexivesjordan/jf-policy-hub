@@ -7,6 +7,7 @@ import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
+import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
@@ -464,8 +465,13 @@ async function rememberedSegment(customerId: string) {
   return data;
 }
 
+async function fixturePause() {
+  if (isFixtureMode()) await new Promise((resolve) => setTimeout(resolve, 1200));
+}
+
 export async function loadFixtureQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
   await requireOperationsUser();
+  await fixturePause();
   const number = String(formData.get("quoteNumber") ?? "").trim();
   if (!number) return { ok: false, message: "Enter a quote number." };
   try {
@@ -476,7 +482,7 @@ export async function loadFixtureQuote(_state: ActionState, formData: FormData):
         ok: false,
         message: connected
           ? "No Cin7 sale has that order number."
-          : "That number is not in the fixture adapter. Cin7 not connected. Upload the quote PDF instead.",
+          : "That order number was not found. Upload the quote PDF instead.",
       };
     }
     const remembered = connected ? await rememberedSegment(quote.customerId ?? "") : "";
@@ -519,6 +525,7 @@ export async function parseUploadedQuote(_state: ActionState, formData: FormData
 
 export async function priceReviewedQuote(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote }> {
   await requireOperationsUser();
+  await fixturePause();
   try {
     const { draft, error } = readDraft(formData);
     if (error) return { ok: false, message: error };
@@ -545,6 +552,7 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
 
 export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft }> {
   await requireOperationsUser();
+  await fixturePause();
   try {
     const file = formData.get("quotePdf");
     const loaded = file instanceof File && file.size > 0 ? await parseUploadedQuote(null, formData) : await loadFixtureQuote(null, formData);
@@ -755,7 +763,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
       if (stored.error) throw new Error(messageFromError(stored.error, "Could not store required resources."));
       view.jobId = jobId;
       revalidatePath("/operations/jobs");
-      return { ok: true, message: "Job created from the Cin7 sale. Required resources are locked for the sales rep.", quote: view };
+      return { ok: true, message: "Job created. You can book a day.", quote: view };
     }
 
     const number = fixtureNumber(draft);
@@ -798,7 +806,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
     if (stored.error) throw new Error(messageFromError(stored.error, "Could not store required resources."));
     view.jobId = jobId;
     revalidatePath("/operations/jobs");
-    return { ok: true, message: "Job created. Required resources are locked for the sales rep.", quote: view };
+    return { ok: true, message: "Job created. You can book a day.", quote: view };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not create that job." };
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button, Field, Input, Select } from "@/components/ui";
+import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { overrideJobRequirements } from "@/features/operations/price-actions";
 import type { JobRequirements } from "@/lib/pulse/requirements";
 

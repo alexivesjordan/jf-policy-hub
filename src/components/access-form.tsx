@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Banner, Button, Field, Input } from "@/components/ui";
+import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { submitAccessForm } from "@/features/operations/access-actions";
 
 type Line = { label?: string; rate?: number; unit?: string; basis?: string; mileage?: number };
