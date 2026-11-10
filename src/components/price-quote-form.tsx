@@ -1,8 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Upload } from "lucide-react";
+import { toast } from "sonner";
 import { PriceWorkings } from "@/components/price-workings";
+import { QuoteNotice } from "@/components/quote-notice";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { BookingModal } from "@/components/booking-modal";
 import {
@@ -60,6 +63,13 @@ export function PriceQuoteForm({
     if ((!showInternal || viewAsSales) && created?.quote?.jobId) setBookingJob(created.quote.jobId);
   }, [created, showInternal, viewAsSales]);
 
+  const toastedSale = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sold?.ok || !sold.message || toastedSale.current === sold.message) return;
+    toastedSale.current = sold.message;
+    toast.success(sold.message);
+  }, [sold]);
+
   const viewingSales = !showInternal || viewAsSales;
   const quote = (created?.quote ?? (viewingSales ? sold?.quote ?? priced?.quote : priced?.quote)) as PricedQuote | undefined;
   const notice = sourceName === "pdf" ? parsed : sourceName === "load" ? loaded : null;
@@ -95,14 +105,12 @@ export function PriceQuoteForm({
           </Field>
           <Button type="submit" disabled={selling || creating}>{selling ? "Calculating…" : "Submit"}</Button>
         </form>
-        <form action={sellOrder} className="grid gap-4 md:grid-cols-[1fr_auto]">
+        <form action={sellOrder} className="space-y-4">
           <input type="hidden" name="segment" value={segmentChoice} />
           <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
-            <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
+            <QuoteFileDrop />
           </Field>
-          <div className="md:pt-7">
-            <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
-          </div>
+          <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
         </form>
         {selling ? (
           <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
@@ -110,9 +118,9 @@ export function PriceQuoteForm({
             <p className="mt-2 text-sm text-grey">Fetching the order and pricing the install.</p>
           </div>
         ) : null}
-        {sold && !selling ? <Banner tone={sold.ok ? "success" : "error"}>{sold.message}</Banner> : null}
+        {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
         {created && !created.ok ? <Banner tone="error">{created.message}</Banner> : null}
-        {summary && quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
+        {summary && quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
         {summary ? (
           <div className="rounded-3xl border border-line bg-card px-6 py-6">
             <dl className="space-y-3 text-ink">
@@ -153,13 +161,11 @@ export function PriceQuoteForm({
           <Button type="submit" disabled={loading}>{loading ? "Loading..." : "Load quote"}</Button>
         </div>
       </form>
-      <form action={parsePdf} className="grid gap-4 md:grid-cols-[1fr_auto]">
+      <form action={parsePdf} className="space-y-4">
         <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
-          <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
+          <QuoteFileDrop />
         </Field>
-        <div className="md:pt-7">
-          <Button type="submit" variant="secondary" disabled={parsing}>{parsing ? "Reading..." : "Read PDF"}</Button>
-        </div>
+        <Button type="submit" variant="secondary" disabled={parsing}>{parsing ? "Reading..." : "Read PDF"}</Button>
       </form>
 
       {notice && !draft ? <Banner tone={notice.ok ? "success" : "error"}>{notice.message}</Banner> : null}
@@ -269,7 +275,7 @@ export function PriceQuoteForm({
           markup={quote.markup ?? null}
           flags={quote.flags ?? []}
         />
-      ) : quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
+      ) : quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
       {quote?.warnings.map((warning) => <Banner key={warning} tone="warning">{warning}</Banner>)}
       {quote?.requirements ? (
         <div className="rounded-3xl border border-line bg-card px-5 py-4 text-sm text-ink">
@@ -303,6 +309,39 @@ export function PriceQuoteForm({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function QuoteFileDrop() {
+  const [fileName, setFileName] = useState("");
+
+  function assign(input: HTMLInputElement, file: File | null) {
+    const transfer = new DataTransfer();
+    if (file) transfer.items.add(file);
+    input.files = transfer.files;
+    setFileName(file?.name ?? "");
+  }
+
+  return (
+    <div
+      className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-field px-4 py-6 text-center"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const input = event.currentTarget.querySelector("input");
+        if (input) assign(input, event.dataTransfer.files?.[0] ?? null);
+      }}
+    >
+      <Upload className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+      <span className="text-sm font-semibold">{fileName || "Drop a PDF here, or choose a file"}</span>
+      <input
+        name="quotePdf"
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
+      />
     </div>
   );
 }

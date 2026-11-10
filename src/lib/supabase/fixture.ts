@@ -212,7 +212,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         access_mode: "follow",
         is_active: true,
         teams: ["Management"],
-        effective: { people: "edit", operations: "edit", sales: "edit", service: "none", supply: "none", finance: "edit" },
+        effective: { people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" },
       },
       {
         id: "00000000-0000-4000-8000-000000000002",
@@ -224,13 +224,26 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         teams: ["Installs"],
         effective: { people: "view", operations: "edit", sales: "none", service: "none", supply: "none", finance: "none" },
       },
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        email: "riley.hart@jordanfitness.com",
+        full_name: "Riley Hart",
+        workspace_role: "member",
+        access_mode: "custom",
+        is_active: true,
+        teams: ["Sales"],
+        effective: { people: "none", service: "view", supply: "none", operations: "none", sales: "edit", finance: "none" },
+      },
     ];
   }
   if (fn === "workspace_teams") {
     return [
-      { id: "team-installs", name: "Installs", members: 6 },
       { id: "team-sales", name: "Sales", members: 4 },
+      { id: "team-installs", name: "Installs", members: 6 },
+      { id: "team-aftersales", name: "Aftersales", members: 2 },
+      { id: "team-operations", name: "Operations", members: 3 },
       { id: "team-office", name: "Office", members: 3 },
+      { id: "team-management", name: "Management", members: 2 },
     ];
   }
   if (fn === "orbit_office_context") return { has_module: true, ops_role: "admin_owner", is_owner: true };
