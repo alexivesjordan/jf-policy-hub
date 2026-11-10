@@ -9,8 +9,18 @@ import { PULSE_MODULE_IDS } from "@/lib/types";
 
 export const metadata = { title: "Users" };
 
-const ROLES = ["owner", "admin", "manager", "member", "viewer"] as const;
-const LEVELS = ["none", "view", "edit"] as const;
+const ROLES = [
+  ["owner", "Owner"],
+  ["admin", "Admin"],
+  ["manager", "Manager"],
+  ["member", "Member"],
+  ["viewer", "Viewer"],
+] as const;
+const LEVELS = [
+  ["none", "None"],
+  ["view", "View"],
+  ["edit", "Edit"],
+] as const;
 
 type DirectoryUser = {
   id: string;
@@ -51,8 +61,8 @@ export default async function WorkspaceUsersPage() {
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-grey">Role</span>
-          <Select name="workspaceRole" defaultValue="member">
-            {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                <Select name="workspaceRole" defaultValue="member">
+            {ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </label>
         <div className="md:col-span-4">
@@ -71,12 +81,12 @@ export default async function WorkspaceUsersPage() {
                   <p className="text-sm text-grey">{person.email}</p>
                 </div>
                 <p className="text-sm text-grey">
-                  {PULSE_MODULE_IDS.map((moduleId) => `${moduleId} ${person.effective?.[moduleId] ?? "none"}`).join(" · ")}
+                  {PULSE_MODULE_IDS.map((moduleId) => `${moduleId.charAt(0).toUpperCase()}${moduleId.slice(1)} ${LEVELS.find(([value]) => value === (person.effective?.[moduleId] ?? "none"))?.[1] ?? "None"}`).join(" · ")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Select name="workspaceRole" defaultValue={person.workspace_role} aria-label="Role">
-                  {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                  {ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </Select>
                 <Select name="accessMode" defaultValue={person.access_mode} aria-label="Access mode">
                   <option value="follow">Access follows team & role</option>
@@ -101,9 +111,9 @@ export default async function WorkspaceUsersPage() {
               <div className="grid gap-2 sm:grid-cols-3">
                 {PULSE_MODULE_IDS.map((moduleId) => (
                   <label key={moduleId} className="text-sm">
-                    <span className="mb-1 block text-grey">{moduleId}</span>
+                    <span className="mb-1 block text-grey">{moduleId.charAt(0).toUpperCase()}{moduleId.slice(1)}</span>
                     <Select name={`level-${moduleId}`} defaultValue={person.effective?.[moduleId] ?? "none"}>
-                      {LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+                      {LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </Select>
                   </label>
                 ))}

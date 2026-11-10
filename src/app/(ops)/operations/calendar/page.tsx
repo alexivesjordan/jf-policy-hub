@@ -32,10 +32,11 @@ async function CalendarBody() {
   });
   const data = (calendar.data ?? { resources: [], reservations: [], unavailability: [] }) as {
     resources: { id: string; name: string; resource_type: string; notes: string | null }[];
-    reservations: { resource_id: string; day: string; kind: string; cin7_number: string | null }[];
+    reservations: { resource_id: string; day: string; kind: string; cin7_number: string | null; job_id?: string }[];
     unavailability: { resource_id: string; starts_on: string; ends_on: string; reason: string }[];
   };
-  const jobs = (await listJobs()).filter((job) => job.fixture);
+  const allJobs = await listJobs();
+  const jobs = allJobs.filter((job) => job.fixture);
 
   return (
     <div className="space-y-8">
@@ -57,12 +58,12 @@ async function CalendarBody() {
                   const held = data.reservations.filter((item) => item.resource_id === resource.id && item.day.startsWith(key));
                   const off = data.unavailability.some((item) => item.resource_id === resource.id && key >= item.starts_on && key <= item.ends_on);
                   const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
-                  const detail = off || weekendCrew ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "Free";
+                  const detail = off || weekendCrew ? "Unavailable" : held.map((item) => holdLabel(item, allJobs)).join(", ") || "Free";
                   return (
                     <li key={resource.id} className="flex items-start justify-between gap-3 text-sm">
                       <span>
                         <span className="block font-semibold">{resource.name}</span>
-                        <span className="text-xs text-grey">{resource.resource_type}</span>
+                        <span className="text-xs text-grey">{resourceTypeLabel(resource.resource_type)}</span>
                       </span>
                       <span className="text-right text-grey">{detail}</span>
                     </li>
@@ -88,7 +89,7 @@ async function CalendarBody() {
               <tr key={resource.id} className="border-t border-line">
                 <td className="px-3 py-3">
                   <p className="font-semibold text-ink">{resource.name}</p>
-                  <p className="text-xs text-grey">{resource.resource_type}</p>
+                  <p className="text-xs text-grey">{resourceTypeLabel(resource.resource_type)}</p>
                 </td>
                 {days.map((day) => {
                   const key = iso(day);
@@ -97,7 +98,7 @@ async function CalendarBody() {
                   const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
                   return (
                     <td key={key} className="px-3 py-3 align-top text-grey">
-                      {off || weekendCrew ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "—"}
+                      {off || weekendCrew ? "Unavailable" : held.map((item) => holdLabel(item, allJobs)).join(", ") || "—"}
                     </td>
                   );
                 })}
@@ -125,6 +126,22 @@ async function CalendarBody() {
       ) : null}
     </div>
   );
+}
+
+function resourceTypeLabel(type: string) {
+  if (type === "installer") return "Installer";
+  if (type === "van") return "Van";
+  if (type === "stair_climber") return "Stair climber";
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : type;
+}
+
+function holdLabel(
+  item: { kind: string; cin7_number: string | null; job_id?: string },
+  jobs: { id: string; customer_name: string; cin7_number: string | null; cin7_order_number?: string | null }[],
+) {
+  const job = jobs.find((row) => row.id === item.job_id || (item.cin7_number && (row.cin7_number === item.cin7_number || row.cin7_order_number === item.cin7_number)));
+  const who = job?.customer_name ?? "Install";
+  return `${item.kind === "firm" ? "Booked" : "Held"} · ${who}`;
 }
 
 function monday(date: Date) {

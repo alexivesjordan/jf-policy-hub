@@ -121,9 +121,13 @@ async function SettingsBody({
       <Card>
         <div>
           <h2 className="font-display text-2xl">Effort table</h2>
-          <p className="mt-2 max-w-2xl text-sm text-grey">
-            How long each product takes to install. {effort ? `${effort.review_count} still need a check.` : ""}
-          </p>
+          <p className="mt-2 max-w-2xl text-sm text-grey">How long each product takes to install.</p>
+          {effort && effort.review_count > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-3">
+              <p className="text-sm font-semibold">{effort.review_count} {effort.review_count === 1 ? "product needs" : "products need"} a review.</p>
+              <a className="text-sm font-semibold underline decoration-primary" href="/operations/settings?status=suggested">Show these</a>
+            </div>
+          ) : null}
         </div>
         <div className="mt-4">
           {effort ? (

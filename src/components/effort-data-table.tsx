@@ -7,7 +7,7 @@ import { useActionState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Upload } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Banner, Button, Input, Select } from "@/components/pulse/ui";
+import { Badge, Banner, Button, Input, Select } from "@/components/pulse/ui";
 import { EmptyState } from "@/components/pulse/states";
 import { bulkUpdateSkuEffort, importSkuEffort } from "@/features/operations/effort-actions";
 import type { SkuEffortRow } from "@/features/operations/queries";
@@ -29,6 +29,14 @@ const COLUMNS = [
 type SortKey = (typeof COLUMNS)[number][0];
 
 type Filters = { search: string; category: string; status: string; needsAssembly: string };
+
+function effortStatus(row: SkuEffortRow): { label: string; tone: "good" | "pending" | "neutral" } {
+  if (row.status === "confirmed") return { label: "Confirmed", tone: "good" };
+  if (row.suggestion_rule) return { label: "Needs review", tone: "pending" };
+  if (row.status === "suggested") return { label: "Suggested", tone: "pending" };
+  const words = row.status.replace(/[_-]+/g, " ");
+  return { label: words.charAt(0).toUpperCase() + words.slice(1), tone: "neutral" };
+}
 
 function assemblyLabel(value: boolean | null) {
   if (value == null) return "Unknown";
@@ -135,8 +143,8 @@ export function EffortDataTable({
           </label>
           <label className="text-sm font-semibold">
             <span className="mb-1 block text-muted-foreground">Category</span>
-            <Select name="category" searchable defaultValue={filters.category} aria-label="Category" onChange={(event) => pushFilters({ category: event.target.value })}>
-              <option value="">All categories</option>
+            <Select name="category" defaultValue={filters.category} aria-label="Category" onChange={(event) => pushFilters({ category: event.target.value })}>
+              <option value="">All</option>
               {categories.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -148,7 +156,7 @@ export function EffortDataTable({
               <option value="">All</option>
               <option value="suggested">Suggested</option>
               <option value="confirmed">Confirmed</option>
-              <option value="name-rule">Name rule</option>
+              <option value="name-rule">Needs review</option>
             </Select>
           </label>
         </div>
@@ -179,8 +187,8 @@ export function EffortDataTable({
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-xs">{row.sku}</p>
                     <p className="font-semibold">{row.product_name}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{row.cin7_category ?? "No category"} · {assemblyLabel(row.needs_assembly)} · {row.status}</p>
-                    <p className="text-sm text-muted-foreground">{unitLabel(row.effort_unit)} · {row.build_location === "hq" ? "HQ" : "Site"} · crew {row.crew ?? "—"} · {minutesLabel(row)}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{row.cin7_category ?? "No category"} · {assemblyLabel(row.needs_assembly)} · {effortStatus(row).label}</p>
+                    <p className="text-sm text-muted-foreground">{unitLabel(row.effort_unit)} · {row.build_location === "hq" ? "HQ" : "Site"} · Crew {row.crew ?? "—"} · {minutesLabel(row)}</p>
                     <Button type="button" variant="ghost" className="mt-2 px-0" onClick={() => setEditing(row.sku)}>Edit row</Button>
                   </div>
                 </div>
@@ -188,8 +196,8 @@ export function EffortDataTable({
             ))}
           </ul>
 
-          <div className="hidden max-h-[70vh] overflow-auto rounded-2xl border border-border md:block">
-            <table className="w-full min-w-[64rem] border-collapse text-sm">
+          <div className="hidden max-h-[70vh] overflow-x-auto rounded-2xl border border-border md:block">
+            <table className="w-full min-w-[72rem] border-collapse text-sm">
               <caption className="sr-only">Effort table. Sorting applies to the rows on this page.</caption>
               <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
                 <tr>
@@ -233,8 +241,8 @@ export function EffortDataTable({
                     <td className="px-3 py-2">{row.product_name}</td>
                     <td className="px-3 py-2">
                       {row.cin7_category ?? "—"}
-                      {row.suggestion_rule === "sled-track" ? <span className="mt-1 block text-xs text-muted-foreground">Name rule: sled track after flooring</span> : null}
-                      {row.suggestion_rule === "pin-loaded" ? <span className="mt-1 block text-xs text-muted-foreground">Name rule: build at HQ</span> : null}
+                      {row.suggestion_rule === "sled-track" ? <span className="mt-1 block text-xs text-muted-foreground">After the flooring</span> : null}
+                      {row.suggestion_rule === "pin-loaded" ? <span className="mt-1 block text-xs text-muted-foreground">Built at HQ</span> : null}
                     </td>
                     <td className="px-3 py-2">{assemblyLabel(row.needs_assembly)}</td>
                     <td className="px-3 py-2">
@@ -244,7 +252,7 @@ export function EffortDataTable({
                     <td className="px-3 py-2">{row.build_location === "hq" ? "HQ" : "Site"}</td>
                     <td className="px-3 py-2">{row.crew ?? "—"}</td>
                     <td className="px-3 py-2">{minutesLabel(row)}</td>
-                    <td className="px-3 py-2">{row.status}</td>
+                    <td className="whitespace-nowrap px-3 py-2"><Badge tone={effortStatus(row).tone}>{effortStatus(row).label}</Badge></td>
                     <td className="px-3 py-2">
                       <Button type="button" variant="ghost" onClick={() => setEditing(row.sku)}>Edit</Button>
                     </td>

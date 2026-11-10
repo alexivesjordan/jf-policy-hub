@@ -11,7 +11,7 @@ const EMPTY = "__pulse_empty__";
 export type SelectOption = { value: string; label: string; disabled?: boolean };
 
 const triggerClass =
-  "h-11 w-full min-w-0 justify-between rounded-2xl border-line bg-field px-3 text-base font-normal text-ink shadow-none";
+  "h-11! w-full min-w-0 justify-between rounded-2xl border-line bg-field px-3 text-base font-normal text-ink shadow-none data-[size=default]:h-11!";
 
 function plainText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
@@ -78,7 +78,7 @@ export function Select({
   const controlled = value !== undefined;
   const [uncontrolled, setUncontrolled] = useState(defaultValue ?? "");
   const current = controlled ? (value ?? "") : uncontrolled;
-  const useCombo = Boolean(searchable) || selectable.length > 12;
+  const useCombo = searchable === true;
 
   function commit(next: string) {
     if (!controlled) setUncontrolled(next);

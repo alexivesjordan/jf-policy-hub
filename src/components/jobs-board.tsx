@@ -177,7 +177,7 @@ function JobList({ jobs }: { jobs: JobSummary[] }) {
               </span>
               <span className="mt-1 block text-sm text-muted-foreground">{job.cin7_order_number || job.cin7_number || "No order number"}</span>
               <span className="mt-2 flex items-center justify-between gap-2 text-sm">
-                <Badge tone="active">{job.status_label}</Badge>
+                <Badge tone="active">{displayStatus(job.status_label)}</Badge>
                 <span className="text-muted-foreground">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</span>
               </span>
             </Link>
@@ -198,13 +198,15 @@ function JobList({ jobs }: { jobs: JobSummary[] }) {
             {jobs.map((job) => (
               <TableRow key={job.id}>
                 <TableCell>
-                  <Link href={`/operations/jobs/${job.id}`} className="font-semibold text-ink underline decoration-red">
-                    {job.customer_name}
-                  </Link>
-                  {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/operations/jobs/${job.id}`} className="font-semibold text-ink underline decoration-red">
+                      {job.customer_name}
+                    </Link>
+                    {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
+                  </div>
                 </TableCell>
                 <TableCell>{job.cin7_order_number || job.cin7_number || "No order number"}</TableCell>
-                <TableCell><Badge tone="active">{job.status_label}</Badge></TableCell>
+                <TableCell><Badge tone="active">{displayStatus(job.status_label)}</Badge></TableCell>
                 <TableCell className="text-grey">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</TableCell>
               </TableRow>
             ))}
@@ -539,6 +541,12 @@ function barOnWeek(job: JobSummary, weekStart: string) {
   const col = Math.round((Date.parse(`${start}T12:00:00Z`) - Date.parse(`${weekStart}T12:00:00Z`)) / 86400000);
   const length = Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86400000) + 1;
   return { col, span: length };
+}
+
+function displayStatus(label: string) {
+  if (!label) return label;
+  if (label !== label.toLowerCase()) return label;
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function jobDate(job: JobSummary) {

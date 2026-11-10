@@ -60,8 +60,8 @@ export function BookFixtureForm({
       <Field label="Day"><Input name="day" type="date" required /></Field>
       <Field label="Hold">
         <Select name="kind" defaultValue="pencil">
-          <option value="pencil">Pencil</option>
-          <option value="firm">Firm — sets the fixture job to booked</option>
+          <option value="pencil">Hold</option>
+          <option value="firm">Booked</option>
         </Select>
       </Field>
       <Button type="submit" disabled={pending || jobs.length === 0}>{pending ? "Booking..." : "Book"}</Button>
