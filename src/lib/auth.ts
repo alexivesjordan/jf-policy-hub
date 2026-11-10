@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { accessRedirect, canUseOperations, canUsePeople, canUseSales } from "@/lib/access";
+import { accessRedirect, canManageWorkspace, canUseOperations, canUsePeople, canUseSales } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
 
@@ -34,6 +34,20 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   }
 
   profile.modules = (modules.data ?? []) as ModuleAccess[];
+  const access = await supabase.rpc("workspace_my_access");
+  if (!access.error && access.data && typeof access.data === "object") {
+    const row = access.data as Record<string, string>;
+    profile.workspace_role = row.role as Profile["workspace_role"];
+    profile.access_mode = row.mode as Profile["access_mode"];
+    profile.levels = {
+      people: row.people as "none" | "view" | "edit",
+      service: row.service as "none" | "view" | "edit",
+      supply: row.supply as "none" | "view" | "edit",
+      operations: row.operations as "none" | "view" | "edit",
+      sales: row.sales as "none" | "view" | "edit",
+      finance: row.finance as "none" | "view" | "edit",
+    };
+  }
   return profile;
 });
 
@@ -52,6 +66,15 @@ export async function requireOperationsUser() {
   if (!canUseOperations(profile)) {
     redirect(canUsePeople(profile) ? "/dashboard" : "/no-access");
   }
+  return profile;
+}
+
+export async function requireWorkspaceAdmin() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  if (!profile.access_granted) redirect("/no-access");
+  if (!profile.is_active) redirect("/account-inactive");
+  if (!canManageWorkspace(profile)) redirect("/");
   return profile;
 }
 

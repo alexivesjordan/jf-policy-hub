@@ -40,7 +40,6 @@ export const pulseModules: PulseModule[] = [
       { href: "/dashboard", label: "Overview" },
       { href: "/policies", label: "Policies" },
       { href: "/amendments", label: "Review queue", count: "pending" },
-      { href: "/admin/users", label: "Users", adminOnly: true },
       { href: "/admin/categories", label: "Categories", adminOnly: true },
     ],
   },

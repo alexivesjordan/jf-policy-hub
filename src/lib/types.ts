@@ -7,6 +7,8 @@ export type ModuleAccess = {
   module_id: PulseModuleId;
   enabled: boolean;
 };
+
+export type ModuleLevels = Partial<Record<PulseModuleId, "none" | "view" | "edit">>;
 export type PolicyStatus = "draft" | "active" | "archived";
 export type AmendmentStatus = "pending" | "approved" | "rejected" | "auto-applied";
 export type Severity = "low" | "medium" | "high";
@@ -22,6 +24,9 @@ export type Profile = {
   created_at: string;
   updated_at: string;
   modules?: ModuleAccess[];
+  workspace_role?: "owner" | "admin" | "manager" | "member" | "viewer";
+  access_mode?: "follow" | "custom";
+  levels?: ModuleLevels;
 };
 
 export type DirectoryUser = Profile & {
