@@ -22,6 +22,12 @@ describe("workspace access", () => {
     assert.equal(resolveModuleAccess({
       accessMode: "custom",
       role: "owner",
+      teamGrants: ["none"],
+      custom: "none",
+    }), "edit");
+    assert.equal(resolveModuleAccess({
+      accessMode: "custom",
+      role: "admin",
       teamGrants: ["edit"],
       custom: "none",
     }), "none");

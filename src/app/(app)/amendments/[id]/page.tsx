@@ -3,6 +3,7 @@ import { ReviewForm } from "@/components/review-form";
 import { Banner, Badge, Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { getAmendment } from "@/features/policies/queries";
+import { canReviewSuggestions } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { displayName, formatDate, formatTimestamp, severityLabel, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
@@ -21,7 +22,7 @@ export default async function AmendmentPage({
   const { id } = await params;
   const done = oneParam((await searchParams).done) === "1";
   const amendment = await getAmendment(id);
-  const reviewer = profile.role === "admin" || profile.role === "approver";
+  const reviewer = canReviewSuggestions(profile);
   const current = amendment.policy?.current_content ?? "";
 
   return (

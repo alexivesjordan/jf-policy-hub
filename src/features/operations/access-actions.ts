@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
 import { storePulseFile } from "@/lib/pulse/files";
@@ -14,8 +15,8 @@ import type { ActionState } from "@/lib/action-state";
 export async function createAccessLink(_state: ActionState, formData: FormData): Promise<ActionState & { path?: string }> {
   await requireOperationsUser();
   const context = await getOfficeContext();
-  if (!context.is_owner && context.ops_role !== "install_lead" && context.ops_role !== "admin_owner") {
-    return { ok: false, message: "Only the install lead can send an access link." };
+  if (!hasLevel(context.operations, "edit", context.is_owner)) {
+    return { ok: false, message: "You need edit access on Operations to send an access link." };
   }
   const jobId = String(formData.get("jobId") ?? "");
   try {

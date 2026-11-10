@@ -1,3 +1,5 @@
+import { safeNextPath } from "@/lib/access";
+
 const OTP_TYPES = new Set(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
 
 export type AuthArrival =
@@ -59,4 +61,28 @@ export function readAuthArrival(href: string): AuthArrival {
 
 export function passwordSetupPath() {
   return "/account/password?setup=1";
+}
+
+/** Invite and recovery always finish on set-password. Other mail uses a safe next path. */
+export function confirmDestination(otpType: string | null, next: string | null) {
+  if (otpType === "invite" || otpType === "recovery") return passwordSetupPath();
+  return safeNextPath(next, "/");
+}
+
+/**
+ * A recovery or invite link that still opens the password page has not established
+ * a session yet. Send it through /auth/confirm first. The browser keeps any
+ * fragment, so an implicit token can be posted from that page.
+ */
+export function passwordLinkHandoff(path: string, search: URLSearchParams): string | null {
+  if (path !== "/account/password") return null;
+  const tokenHash = search.get("token_hash");
+  const code = search.get("code");
+  if (!tokenHash && !code && search.get("setup") !== "1") return null;
+
+  const dest = new URLSearchParams(search);
+  if (!dest.get("next")) dest.set("next", passwordSetupPath());
+  if (!tokenHash && !code) dest.delete("setup");
+  const query = dest.toString();
+  return query ? `/auth/confirm?${query}` : "/auth/confirm";
 }

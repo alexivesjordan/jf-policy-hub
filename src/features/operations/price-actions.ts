@@ -5,6 +5,7 @@ import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import { fillMissingSkuCategories } from "@/lib/cin7/missing-product";
 import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
@@ -328,7 +329,7 @@ async function withLiveCategories(lines: ReviewLine[]) {
 
 async function priceDraft(draft: QuoteDraft) {
   const context = await getOfficeContext();
-  const showCost = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
+  const showCost = hasLevel(context.operations, "edit", context.is_owner);
   const pricing = await pricingConfig();
   const lines = await withLiveCategories(draft.lines);
   draft.lines = lines;
@@ -636,7 +637,7 @@ export async function loadBookingWindow(jobId: string, month: string): Promise<{
     ok: true,
     message: "",
     installDays: Math.max(1, Number(need.install_days ?? 1)),
-    canAllowWeekends: canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner }),
+    canAllowWeekends: canOverrideRequirements({ isOwner: context.is_owner }),
     requirements: {
       installers: need.installers,
       licensedDrivers: need.licensed_drivers,
@@ -817,7 +818,7 @@ export async function pencilJobDay(_state: ActionState, formData: FormData): Pro
   const day = String(formData.get("day") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, message: "Choose a day." };
   const context = await getOfficeContext();
-  const canAllowWeekends = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
+  const canAllowWeekends = canOverrideRequirements({ isOwner: context.is_owner });
   const allowWeekends = formData.get("allowWeekends") === "yes";
   if (allowWeekends && !canAllowWeekends) {
     return { ok: false, message: "Weekend installs can only be pencilled by the owner." };
@@ -895,7 +896,7 @@ export async function pencilJobDay(_state: ActionState, formData: FormData): Pro
 export async function overrideJobRequirements(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireOperationsUser();
   const context = await getOfficeContext();
-  if (!canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner })) {
+  if (!canOverrideRequirements({ isOwner: context.is_owner })) {
     return { ok: false, message: "A sales rep cannot change required resources." };
   }
   const jobId = String(formData.get("jobId") ?? "");

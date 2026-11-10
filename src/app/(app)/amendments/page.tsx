@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listAmendments } from "@/features/policies/queries";
+import { canReviewSuggestions } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate, formatTimestamp, severityLabel, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
@@ -27,7 +28,7 @@ export default async function AmendmentsPage({
   const profile = await requireUser();
   const status = oneParam((await searchParams).status) ?? "";
   const amendments = await listAmendments(status);
-  const reviewer = profile.role === "admin" || profile.role === "approver";
+  const reviewer = canReviewSuggestions(profile);
 
   return (
     <div className="space-y-6">

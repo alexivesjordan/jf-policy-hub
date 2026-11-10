@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePeopleEditor } from "@/lib/auth";
 import type { ActionState } from "@/lib/action-state";
 import { messageFromError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +62,7 @@ async function savePolicy(input: {
 }
 
 export async function savePolicyForm(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  await requirePeopleEditor();
   const policyId = clean(formData.get("policyId"));
   const isNew = !policyId;
   const status = clean(formData.get("status"));
@@ -102,7 +102,7 @@ function refreshPolicy(id: string) {
 }
 
 export async function uploadPolicyDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
+  const user = await requirePeopleEditor();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, message: "Please choose a Word (.docx) or PDF file." };
@@ -229,7 +229,7 @@ export async function uploadPolicyDocument(_prev: ActionState, formData: FormDat
 }
 
 export async function readAttachedText(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  await requirePeopleEditor();
   const policyId = clean(formData.get("policyId"));
   const supabase = await createClient();
   const { data, error } = await supabase

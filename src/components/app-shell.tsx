@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { canManageWorkspace } from "@/lib/access";
+import { canManageWorkspace, moduleAllows } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,7 @@ export function AppShell({
   const heading = inWorkspace ? "Workspace" : current ? pulseLabel(current) : "Jordan Pulse";
   const counts = { pending, unread };
   const items = (nav ?? current?.nav ?? []).filter((item) => {
-    if (item.adminOnly && profile.role !== "admin") return false;
+    if (item.adminOnly && !moduleAllows(profile, "people", "edit")) return false;
     if (item.ownerOnly && !isOwner) return false;
     return true;
   });

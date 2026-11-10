@@ -3,12 +3,12 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { accessRedirect, canManageWorkspace, canUseOperations, canUsePeople, canUseSales } from "@/lib/access";
+import { accessRedirect, canManageWorkspace, canUseOperations, canUsePeople, canUseSales, moduleAllows } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
 
 const profileColumns =
-  "id, email, full_name, role, is_active, access_granted, last_sign_in_at, created_at, updated_at";
+  "id, email, full_name, role, is_active, access_granted, can_review, last_sign_in_at, created_at, updated_at";
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
@@ -85,6 +85,17 @@ export async function requireSalesUser() {
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseSales(profile)) {
     redirect(canUsePeople(profile) || canUseOperations(profile) ? "/dashboard" : "/no-access");
+  }
+  return profile;
+}
+
+export async function requirePeopleEditor() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  if (!profile.access_granted) redirect("/no-access");
+  if (!profile.is_active) redirect("/account-inactive");
+  if (!moduleAllows(profile, "people", "edit")) {
+    redirect(canUsePeople(profile) ? "/dashboard" : "/no-access");
   }
   return profile;
 }
