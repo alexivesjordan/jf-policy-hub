@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { AccessForm } from "@/components/access-form";
-import { hashOrbitToken } from "@/lib/orbit/token-hash";
+import { hashPulseToken } from "@/lib/pulse/token-hash";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Site access" };
@@ -19,7 +19,7 @@ function AccessFallback() {
     <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Jordan Fitness</p>
       <h1 className="font-display mt-2 text-4xl">Site access</h1>
-      <p className="mt-6 text-white/70">Loading the form...</p>
+      <p className="mt-6 text-ink/70">Loading the form...</p>
     </main>
   );
 }
@@ -27,7 +27,7 @@ function AccessFallback() {
 async function AccessContent({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const hash = hashOrbitToken(token);
+  const hash = hashPulseToken(token);
   const admin = createAdminClient();
   if (!hash || !admin) {
     return <Invalid />;
@@ -44,7 +44,7 @@ async function AccessContent({ params }: { params: Promise<{ token: string }> })
     <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Jordan Fitness</p>
       <h1 className="font-display mt-2 text-4xl">Site access</h1>
-      <p className="mt-2 text-white/70">
+      <p className="mt-2 text-ink/70">
         {data.customer_name}
         {data.postcode ? ` · ${data.postcode}` : ""}. No account is needed.
       </p>
@@ -63,7 +63,7 @@ function Invalid() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4">
       <h1 className="font-display text-4xl">That link is not valid</h1>
-      <p className="mt-3 text-white/70">Ask Jordan Fitness for a new access link.</p>
+      <p className="mt-3 text-ink/70">Ask Jordan Fitness for a new access link.</p>
     </main>
   );
 }

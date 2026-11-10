@@ -227,6 +227,27 @@ export async function dashboardCounts(reviewBefore: string) {
   };
 }
 
+export async function listMyNotifications() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id, title, body, link, read_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return (data ?? []) as {
+    id: string;
+    title: string;
+    body: string;
+    link: string | null;
+    read_at: string | null;
+    created_at: string;
+  }[];
+}
+
 export async function unreadCount(userId: string) {
   const supabase = await createClient();
   const { count, error } = await supabase

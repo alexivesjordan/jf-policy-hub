@@ -1,0 +1,129 @@
+Anonymised text extracted from a Cin7 Core quote. Customer name, street and contacts are replaced. Product lines are the quote's own.
+Quote No: SO-00490
+
+Customer
+Sample Fitness Club
+1 Anonymised Road
+Ipswich
+IP14NJ
+
+Delivery Address
+Sample Fitness Club
+1 Anonymised Road
+Ipswich
+IP14NJ
+
+Sales Contact
+Jordan Example
+sales.example@example.com
+
+Order No
+Date
+Terms
+Customer Reference
+Currency
+SO-00490
+06/11/2026
+Prepayment
+06/11
+GBP
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+1 JF-C2SE-2 Concept2 SkiErg - Including 1.00 679.17 0.00% 679.17 679.17 135.83
+PM5 Monitor
+2 JF-C2SE-FS-2 Concept2 SkiErg Floor Stand 1.00 195.83 0.00% 195.83 195.83 39.17
+3 JLC-HEXR-P1 JORDAN 1kg-10kg Hex Rubber 1.00 275.00 35.00% 178.75 178.75 35.75
+Dumbbell Set (10 Pairs, 1kg increments)
+4 JTDR-05-10 10 pair Vertical Rack 1.00 285.00 35.00% 185.25 185.25 37.05
+BLK - 1-10kg dumbbells (oval frame)
+5 JTBR-10-BLK Barbell Rack Holds 10 1.00 430.00 35.00% 279.50 279.50 55.90
+- Black
+6 JTRBARSN2- JORDAN 10 - 45kg 1.00 1,004.50 35.00% 652.93 652.93 130.59
+1N-RC Rubber Fixed Barbell (5kg increments / 10 Bars) - Straight Bar - Red
+7 JF-J75-CR-BLK- JORDAN J75 Cable Rack 1.00 3,545.54 35.00% 2,304.60 2,304.60 460.92
+V3 Gen III - Black - Including J-Hooks & Weight Horns
+8 JTKBRC3-10 JORDAN 10kg Black Rubber 1.00 44.00 35.00% 28.60 28.60 5.72
+Kettlebell/ Chrome Handle (each)
+9 JTKBRC3-12 JORDAN 12kg Black Rubber 1.00 52.80 35.00% 34.32 34.32 6.86
+Kettlebell/ Chrome Handle (each)
+
+This quotation is valid for 30 days.
+Printed: 09/11/2026 Page 1 of 4
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+10 JTKBRC3-16 JORDAN 16kg Black Rubber 1.00 70.40 35.00% 45.76 45.76 9.15
+Kettlebell/ Chrome Handle (each)
+11 JTKBRC3-20 JORDAN 20kg Black Rubber 1.00 88.00 35.00% 57.20 57.20 11.44
+Kettlebell/ Chrome Handle (each)
+12 JTKBRC3-04 JORDAN 4kg Black Rubber 1.00 17.60 35.00% 11.44 11.44 2.29
+Kettlebell/ Chrome Handle (each)
+13 JTKBRC3-06 JORDAN 6kg Black Rubber 1.00 26.40 35.00% 17.16 17.16 3.43
+Kettlebell/ Chrome Handle (each)
+14 JTKBRC3-08 JORDAN 8kg Black Rubber 1.00 35.20 35.00% 22.88 22.88 4.58
+Kettlebell/ Chrome Handle (each)
+15 JLTR-01 JORDAN 38mm diameter, 15m 1.00 180.00 35.00% 117.00 117.00 23.40
+Black Battle Rope
+16 JF-SB-05 JORDAN Black Slam Ball 1.00 13.49 35.00% 8.77 8.77 1.75
+- 5kg
+17 JF-SB-07 JORDAN Black Slam Ball 1.00 15.34 35.00% 9.97 9.97 1.99
+- 7kg
+18 JF-SB-09 JORDAN Black Slam Ball 1.00 20.24 35.00% 13.16 13.16 2.63
+- 9kg
+19 JF-EC-950ET- JORDAN Elite Cardio - 3.00 5,075.00 35.00% 3,298.75 9,896.25 1,979.25
+TFT-21.5 950E Treadmill - 21.5" TFT Screen
+20 JF-EC-805R- JORDAN Elite Cardio - 1.00 3,331.67 35.00% 2,165.59 2,165.59 433.12
+15.6 805R Recumbent Bike - 15.6" TFT Screen
+21 JF-EC-805U- JORDAN Elite Cardio - 2.00 3,130.83 35.00% 2,035.04 4,070.08 814.02
+15.6 805U Upright Bike - 15.6" TFT Screen
+22 JF-EC-90AB- JORDAN Elite Cardio - 1.00 1,858.33 35.00% 1,207.91 1,207.91 241.58
+LCD 90+ Air Bike - LCD Screen
+23 JF-C2RE-SL-3 Concept2 RowErg - Standard 2.00 825.00 0.00% 825.00 1,650.00 330.00
+Legs
+24 JF-PS-PIN-SP- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Shoulder Press - Black
+25 JF-PS-PIN-VP- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Vertical Chest Press - Black
+26 JF-PS-PIN-LP- JORDAN Performance Strength - 1.00 2,526.32 35.00% 1,642.11 1,642.11 328.42
+BLK Pin Loaded Leg Press - Black
+27 JF-PS-PIN-DCA- JORDAN Performance Strength - 1.00 2,089.74 35.00% 1,358.33 1,358.33 271.67
+BLK Pin Loaded Dual Dip/Chin Assist - Black
+28 JF-PS-PIN-LPD- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Lat Pulldown - Black
+29 JF-EC-805D- JORDAN Elite Cardio - 3.00 4,018.33 35.00% 2,611.91 7,835.74 1,567.15
+15.6 805D Elliptical - 15.6" TFT Screen
+30 JF-PS-PIN-SR- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Seated Row - Black
+31 JF-PS-PIN-DPF- JORDAN Performance Strength - 1.00 1,988.57 35.00% 1,292.57 1,292.57 258.51
+BLK Pin Loaded Dual Delt/Pec Fly - Black
+32 JF-PS-PIN-HAD- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Hip Adductor - Black
+33 JF-PS-PIN-SLC- JORDAN Performance Strength - 1.00 1,804.51 35.00% 1,172.93 1,172.93 234.59
+BLK Pin Loaded Seated Leg Curl - Black
+34 JF-CKB-P1 JORDAN 8-40kg Competition 9 1.00 850.00 35.00% 552.50 552.50 110.50
+Kettlebell Set
+35 JF-KBR-2-BLK JORDAN Kettlebell Rack - 1.00 208.33 35.00% 135.41 135.41 27.08
+2 Tier - Black
+36 JF-CRBP-P1 JORDAN 150kg Coloured Rubber 1.00 560.00 35.00% 364.00 364.00 72.80
+Bumper Plate Set
+37 JF-AFID-BLK JORDAN Adjustable FID Bench 1.00 399.00 35.00% 259.35 259.35 51.87
+- Black
+38 JLPOWB-01 JORDAN Power Band - 1.00 12.00 35.00% 7.80 7.80 1.56
+13mm Red (each)
+39 JLPOWB-02 JORDAN Power Band - 1.00 16.50 35.00% 10.73 10.73 2.15
+22mm Black (each)
+40 JLPOWB-03 JORDAN Power Band - 1.00 21.50 35.00% 13.98 13.98 2.80
+32mm Purple (each)
+41 JLPOWB-04 JORDAN Power Band - 1.00 35.00 35.00% 22.75 22.75 4.55
+44mm Green (each)
+42 JLPOWB-05 JORDAN Power Band - 1.00 44.50 35.00% 28.93 28.93 5.79
+64mm Blue (each)
+43 JLPOWB-06 JORDAN Power Band - 1.00 65.50 35.00% 42.58 42.58 8.52
+83mm Orange (each)
+44 JF-J75-CPR- JORDAN J75 Compact Power 1.00 3,927.76 35.00% 2,553.04 2,553.04 510.61
+BLK-P3 Rack - Black - Package 3
+
+Goods Net: 46,989.52
+Additional Charges Net: 0.00
+Total Order Net: 46,989.52
+VAT: 9,397.90
+Total: 56,387.42

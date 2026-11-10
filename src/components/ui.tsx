@@ -6,9 +6,9 @@ export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger
   return cn(
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
     variant === "primary" && "bg-red text-white shadow-[0_0_24px_rgba(206,0,55,0.28)] hover:bg-red-deep",
-    variant === "secondary" && "border border-line bg-card text-white hover:border-white/40 hover:bg-white/5",
-    variant === "ghost" && "text-white hover:bg-white/10",
-    variant === "danger" && "border border-red-deep bg-transparent text-white hover:bg-red-deep/30",
+    variant === "secondary" && "border border-line bg-card text-ink hover:border-red",
+    variant === "ghost" && "text-ink hover:bg-ink/5",
+    variant === "danger" && "border border-red-deep bg-transparent text-ink hover:bg-red/10",
   );
 }
 
@@ -50,7 +50,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 const controlClass =
-  "w-full rounded-2xl border border-line bg-field px-3 py-2.5 text-base text-white outline-none ring-red transition focus:border-red focus:ring-2 focus:shadow-[0_0_0_4px_rgba(206,0,55,0.28)]";
+  "w-full rounded-2xl border border-line bg-field px-3 py-2.5 text-base text-ink outline-none ring-red transition focus:border-red focus:ring-2 focus:shadow-[0_0_0_4px_rgba(206,0,55,0.28)]";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(controlClass, props.className)} />;
@@ -76,10 +76,10 @@ export function Banner({
       role={tone === "error" ? "alert" : "status"}
       className={cn(
         "rounded-2xl border px-4 py-3 text-sm leading-6",
-        tone === "info" && "border-line bg-card text-white",
-        tone === "success" && "border-line bg-card text-white",
-        tone === "warning" && "border-line bg-card text-white",
-        tone === "error" && "border-red bg-card text-white",
+        tone === "info" && "border-line bg-card text-ink",
+        tone === "success" && "border-line bg-card text-ink",
+        tone === "warning" && "border-red bg-card text-ink",
+        tone === "error" && "border-red bg-card text-ink",
       )}
     >
       {children}
@@ -103,13 +103,13 @@ export function Badge({
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
         tone === "neutral" && "border border-line bg-transparent text-grey",
-        tone === "draft" && "border border-line bg-transparent text-white",
+        tone === "draft" && "border border-line bg-transparent text-ink",
         tone === "active" && "bg-red text-white",
         tone === "archived" && "border border-line bg-transparent text-grey",
-        tone === "pending" && "border border-red bg-transparent text-white",
+        tone === "pending" && "border border-red bg-transparent text-ink",
         tone === "good" && "bg-red text-white",
-        tone === "bad" && "border border-red-deep bg-transparent text-white",
-        tone === "auto" && "border border-line bg-transparent text-white",
+        tone === "bad" && "border border-red-deep bg-transparent text-ink",
+        tone === "auto" && "border border-line bg-transparent text-ink",
       )}
     >
       {children}

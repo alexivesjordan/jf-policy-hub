@@ -1,8 +1,8 @@
 import { connection } from "next/server";
-import { orbitRpcError, readJson } from "@/lib/orbit/http";
-import { tokenRoundtripSchema } from "@/lib/orbit/schema";
-import { orbitSession, requireOpsOwner } from "@/lib/orbit/session";
-import { createTokenLink, resolveTokenHash, resolveTokenLink, revokeTokenLink } from "@/lib/orbit/tokens";
+import { pulseRpcError, readJson } from "@/lib/pulse/http";
+import { tokenRoundtripSchema } from "@/lib/pulse/schema";
+import { pulseSession, requireOpsOwner } from "@/lib/pulse/session";
+import { createTokenLink, resolveTokenHash, resolveTokenLink, revokeTokenLink } from "@/lib/pulse/tokens";
 
 /**
  * Throwaway M0 check. It is not the access form or the customer portal.
@@ -11,11 +11,11 @@ import { createTokenLink, resolveTokenHash, resolveTokenLink, revokeTokenLink } 
  */
 export async function POST(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const owner = await requireOpsOwner(session.supabase);
-  if (!owner.ok) return orbitRpcError(owner.error, "Could not check owner access.");
+  if (!owner.ok) return pulseRpcError(owner.error, "Could not check owner access.");
   if (!owner.owner) {
     return Response.json({ error: "Only the owner can run the token check." }, { status: 403 });
   }

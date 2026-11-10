@@ -16,3 +16,6 @@ sudo -u postgres psql -v ON_ERROR_STOP=1 -d "$db" -f "$root/scripts/sql/orbit-m0
 if [[ -f "$root/scripts/sql/orbit-office-checks.sql" ]]; then
   sudo -u postgres psql -v ON_ERROR_STOP=1 -d "$db" -f "$root/scripts/sql/orbit-office-checks.sql"
 fi
+if [[ -f "$root/scripts/sql/orbit-booking-checks.sql" ]]; then
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -d "$db" -f "$root/scripts/sql/orbit-booking-checks.sql"
+fi

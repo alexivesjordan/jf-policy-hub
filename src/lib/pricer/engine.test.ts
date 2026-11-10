@@ -20,12 +20,32 @@ describe("mode A", () => {
     assert.equal(result.notice, BEST_CASE_NOTICE);
     assert.equal(result.blockedReason, null);
     assert.equal(result.crew, 1);
+    assert.equal(result.requirements?.installers, 1);
+    assert.equal(result.requirements?.vanSize, "small");
+    assert.equal(result.requirements?.stairClimber, false);
+    assert.equal(result.requirements?.licensedDrivers, result.requirements?.vanCount);
+    assert.equal("breakdown" in forSales(result), false);
     assert.ok(result.cost != null && result.cost > 0);
     assert.equal(result.customerPrice, Math.round(result.cost * 1.4 * 100) / 100);
     assert.equal(result.markup, 0.4);
     assert.equal("cost" in forSales(result), false);
     assert.equal(result.minJobChargeConfigured, false);
     assert.ok(result.flags.some((flag) => flag.includes("min job charge not set")));
+  });
+
+  it("keeps an exact product row ahead of a category build default", () => {
+    const result = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 50,
+      segment: "independent",
+      lines: [{ productName: "FID Bench", category: "bench", qty: 1 }],
+      table,
+      categoryDefaults: [{ category: "bench", buildCrew: 2, buildMinutes: 120, note: "Each machine: 2-man, 2-hour build." }],
+    });
+    assert.equal(result.lines[0]?.match, "exact");
+    assert.equal(result.lines[0]?.row?.buildMinutes, 12);
+    assert.equal(result.lines[0]?.row?.buildCrew, 1);
   });
 
   it("refuses an untagged segment", () => {

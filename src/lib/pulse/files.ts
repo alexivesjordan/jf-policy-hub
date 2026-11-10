@@ -3,15 +3,15 @@ import "server-only";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  orbitStoragePath,
-  prepareOrbitUpload,
-  type OrbitBucket,
-} from "@/lib/orbit/prepare-upload";
+  pulseStoragePath,
+  preparePulseUpload,
+  type PulseBucket,
+} from "@/lib/pulse/prepare-upload";
 
 const SIGNED_URL_SECONDS = 60 * 10;
 
-export async function storeOrbitFile(input: {
-  bucket: OrbitBucket;
+export async function storePulseFile(input: {
+  bucket: PulseBucket;
   mimeType: string;
   bytes: Buffer;
   uploadedBy: string | null;
@@ -20,8 +20,8 @@ export async function storeOrbitFile(input: {
   entityId: string;
   kind: string;
 }) {
-  const prepared = await prepareOrbitUpload(input.bucket, input.mimeType, input.bytes);
-  const storagePath = orbitStoragePath(input.entitySchema, input.entityId, prepared.extension);
+  const prepared = await preparePulseUpload(input.bucket, input.mimeType, input.bytes);
+  const storagePath = pulseStoragePath(input.entitySchema, input.entityId, prepared.extension);
   const admin = createAdminClient();
   if (!admin) throw new Error("Supabase is not configured.");
 

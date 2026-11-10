@@ -119,7 +119,18 @@ export type GateOverrideRow = {
   cin7_number: string | null;
 };
 
-export type OrbitNotification = {
+export type StoredRequirements = {
+  installers: number;
+  licensed_drivers: number;
+  van_size: "small" | "crafter";
+  van_count: number;
+  stair_climber: boolean;
+  overridden: boolean;
+  conflict: boolean;
+  conflict_detail: string | null;
+};
+
+export type PulseNotification = {
   id: string;
   title: string;
   body: string;
@@ -130,7 +141,7 @@ export type OrbitNotification = {
   created_at: string;
 };
 
-export type OrbitTask = {
+export type PulseTask = {
   id: string;
   module_id: string;
   kind: string;

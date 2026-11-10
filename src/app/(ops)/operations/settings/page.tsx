@@ -1,6 +1,6 @@
-import { PricingForm, TermsForm } from "@/components/operations-forms";
+import { CategoryEffortForm, PricingForm, TermsForm } from "@/components/operations-forms";
 import { Card } from "@/components/ui";
-import { getOfficeContext, readOwnerSettings, readTerms } from "@/features/operations/queries";
+import { getOfficeContext, listCategoryEffortDefaults, readOwnerSettings, readTerms } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 
 export const metadata = { title: "Pricing" };
@@ -12,12 +12,16 @@ export default async function SettingsPage() {
     return (
       <div className="space-y-4">
         <h1 className="font-display text-4xl">Pricing</h1>
-        <p className="max-w-xl text-white/75">Only the named owner can view and change pricing and the charges grid.</p>
+        <p className="max-w-xl text-ink/75">Only the named owner can view and change pricing and the charges grid.</p>
       </div>
     );
   }
 
-  const [pricing, terms] = await Promise.all([readOwnerSettings(), readTerms()]);
+  const [pricing, terms, effort] = await Promise.all([
+    readOwnerSettings(),
+    readTerms(),
+    listCategoryEffortDefaults().catch(() => []),
+  ]);
   const lines = terms?.charges_grid.lines ?? [];
   const schedule = terms?.cancellation_schedule.rows ?? [];
 
@@ -25,7 +29,7 @@ export default async function SettingsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-4xl">Pricing</h1>
-        <p className="mt-2 max-w-2xl text-white/70">
+        <p className="mt-2 max-w-2xl text-ink/70">
           Markups live on the pricing settings table. Each save appends a version. Minimum job charge and margin floor stay “not configured” until a number is entered.
         </p>
       </div>
@@ -49,7 +53,7 @@ export default async function SettingsPage() {
               roundingHours={Number(pricing.variation_rounding_hours)}
             />
           ) : (
-            <p className="text-white/70">Pricing settings are not configured.</p>
+            <p className="text-ink/70">Pricing settings are not configured.</p>
           )}
         </div>
         {pricing ? (
@@ -58,6 +62,16 @@ export default async function SettingsPage() {
             . Margin floor: {pricing.margin_floor_pct == null ? "Not configured" : `${Math.round(Number(pricing.margin_floor_pct) * 1000) / 10}%`}.
           </p>
         ) : null}
+      </Card>
+
+      <Card>
+        <h2 className="font-display text-2xl">Category build defaults</h2>
+        <p className="mt-2 text-sm text-grey">
+          Used when a quote line has no exact product row. The seeded assumption is each machine at 2 people and 120 minutes. Saving appends a version.
+        </p>
+        <div className="mt-4">
+          {effort.length > 0 ? <CategoryEffortForm rows={effort} /> : <p className="text-sm text-ink">No category defaults yet.</p>}
+        </div>
       </Card>
 
       <Card>

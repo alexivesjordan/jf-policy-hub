@@ -20,12 +20,17 @@ export const RATES = {
   palletRate: 65,
   palletCapacityKg: 400,
   dayThresholdHours: 12,
+  /** Default site window 08:00–17:00. A day may run past 8 h inside this window. */
+  siteWindowHours: 9,
   sitePrepMinutes: 45,
   repeatRate: 0.8,
   contingencyBase: 0.1,
   contingencyHigh: 0.05,
   contingencyAccess: 0.05,
   tagCost: 0.22,
+  /** SET in install-quoting v2.5. Same-day food stays off while food_trigger is UNSET. */
+  foodRate: 15,
+  hotelRate: 80,
   installerHour: 30,
   installerHourOoh: 45,
   mileageCharge: 0.5,

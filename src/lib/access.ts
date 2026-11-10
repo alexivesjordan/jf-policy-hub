@@ -25,7 +25,7 @@ export function canUsePeople(profile: Profile) {
   return profile.modules.some((module) => module.module_id === "people" && module.enabled);
 }
 
-/** Where to send this session, or null when they may use Orbit People. */
+/** Where to send this session, or null when they may use Pulse People. */
 export function accessRedirect(profile: Profile | null) {
   if (!profile) return "/login";
   if (!profile.access_granted) return "/no-access";

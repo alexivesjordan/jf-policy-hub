@@ -39,7 +39,7 @@ export default async function UploadPage({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
         <h1 className="font-display mt-2 text-4xl">Upload a policy document</h1>
         <p className="mt-2 text-grey">
           Choose any draft or active policy, including one that already has a file. Word and PDF files are read into the policy text, and the original file stays attached. Saving creates a new version.

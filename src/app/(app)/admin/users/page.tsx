@@ -15,7 +15,7 @@ export default async function UsersPage() {
       <div>
         <h1 className="font-display text-4xl">Users</h1>
         <p className="mt-2 max-w-2xl text-grey">
-          Invite a colleague with their Jordan Fitness email, choose a role, and switch Orbit People on or off. Deactivated people cannot open the app. Someone who signs in without an invite sees a message to ask an administrator.
+          Invite a colleague with their Jordan Fitness email, choose a role, and switch Pulse People on or off. Deactivated people cannot open the app. Someone who signs in without an invite sees a message to ask an administrator.
         </p>
       </div>
       <Card>

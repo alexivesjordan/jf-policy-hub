@@ -1,12 +1,12 @@
 import { connection } from "next/server";
 import { z } from "zod";
-import { orbitRpcError, readJson } from "@/lib/orbit/http";
-import { updateTaskSchema } from "@/lib/orbit/schema";
-import { orbitSession } from "@/lib/orbit/session";
+import { pulseRpcError, readJson } from "@/lib/pulse/http";
+import { updateTaskSchema } from "@/lib/pulse/schema";
+import { pulseSession } from "@/lib/pulse/session";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const { id } = await context.params;
@@ -27,6 +27,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     p_due_at: parsed.data.due_at ?? null,
     p_assignee_id: parsed.data.assignee_id ?? null,
   });
-  if (error) return orbitRpcError(error, "Could not update that task.");
+  if (error) return pulseRpcError(error, "Could not update that task.");
   return Response.json({ task: data });
 }

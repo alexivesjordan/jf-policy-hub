@@ -14,7 +14,7 @@ export function AccessLinkButton({ jobId }: { jobId: string }) {
         {pending ? "Creating..." : "Create access link"}
       </Button>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
-      {path ? <p className="break-all text-sm text-white">{path}</p> : null}
+      {path ? <p className="break-all text-sm text-ink">{path}</p> : null}
     </form>
   );
 }

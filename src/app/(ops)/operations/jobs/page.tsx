@@ -20,13 +20,13 @@ export default async function JobsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-4xl">Jobs</h1>
-        <p className="mt-2 max-w-2xl text-white/70">
+        <p className="mt-2 max-w-2xl text-ink/70">
           Status is read from the database. It cannot be edited here. Sales see their own jobs. The install lead, HQ, and the owner see the fixture set.
         </p>
       </div>
       {error ? <p className="rounded-3xl border border-red bg-card px-5 py-4">{error}</p> : null}
       {jobs.length === 0 && !error ? (
-        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-white/70">
+        <p className="rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-ink/70">
           No jobs for this role. Fixture jobs are visible to the install lead, HQ, and the owner. A sales role only sees jobs they own.
         </p>
       ) : (

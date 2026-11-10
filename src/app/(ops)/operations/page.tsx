@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { getOfficeContext, listJobs, listOrbitNotifications, listOrbitTasks } from "@/features/operations/queries";
+import { getOfficeContext, listJobs, listPulseNotifications, listPulseTasks } from "@/features/operations/queries";
 import { greetingName } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -20,8 +20,8 @@ export default async function OperationsHomePage() {
     const [context, jobRows, taskRows, notes] = await Promise.all([
       getOfficeContext(),
       listJobs(),
-      listOrbitTasks(),
-      listOrbitNotifications(true),
+      listPulseTasks(),
+      listPulseNotifications(true),
     ]);
     role = context.ops_role ?? "not set";
     owner = context.is_owner;
@@ -38,7 +38,7 @@ export default async function OperationsHomePage() {
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Release 1A · Office</p>
         <h1 className="font-display mt-2 text-4xl">Hello {greetingName(profile)}</h1>
-        <p className="mt-2 max-w-2xl text-lg text-white/70">
+        <p className="mt-2 max-w-2xl text-lg text-ink/70">
           Jobs, pricing, exceptions, and notifications. No Cin7 connection, no pricer, and no installer app on this screen.
         </p>
       </div>
@@ -47,7 +47,7 @@ export default async function OperationsHomePage() {
         <p className="rounded-3xl border border-red bg-card px-5 py-4 text-sm">{contextError}</p>
       ) : (
         <p className="text-sm text-grey">
-          Operations role: <span className="text-white">{roleLabel(role)}</span>
+          Operations role: <span className="text-ink">{roleLabel(role)}</span>
           {owner ? " · named owner" : ""}
         </p>
       )}
@@ -60,7 +60,7 @@ export default async function OperationsHomePage() {
 
       <Card>
         <h2 className="font-display text-2xl">Fixture data</h2>
-        <p className="mt-3 leading-7 text-white/75">
+        <p className="mt-3 leading-7 text-ink/75">
           Jobs numbered FIXTURE- are demo rows so this office can be opened before Cin7. They are not production installs.
           Segment and customer type on those rows are labels for the screen, not a Cin7 mapping. Quote versions stay empty until a pricer exists.
         </p>

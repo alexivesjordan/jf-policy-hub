@@ -5,10 +5,10 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
-type OrbitClient = Awaited<ReturnType<typeof createClient>>;
+type PulseClient = Awaited<ReturnType<typeof createClient>>;
 
-export async function orbitSession(): Promise<
-  | { ok: true; profile: Profile; supabase: OrbitClient }
+export async function pulseSession(): Promise<
+  | { ok: true; profile: Profile; supabase: PulseClient }
   | { ok: false; response: Response }
 > {
   if (!isSupabaseConfigured()) {
@@ -35,13 +35,13 @@ export async function orbitSession(): Promise<
   return { ok: true, profile, supabase: await createClient() };
 }
 
-export async function requireOpsOwner(supabase: OrbitClient) {
+export async function requireOpsOwner(supabase: PulseClient) {
   const { data, error } = await supabase.rpc("orbit_is_ops_owner");
   if (error) return { ok: false as const, error };
   return { ok: true as const, owner: Boolean(data) };
 }
 
-export async function requireOpsRole(supabase: OrbitClient, roles: string[]) {
+export async function requireOpsRole(supabase: PulseClient, roles: string[]) {
   const { data, error } = await supabase.rpc("orbit_has_ops_role", { p_roles: roles });
   if (error) return { ok: false as const, error };
   return { ok: true as const, allowed: Boolean(data) };

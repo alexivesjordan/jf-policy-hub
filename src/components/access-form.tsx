@@ -67,11 +67,11 @@ export function AccessForm({
           if (node.scrollTop + node.clientHeight >= node.scrollHeight - 12) setScrolled(true);
         }}
       >
-        <p className="font-semibold text-white">Additional charges, version {versionLabel}, ex VAT</p>
+        <p className="font-semibold text-ink">Additional charges, version {versionLabel}, ex VAT</p>
         <ul className="mt-3 space-y-3">
           {lines.map((line) => (
             <li key={line.label}>
-              <p className="text-white">{line.label}</p>
+              <p className="text-ink">{line.label}</p>
               <p className="text-grey">
                 {line.rate != null ? `£${Number(line.rate).toFixed(2)}` : basisText(line.basis)}
                 {line.unit ? ` ${line.unit}` : ""}
@@ -103,7 +103,7 @@ export function AccessForm({
 function YesNo({ name, label, defaultYes = false }: { name: string; label: string; defaultYes?: boolean }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold text-white">{label}</legend>
+      <legend className="text-sm font-semibold text-ink">{label}</legend>
       <div className="flex gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input type="radio" name={name} value="yes" defaultChecked={defaultYes} className="accent-[#ce0037]" /> Yes

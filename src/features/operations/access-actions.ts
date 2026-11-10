@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
-import { storeOrbitFile } from "@/lib/orbit/files";
-import { hashOrbitToken } from "@/lib/orbit/token-hash";
-import { createTokenLink } from "@/lib/orbit/tokens";
+import { storePulseFile } from "@/lib/pulse/files";
+import { hashPulseToken } from "@/lib/pulse/token-hash";
+import { createTokenLink } from "@/lib/pulse/tokens";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { messageFromError } from "@/lib/errors";
 import type { ActionState } from "@/lib/action-state";
@@ -34,7 +34,7 @@ export async function createAccessLink(_state: ActionState, formData: FormData):
 
 export async function submitAccessForm(_state: ActionState, formData: FormData): Promise<ActionState> {
   const token = String(formData.get("token") ?? "");
-  const hash = hashOrbitToken(token);
+  const hash = hashPulseToken(token);
   if (!hash) return { ok: false, message: "That link is not valid." };
   const accepted = formData.get("accept") === "yes";
   const name = String(formData.get("acceptedName") ?? "").trim();
@@ -72,7 +72,7 @@ export async function submitAccessForm(_state: ActionState, formData: FormData):
   const media: string[] = [];
   const files = formData.getAll("photos").filter((item): item is File => item instanceof File && item.size > 0);
   for (const file of files.slice(0, 8)) {
-    const stored = await storeOrbitFile({
+    const stored = await storePulseFile({
       bucket: "access-media",
       mimeType: file.type || "image/jpeg",
       bytes: Buffer.from(await file.arrayBuffer()),

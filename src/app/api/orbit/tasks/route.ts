@@ -1,21 +1,21 @@
 import { connection } from "next/server";
-import { orbitRpcError, readJson } from "@/lib/orbit/http";
-import { createTaskSchema } from "@/lib/orbit/schema";
-import { orbitSession } from "@/lib/orbit/session";
+import { pulseRpcError, readJson } from "@/lib/pulse/http";
+import { createTaskSchema } from "@/lib/pulse/schema";
+import { pulseSession } from "@/lib/pulse/session";
 
 export async function GET() {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const { data, error } = await session.supabase.rpc("orbit_list_tasks");
-  if (error) return orbitRpcError(error, "Could not load tasks.");
+  if (error) return pulseRpcError(error, "Could not load tasks.");
   return Response.json({ tasks: data ?? [] });
 }
 
 export async function POST(request: Request) {
   await connection();
-  const session = await orbitSession();
+  const session = await pulseSession();
   if (!session.ok) return session.response;
 
   const parsed = createTaskSchema.safeParse(await readJson(request));
@@ -34,6 +34,6 @@ export async function POST(request: Request) {
     p_entity_table: parsed.data.entity_table ?? null,
     p_entity_id: parsed.data.entity_id ?? null,
   });
-  if (error) return orbitRpcError(error, "Could not create that task.");
+  if (error) return pulseRpcError(error, "Could not create that task.");
   return Response.json({ task: data }, { status: 201 });
 }

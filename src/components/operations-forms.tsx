@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import { Banner, Button, Field, Input, Select, TextArea } from "@/components/ui";
 import {
   createGateOverride,
-  createOrbitTask,
+  createPulseTask,
+  saveCategoryEffort,
   savePricing,
   saveTerms,
 } from "@/features/operations/actions";
@@ -13,6 +14,32 @@ import type { JobSummary, TermsLine } from "@/features/operations/types";
 function percentInput(value: number) {
   const percent = Math.round(value * 10000) / 100;
   return String(percent);
+}
+
+export function CategoryEffortForm({
+  rows,
+}: {
+  rows: { category: string; build_crew: number; build_minutes: number; note: string }[];
+}) {
+  const [state, action, pending] = useActionState(saveCategoryEffort, null);
+  return (
+    <form action={action} className="space-y-3">
+      {rows.map((row) => (
+        <div key={row.category} className="grid gap-2 md:grid-cols-[1fr_6rem_8rem]">
+          <input type="hidden" name="category" value={row.category} />
+          <input type="hidden" name="note" value={row.note} />
+          <p className="self-center text-sm font-semibold text-ink">{row.category}</p>
+          <Input name="buildCrew" type="number" min={1} max={6} defaultValue={row.build_crew} aria-label={`${row.category} crew`} />
+          <Input name="buildMinutes" type="number" min={0} max={480} defaultValue={row.build_minutes} aria-label={`${row.category} minutes`} />
+        </div>
+      ))}
+      <Field label="Reason">
+        <Input name="reason" required placeholder="Why this build assumption changed" />
+      </Field>
+      {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
+      <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Saving..." : "Save effort defaults"}</Button>
+    </form>
+  );
 }
 
 export function PricingForm({
@@ -108,7 +135,7 @@ export function TermsForm({ lines }: { lines: TermsLine[] }) {
               <tr key={line.label} className="align-top">
                 <td className="border-b border-line py-3 pr-3">
                   <input type="hidden" name="label" value={line.label} />
-                  <p className="font-semibold text-white">{line.label}</p>
+                  <p className="font-semibold text-ink">{line.label}</p>
                   <p className="mt-1 text-grey">{line.unit || basisLabel(line.basis) || "Seeded line"}</p>
                 </td>
                 <td className="border-b border-line py-3 pr-3">
@@ -187,7 +214,7 @@ export function GateOverrideForm({ jobs }: { jobs: JobSummary[] }) {
 }
 
 export function TaskForm() {
-  const [state, action, pending] = useActionState(createOrbitTask, null);
+  const [state, action, pending] = useActionState(createPulseTask, null);
   return (
     <form action={action} className="grid gap-4">
       <Field label="Title">

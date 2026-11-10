@@ -90,7 +90,7 @@ export default async function PolicyPage({
         {policy.source_file_name ? (
           <p className="mt-4 text-sm">
             Attached file:{" "}
-            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-white underline decoration-red">
+            <Link href={`/policies/${policy.id}/file`} className="font-semibold text-ink underline decoration-red">
               {policy.source_file_name}
             </Link>
           </p>

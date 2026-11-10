@@ -29,7 +29,7 @@ export default async function AmendmentsPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
         <h1 className="font-display mt-2 text-4xl">Review queue</h1>
         <p className="mt-2 max-w-2xl text-ink/75">
           {reviewer

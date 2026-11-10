@@ -37,7 +37,7 @@ export default async function PoliciesPage({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
           <h1 className="font-display mt-2 text-4xl">Policies</h1>
           <p className="mt-2 max-w-2xl text-ink/75">
             Upload a finished Word or PDF file into a placeholder, or open a policy and write it here.
@@ -95,7 +95,7 @@ export default async function PoliciesPage({
               <li key={policy.id} className="rounded-3xl border border-line bg-card px-5 py-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-white">
+                    <Link href={`/policies/${policy.id}`} className="text-lg font-semibold text-ink">
                       {policy.title}
                     </Link>
                     <p className="mt-1 text-sm text-ink/70">

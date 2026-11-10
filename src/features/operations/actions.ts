@@ -71,6 +71,33 @@ export async function savePricing(_state: ActionState, formData: FormData): Prom
   }
 }
 
+export async function saveCategoryEffort(_state: ActionState, formData: FormData): Promise<ActionState> {
+  await requireOperationsUser();
+  try {
+    const categories = formData.getAll("category").map(String);
+    const crews = formData.getAll("buildCrew").map((value) => Number(value));
+    const minutes = formData.getAll("buildMinutes").map((value) => Number(value));
+    const notes = formData.getAll("note").map(String);
+    const rows = categories.map((category, index) => ({
+      category: category.trim(),
+      build_crew: crews[index],
+      build_minutes: minutes[index],
+      note: notes[index]?.trim() || "Category build default",
+    }));
+    if (rows.some((row) => !row.category || !Number.isFinite(row.build_crew) || !Number.isFinite(row.build_minutes))) {
+      return { ok: false, message: "Each category needs a crew and a build time." };
+    }
+    await callRpc("orbit_save_category_effort_defaults", {
+      p_rows: rows,
+      p_reason: requiredText(formData, "reason", "a short reason"),
+    });
+    revalidatePath("/operations/settings");
+    return { ok: true, message: "Saved a new category effort version." };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not save effort defaults." };
+  }
+}
+
 export async function saveTerms(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireOperationsUser();
   try {
@@ -111,7 +138,7 @@ export async function createGateOverride(_state: ActionState, formData: FormData
   }
 }
 
-export async function createOrbitTask(_state: ActionState, formData: FormData): Promise<ActionState> {
+export async function createPulseTask(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireOperationsUser();
   try {
     const kind = String(formData.get("kind") ?? "exception");
@@ -134,7 +161,7 @@ export async function createOrbitTask(_state: ActionState, formData: FormData): 
   }
 }
 
-export async function markOrbitNotificationRead(formData: FormData) {
+export async function markPulseNotificationRead(formData: FormData) {
   await requireOperationsUser();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -142,12 +169,14 @@ export async function markOrbitNotificationRead(formData: FormData) {
   await supabase.rpc("orbit_mark_notifications_read", { p_ids: [id] });
   revalidatePath("/operations/notifications");
   revalidatePath("/operations");
+  revalidatePath("/", "layout");
 }
 
-export async function markAllOrbitNotificationsRead() {
+export async function markAllPulseNotificationsRead() {
   await requireOperationsUser();
   const supabase = await createClient();
   await supabase.rpc("orbit_mark_notifications_read", { p_ids: null });
   revalidatePath("/operations/notifications");
   revalidatePath("/operations");
+  revalidatePath("/", "layout");
 }

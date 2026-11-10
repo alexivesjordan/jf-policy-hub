@@ -1,25 +1,53 @@
 @import "tailwindcss";
 
+:root {
+  --paper: #ffffff;
+  --ink: #111111;
+  --pine: #f6f6f6;
+  --card: #ffffff;
+  --field: #ffffff;
+  --line: #e6e6e6;
+  --red: #ce0037;
+  --red-deep: #8e0026;
+  --grey: #525252;
+  --mist: #f3f3f3;
+  --grid-line: rgba(0, 0, 0, 0.06);
+  --glow: rgba(206, 0, 55, 0.12);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #000000;
+  --ink: #ffffff;
+  --pine: #0d0d0d;
+  --card: #1a1a1a;
+  --field: #0d0d0d;
+  --line: #262626;
+  --grey: #a3a3a3;
+  --mist: #1a1a1a;
+  --grid-line: rgba(255, 255, 255, 0.045);
+  --glow: rgba(206, 0, 55, 0.28);
+  color-scheme: dark;
+}
+
 @theme inline {
   --font-sans: var(--font-grotesk), "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
-  --color-paper: #000000;
-  --color-ink: #ffffff;
-  --color-pine: #0d0d0d;
-  --color-card: #1a1a1a;
-  --color-field: #0d0d0d;
-  --color-line: #262626;
-  --color-red: #ce0037;
-  --color-red-deep: #8e0026;
-  /* #6D6D6D on black is about 4.0:1, short of AA for small text.
-     Secondary copy uses #A3A3A3 so it stays grey and clears 4.5:1. */
-  --color-grey: #a3a3a3;
-  --color-mist: #1a1a1a;
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-pine: var(--pine);
+  --color-card: var(--card);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-red: var(--red);
+  --color-red-deep: var(--red-deep);
+  --color-grey: var(--grey);
+  --color-mist: var(--mist);
 }
 
 body {
-  background: #000000;
-  color: #ffffff;
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font-grotesk), "Segoe UI", sans-serif;
 }
 
@@ -28,19 +56,19 @@ body {
   letter-spacing: -0.03em;
 }
 
-.orbit-grid {
-  background-color: #000000;
+.pulse-grid {
+  background-color: var(--paper);
   background-image:
-    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(206, 0, 55, 0.28), transparent 58%),
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    radial-gradient(ellipse 70% 45% at 50% -8%, var(--glow), transparent 58%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: auto, 56px 56px, 56px 56px;
 }
 
 input,
 textarea,
 select {
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 
 :focus-visible {
@@ -95,7 +123,7 @@ select {
 }
 
 .policy-prose a {
-  color: #ffffff;
+  color: var(--ink);
   text-decoration: underline;
   text-decoration-color: #ce0037;
 }
@@ -108,7 +136,7 @@ select {
 
 .policy-prose th,
 .policy-prose td {
-  border: 1px solid #262626;
+  border: 1px solid var(--line);
   padding: 0.45rem 0.6rem;
   text-align: left;
   vertical-align: top;

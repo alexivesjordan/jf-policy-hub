@@ -1,10 +1,10 @@
 export type Role = "admin" | "approver" | "staff";
 
-export const ORBIT_MODULE_IDS = ["people", "service", "supply", "operations", "sales", "finance"] as const;
-export type OrbitModuleId = (typeof ORBIT_MODULE_IDS)[number];
+export const PULSE_MODULE_IDS = ["people", "service", "supply", "operations", "sales", "finance"] as const;
+export type PulseModuleId = (typeof PULSE_MODULE_IDS)[number];
 
 export type ModuleAccess = {
-  module_id: OrbitModuleId;
+  module_id: PulseModuleId;
   enabled: boolean;
 };
 export type PolicyStatus = "draft" | "active" | "archived";

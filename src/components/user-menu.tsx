@@ -45,9 +45,9 @@ export function UserMenu({
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="w-full rounded-2xl px-3 py-2 text-left hover:bg-white/10"
+        className="w-full rounded-2xl px-3 py-2 text-left hover:bg-ink/5"
       >
-        <span className="block truncate text-sm font-semibold text-white">{name}</span>
+        <span className="block truncate text-sm font-semibold text-ink">{name}</span>
         <span className="block truncate text-sm text-grey">{roleLabel(profile.role)}</span>
       </button>
       {open ? (
@@ -63,7 +63,7 @@ export function UserMenu({
           <Link
             role="menuitem"
             href="/account/password"
-            className="block rounded-xl px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            className="block rounded-xl px-3 py-2 text-sm font-semibold text-ink hover:bg-ink/5"
             onClick={() => setOpen(false)}
           >
             Change password
@@ -72,7 +72,7 @@ export function UserMenu({
             <button
               type="submit"
               role="menuitem"
-              className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10"
+              className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-ink/5"
             >
               Sign out
             </button>

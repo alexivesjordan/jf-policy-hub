@@ -5,7 +5,7 @@ import { createCategory, inviteUser, setAutoApply, updateUser } from "@/features
 import { Banner, Button, Field, Input, Select } from "@/components/ui";
 import { formatTimestamp, memberStatus, roleLabel } from "@/lib/format";
 import type { Category, DirectoryUser } from "@/lib/types";
-import { orbitModules } from "@/modules/registry";
+import { pulseModules } from "@/modules/registry";
 
 function RoleOptions() {
   return (
@@ -39,7 +39,7 @@ export function InviteForm() {
       </div>
       <label className="flex min-h-11 items-center gap-3 text-sm font-semibold md:col-span-4">
         <input type="checkbox" name="peopleEnabled" value="yes" defaultChecked className="size-4 accent-[#ce0037]" />
-        Orbit People licence
+        Pulse People licence
       </label>
       {state ? (
         <div className="md:col-span-4">
@@ -95,7 +95,7 @@ export function UserForm({ person }: { person: DirectoryUser }) {
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">Module licences</legend>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {orbitModules.map((module) => {
+          {pulseModules.map((module) => {
             const stored = person.modules.find((item) => item.module_id === module.id);
             if (module.id === "people") {
               return (
@@ -114,14 +114,14 @@ export function UserForm({ person }: { person: DirectoryUser }) {
             return (
               <label key={module.id} className="flex min-h-11 items-center gap-3 rounded-2xl border border-line px-3 text-sm text-grey">
                 <input type="checkbox" defaultChecked={stored?.enabled ?? false} disabled className="size-4" />
-                {module.name.replace("Orbit ", "")}
+                {module.name.replace("Pulse ", "")}
                 <span className="ml-auto text-xs">Coming soon</span>
               </label>
             );
           })}
         </div>
         <p className="text-sm text-grey">
-          Administrators can always open Orbit People. The People switch applies to everyone else. Other modules are stored and stay off until they open.
+          Administrators can always open Pulse People. The People switch applies to everyone else. Other modules are stored and stay off until they open.
         </p>
       </fieldset>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}

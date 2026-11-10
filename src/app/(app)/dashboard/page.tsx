@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { actorName, formatDate, formatTimestamp, greetingName, londonToday, plusDays } from "@/lib/format";
 import { Card } from "@/components/ui";
 
-export const metadata = { title: "Orbit People" };
+export const metadata = { title: "Pulse People" };
 
 export default async function DashboardPage() {
   const profile = await requireUser();
@@ -19,9 +19,9 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Orbit People</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Pulse People</p>
         <h1 className="font-display mt-2 text-4xl">Hello {greetingName(profile)}</h1>
-        <p className="mt-2 max-w-2xl text-lg text-white/70">
+        <p className="mt-2 max-w-2xl text-lg text-ink/70">
           Suggestions waiting for a decision, policies that need a review, and the latest edits.
         </p>
       </div>
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
             <ul className="mt-4 space-y-3">
               {due.slice(0, 8).map((policy) => (
                 <li key={policy.id} className="flex items-start justify-between gap-3">
-                  <Link href={`/policies/${policy.id}`} className="font-semibold text-white underline decoration-red underline-offset-2">
+                  <Link href={`/policies/${policy.id}`} className="font-semibold text-ink underline decoration-red underline-offset-2">
                     {policy.title}
                   </Link>
                   <span className="shrink-0 text-sm text-ink/70">
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
             <ul className="mt-4 space-y-4">
               {recent.map((version) => (
                 <li key={version.id}>
-                  <Link href={`/policies/${version.policy_id}`} className="font-semibold text-white underline decoration-red underline-offset-2">
+                  <Link href={`/policies/${version.policy_id}`} className="font-semibold text-ink underline decoration-red underline-offset-2">
                     {version.policy?.title ?? "Policy"}
                   </Link>
                   <p className="text-sm text-ink/80">{version.change_summary}</p>

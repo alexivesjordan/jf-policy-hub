@@ -6,7 +6,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export const metadata = {
-  title: "Jordan Orbit",
+  title: "Jordan Pulse",
 };
 
 export default function HomePage() {

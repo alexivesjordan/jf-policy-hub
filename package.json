@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pricer": "tsx --test src/lib/pricer/engine.test.ts",
+    "test:pricer": "tsx --test src/lib/pricer/engine.test.ts src/lib/pricer/so-00490.golden.test.ts src/lib/quotes/parse-cin7-core.test.ts src/lib/pulse/availability.test.ts",
     "backfill:policy-text": "npx tsx scripts/backfill-policy-text.ts"
   },
   "dependencies": {

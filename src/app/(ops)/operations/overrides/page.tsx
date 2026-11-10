@@ -13,7 +13,7 @@ export default async function OverridesPage() {
     return (
       <div className="space-y-4">
         <h1 className="font-display text-4xl">Gate overrides</h1>
-        <p className="max-w-xl text-white/75">Only the named owner can record or read gate overrides.</p>
+        <p className="max-w-xl text-ink/75">Only the named owner can record or read gate overrides.</p>
       </div>
     );
   }
@@ -24,7 +24,7 @@ export default async function OverridesPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-4xl">Gate overrides</h1>
-        <p className="mt-2 max-w-2xl text-white/70">
+        <p className="mt-2 max-w-2xl text-ink/70">
           A reason is required. The row cannot be edited afterwards. This does not change the job status by itself.
         </p>
       </div>
@@ -34,7 +34,7 @@ export default async function OverridesPage() {
       <div>
         <h2 className="font-display text-2xl">Recorded</h2>
         {overrides.length === 0 ? (
-          <p className="mt-3 text-white/70">No overrides yet.</p>
+          <p className="mt-3 text-ink/70">No overrides yet.</p>
         ) : (
           <ul className="mt-4 space-y-3">
             {overrides.map((row) => (
@@ -43,7 +43,7 @@ export default async function OverridesPage() {
                   {row.gate} · {row.job_label ?? row.entity_table}
                   {row.cin7_number ? ` · ${row.cin7_number}` : ""}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-white/80">{row.reason}</p>
+                <p className="mt-2 text-sm leading-6 text-ink/80">{row.reason}</p>
                 <p className="mt-2 text-xs text-grey">{formatTimestamp(row.created_at)}</p>
               </li>
             ))}

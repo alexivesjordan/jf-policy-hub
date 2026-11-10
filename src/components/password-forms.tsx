@@ -18,7 +18,7 @@ export function ForgotPasswordForm() {
         {pending ? "Sending..." : "Email me a link"}
       </Button>
       <p className="text-sm leading-6 text-grey">
-        <Link href="/login" className="font-semibold text-white underline decoration-red underline-offset-4">
+        <Link href="/login" className="font-semibold text-ink underline decoration-red underline-offset-4">
           Back to sign in
         </Link>
       </p>
