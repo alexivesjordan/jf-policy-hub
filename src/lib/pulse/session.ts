@@ -35,14 +35,9 @@ export async function pulseSession(): Promise<
   return { ok: true, profile, supabase: await createClient() };
 }
 
+/** True for a workspace owner. orbit_is_ops_owner follows workspace_role, not the old install role. */
 export async function requireOpsOwner(supabase: PulseClient) {
   const { data, error } = await supabase.rpc("orbit_is_ops_owner");
   if (error) return { ok: false as const, error };
   return { ok: true as const, owner: Boolean(data) };
-}
-
-export async function requireOpsRole(supabase: PulseClient, roles: string[]) {
-  const { data, error } = await supabase.rpc("orbit_has_ops_role", { p_roles: roles });
-  if (error) return { ok: false as const, error };
-  return { ok: true as const, allowed: Boolean(data) };
 }

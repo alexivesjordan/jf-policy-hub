@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { isCompanyEmail, normaliseEmail, safeNextPath } from "@/lib/access";
 import type { ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
-import { requestOrigin } from "@/lib/auth";
+import { authConfirmRedirect } from "@/lib/site-url";
+import { passwordSetupPath } from "@/lib/auth-link";
 
 function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -33,9 +34,8 @@ export async function requestPasswordReset(_prev: ActionState, formData: FormDat
   // verifier. This request omits the challenge, so the default reset email
   // redirects with the session in the hash and works on any device. Admin
   // invites already do that. /auth/confirm accepts both shapes.
-  const origin = await requestOrigin();
   const endpoint = new URL("/auth/v1/recover", url);
-  endpoint.searchParams.set("redirect_to", `${origin}/auth/confirm`);
+  endpoint.searchParams.set("redirect_to", authConfirmRedirect(passwordSetupPath()));
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -98,4 +98,34 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
   }
 
   redirect(next);
+}
+
+export async function requestMagicLink(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const email = normaliseEmail(clean(formData.get("email")));
+  if (!isCompanyEmail(email)) {
+    return { ok: false, message: "Use your @jordanfitness.com email address." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: authConfirmRedirect(),
+    },
+  });
+
+  if (error) {
+    const detail = error.message.toLowerCase();
+    if (detail.includes("rate") || detail.includes("seconds") || detail.includes("once")) {
+      return { ok: false, message: "Please wait a moment, then request another email." };
+    }
+    console.error(error);
+    return { ok: false, message: "We could not send the email. Check that email is switched on in Supabase, then try again." };
+  }
+
+  return {
+    ok: true,
+    message: "If that address has an account, we sent a sign-in link. It may take a minute to arrive.",
+  };
 }

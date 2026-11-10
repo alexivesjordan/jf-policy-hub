@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { isCompanyEmail, normaliseEmail } from "@/lib/access";
-import { requireRole, requestOrigin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { authConfirmRedirect } from "@/lib/site-url";
+import { passwordSetupPath } from "@/lib/auth-link";
 import type { ActionState } from "@/lib/action-state";
 import { hasServiceRole } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
@@ -74,10 +76,9 @@ export async function inviteUser(_prev: ActionState, formData: FormData): Promis
     };
   }
 
-  const origin = await requestOrigin();
   const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
-    redirectTo: `${origin}/auth/confirm`,
+    redirectTo: authConfirmRedirect(passwordSetupPath()),
   });
 
   if (inviteError) {

@@ -2,6 +2,7 @@ import { TaskForm } from "@/components/operations-forms";
 import { Badge, Card } from "@/components/ui";
 import { getOfficeContext, listPulseTasks } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 
 export const metadata = { title: "Tasks" };
@@ -9,7 +10,7 @@ export const metadata = { title: "Tasks" };
 export default async function TasksPage() {
   await requireOperationsUser();
   const [context, tasks] = await Promise.all([getOfficeContext(), listPulseTasks()]);
-  const canCreate = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "hq";
+  const canCreate = hasLevel(context.operations, "edit", context.is_owner);
 
   return (
     <div className="space-y-8">

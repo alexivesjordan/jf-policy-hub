@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWorkspaceAdmin, requestOrigin } from "@/lib/auth";
+import { requireWorkspaceAdmin } from "@/lib/auth";
+import { authConfirmRedirect } from "@/lib/site-url";
+import { passwordSetupPath } from "@/lib/auth-link";
 import { hasServiceRole } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -65,10 +67,9 @@ export async function inviteWorkspaceUser(formData: FormData) {
     if (!hasServiceRole()) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
     const service = createAdminClient();
     if (!service) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
-    const origin = await requestOrigin();
     const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
       data: { full_name: clean(formData.get("fullName")) },
-      redirectTo: `${origin}/auth/confirm`,
+      redirectTo: authConfirmRedirect(passwordSetupPath()),
     });
     if (inviteError && !inviteError.message.toLowerCase().includes("already")) {
       throw new Error("Their access is saved, but the invite email was not sent. Try again in a moment.");
@@ -82,8 +83,7 @@ export async function resendWorkspaceInvite(formData: FormData) {
   if (!hasServiceRole()) return;
   const service = createAdminClient();
   if (!service) return;
-  const origin = await requestOrigin();
   await service.auth.admin.inviteUserByEmail(clean(formData.get("email")), {
-    redirectTo: `${origin}/auth/confirm`,
+    redirectTo: authConfirmRedirect(passwordSetupPath()),
   });
 }

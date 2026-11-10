@@ -198,7 +198,7 @@ export async function markAllPulseNotificationsRead() {
 export async function setJobStatus(jobId: string, status: string): Promise<ActionState> {
   await requireOperationsUser();
   const context = await getOfficeContext();
-  if (!canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner })) {
+  if (!canOverrideRequirements({ isOwner: context.is_owner })) {
     return { ok: false, message: "Only the owner can move a job." };
   }
   const supabase = await createClient();

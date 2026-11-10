@@ -1,17 +1,15 @@
 import { connection } from "next/server";
 import { PulseFileError, isPulseBucket } from "@/lib/pulse/prepare-upload";
 import { storePulseFile } from "@/lib/pulse/files";
-import { pulseRpcError } from "@/lib/pulse/http";
-import { pulseSession, requireOpsRole } from "@/lib/pulse/session";
+import { moduleAllows } from "@/lib/access";
+import { pulseSession } from "@/lib/pulse/session";
 
 export async function POST(request: Request) {
   await connection();
   const session = await pulseSession();
   if (!session.ok) return session.response;
 
-  const allowed = await requireOpsRole(session.supabase, ["install_lead", "admin_owner"]);
-  if (!allowed.ok) return pulseRpcError(allowed.error, "Could not check access.");
-  if (!allowed.allowed) {
+  if (!moduleAllows(session.profile, "operations", "edit")) {
     return Response.json({ error: "You cannot upload that file." }, { status: 403 });
   }
 

@@ -1,6 +1,7 @@
 import { BookFixtureForm, UnavailabilityForm } from "@/components/calendar-forms";
 import { Card } from "@/components/ui";
 import { getOfficeContext, listJobs } from "@/features/operations/queries";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,7 +10,7 @@ export const metadata = { title: "Resource Availability" };
 export default async function CalendarPage() {
   await requireOperationsUser();
   const context = await getOfficeContext();
-  const canEdit = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner";
+  const canEdit = hasLevel(context.operations, "edit", context.is_owner);
   const start = monday(new Date());
   const days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
   const supabase = await createClient();

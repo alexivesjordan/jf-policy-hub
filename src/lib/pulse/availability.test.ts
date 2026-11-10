@@ -45,12 +45,9 @@ describe("pricer requirements", () => {
     assert.equal(heavy.stairClimber, true);
   });
 
-  it("lets an owner or ops manager override, and not a sales rep", () => {
-    assert.equal(canOverrideRequirements({ opsRole: "sales", isOwner: false }), false);
-    assert.equal(canOverrideRequirements({ opsRole: "installer", isOwner: false }), false);
-    assert.equal(canOverrideRequirements({ opsRole: "ops_manager", isOwner: false }), true);
-    assert.equal(canOverrideRequirements({ opsRole: "admin_owner", isOwner: false }), true);
-    assert.equal(canOverrideRequirements({ opsRole: "sales", isOwner: true }), true);
+  it("lets a workspace owner override, and not someone who only has a module", () => {
+    assert.equal(canOverrideRequirements({ isOwner: false }), false);
+    assert.equal(canOverrideRequirements({ isOwner: true }), true);
   });
 });
 
