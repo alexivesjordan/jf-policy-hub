@@ -4,7 +4,7 @@ import { getOfficeContext, listJobs } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Calendar" };
+export const metadata = { title: "Resource Availability" };
 
 export default async function CalendarPage() {
   await requireOperationsUser();
@@ -27,7 +27,7 @@ export default async function CalendarPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-4xl">Resources</h1>
+        <h1 className="font-display text-4xl">Resource Availability</h1>
         <p className="mt-2 max-w-2xl text-ink/70">
           Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected.
         </p>
@@ -54,9 +54,10 @@ export default async function CalendarPage() {
                   const key = iso(day);
                   const held = data.reservations.filter((item) => item.resource_id === resource.id && item.day.startsWith(key));
                   const off = data.unavailability.some((item) => item.resource_id === resource.id && key >= item.starts_on && key <= item.ends_on);
+                  const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
                   return (
                     <td key={key} className="px-3 py-3 align-top text-grey">
-                      {off ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "—"}
+                      {off || weekendCrew ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "—"}
                     </td>
                   );
                 })}

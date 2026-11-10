@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getOfficeContext } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { messageFromError } from "@/lib/errors";
+import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import type { ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
 
@@ -191,4 +193,18 @@ export async function markAllPulseNotificationsRead() {
   revalidatePath("/operations/notifications");
   revalidatePath("/operations");
   revalidatePath("/", "layout");
+}
+
+export async function setJobStatus(jobId: string, status: string): Promise<ActionState> {
+  await requireOperationsUser();
+  const context = await getOfficeContext();
+  if (!canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner })) {
+    return { ok: false, message: "Only the owner can move a job." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("orbit_set_job_status", { p_job_id: jobId, p_status: status });
+  if (error) return { ok: false, message: messageFromError(error, "Could not move that job.") };
+  revalidatePath("/operations/jobs");
+  revalidatePath(`/operations/jobs/${jobId}`);
+  return { ok: true, message: "Status updated." };
 }

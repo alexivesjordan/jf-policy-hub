@@ -10,6 +10,7 @@ export type JobSummary = {
   status_label: string;
   job_type: string;
   cin7_number: string | null;
+  cin7_order_number?: string | null;
   fixture: boolean;
   customer_name: string;
   customer_segment: string | null;
@@ -18,6 +19,8 @@ export type JobSummary = {
   city: string | null;
   big_install: boolean;
   hold_reason: string | null;
+  requested_date?: string | null;
+  requested_end?: string | null;
   booked_date: string | null;
   created_at: string;
 };
@@ -129,6 +132,7 @@ export type StoredRequirements = {
   van_size: "small" | "crafter";
   van_count: number;
   stair_climber: boolean;
+  install_days?: number;
   overridden: boolean;
   conflict: boolean;
   conflict_detail: string | null;
