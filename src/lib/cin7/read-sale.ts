@@ -1,3 +1,4 @@
+import { tilesPerPackFromProduct } from "@/lib/pricer/flooring";
 import { normaliseUkPostcode } from "@/lib/quotes/postcode";
 import type { Cin7Quote, Cin7QuoteLine } from "@/lib/cin7/types";
 
@@ -128,6 +129,8 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       width: amount(product.Width),
       height: amount(product.Height),
       dimensionUnit: text(product.DimensionsUnits),
+      uom: text(product.UOM),
+      tilesPerPack: tilesPerPackFromProduct(product),
     };
   });
 

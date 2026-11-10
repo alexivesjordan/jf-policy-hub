@@ -12,6 +12,7 @@ import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import { effortRowForSku, forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
+import { tilesFromSale } from "@/lib/pricer/flooring";
 import { looksLikeUkPostcode, normaliseUkPostcode } from "@/lib/quotes/postcode";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
@@ -32,6 +33,11 @@ export type ReviewLine = {
   lineTotal: number | null;
   unitWeightKg: number | null;
   productId: string;
+  uom?: string | null;
+  tileLength?: number | null;
+  tileWidth?: number | null;
+  dimensionUnit?: string | null;
+  tilesPerPack?: number | null;
 };
 
 export type QuoteDraft = {
@@ -57,6 +63,7 @@ export type PricedQuote = ReturnType<typeof forSales> & {
   jobId?: string;
   showCost: boolean;
   requirements: JobRequirements | null;
+  repSummary?: { cost: number; price: number; margin: number | null } | null;
   warnings: string[];
   breakdown?: QuoteBreakdown | null;
   segment?: string | null;
@@ -91,7 +98,21 @@ async function effortTableFor(lines: { sku: string }[]) {
   if (!admin || skus.length === 0) return bundled;
   const { data, error } = await admin.rpc("orbit_sku_effort_for_pricing", { p_skus: skus });
   if (error || !Array.isArray(data)) return bundled;
-  const rows = (data as { sku: string; product_name: string; cin7_category: string | null; needs_assembly: boolean | null; crew: number | null; build_minutes: number | null }[]).map((row) =>
+  const rows = (data as {
+    sku: string;
+    product_name: string;
+    cin7_category: string | null;
+    needs_assembly: boolean | null;
+    crew: number | null;
+    build_minutes: number | null;
+    build_location?: "hq" | "site" | null;
+    hq_build_minutes?: number | null;
+    hq_build_crew?: number | null;
+    site_position_minutes?: number | null;
+    suggestion_rule?: string | null;
+    status?: string | null;
+    effort_unit?: "each" | "tile" | "m2" | null;
+  }[]).map((row) =>
     effortRowForSku({
       sku: row.sku,
       productName: row.product_name,
@@ -99,6 +120,13 @@ async function effortTableFor(lines: { sku: string }[]) {
       needsAssembly: row.needs_assembly,
       crew: row.crew,
       buildMinutes: row.build_minutes,
+      buildLocation: row.build_location,
+      hqBuildMinutes: row.hq_build_minutes,
+      hqBuildCrew: row.hq_build_crew,
+      sitePositionMinutes: row.site_position_minutes,
+      effortUnit: row.effort_unit,
+      workPhase: row.suggestion_rule === "sled-track" ? "sled" : row.effort_unit === "tile" || row.effort_unit === "m2" ? "floor" : "job",
+      needsReview: row.status === "suggested" || Boolean(row.suggestion_rule),
     }),
   );
   return [...rows, ...bundled];
@@ -116,6 +144,10 @@ async function pricingConfig(): Promise<PricingConfig> {
       marginFloorPct: null,
       largeOrderThreshold: 50000,
       variationRoundingHours: 0.5,
+      sledTrackWidthM: null,
+      sledBaseMinutes: 180,
+      sledBaseLengthM: 10,
+      sledExtraMinutesPerMetre: 6,
     };
   }
   const { data, error } = await admin.rpc("orbit_pricing_snapshot");
@@ -132,6 +164,10 @@ async function pricingConfig(): Promise<PricingConfig> {
     marginFloorPct: row.margin_floor_pct == null ? null : Number(row.margin_floor_pct),
     largeOrderThreshold: Number(row.large_order_threshold),
     variationRoundingHours: Number(row.variation_rounding_hours),
+    sledTrackWidthM: row.sled_track_width_m == null ? null : Number(row.sled_track_width_m),
+    sledBaseMinutes: row.sled_base_minutes == null ? 180 : Number(row.sled_base_minutes),
+    sledBaseLengthM: row.sled_base_length_m == null ? 10 : Number(row.sled_base_length_m),
+    sledExtraMinutesPerMetre: row.sled_extra_minutes_per_m == null ? 6 : Number(row.sled_extra_minutes_per_m),
   };
 }
 
@@ -197,6 +233,11 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
     lineTotal: totals[index] ?? null,
     unitWeightKg: weights[index] ?? null,
     productId: String(formData.getAll("lineProductId")[index] ?? ""),
+    uom: String(formData.getAll("lineUom")[index] ?? "").trim() || null,
+    tileLength: optionalMeasure(formData.getAll("lineTileLength")[index]),
+    tileWidth: optionalMeasure(formData.getAll("lineTileWidth")[index]),
+    dimensionUnit: String(formData.getAll("lineDimensionUnit")[index] ?? "").trim() || null,
+    tilesPerPack: optionalMeasure(formData.getAll("lineTilesPerPack")[index]),
   }));
   if (lines.some((line) => !line.description || !Number.isFinite(line.qty) || line.qty <= 0)) {
     return { draft: emptyDraft(), error: "Each line needs a description and a quantity." };
@@ -227,6 +268,13 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
       internalNote: String(formData.get("internalNote") ?? "").trim(),
     },
   };
+}
+
+function optionalMeasure(value: FormDataEntryValue | undefined) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function emptyDraft(): QuoteDraft {
@@ -282,15 +330,34 @@ async function priceDraft(draft: QuoteDraft) {
   const pricing = await pricingConfig();
   const lines = await withLiveCategories(draft.lines);
   draft.lines = lines;
+  const floorFlags: string[] = [];
   const result = priceInstall({
     mode: "A",
-    lines: lines.map((line) => ({
-      sku: line.sku || null,
-      productName: line.description,
-      category: line.category || null,
-      qty: line.qty,
-      unitWeightKg: line.unitWeightKg,
-    })),
+    lines: lines.map((line) => {
+      const floor = /floor/i.test(line.category);
+      const measured = floor
+        ? tilesFromSale({
+            qty: line.qty,
+            uom: line.uom ?? null,
+            length: line.tileLength ?? null,
+            width: line.tileWidth ?? null,
+            dimensionUnit: line.dimensionUnit ?? null,
+            tilesPerPack: line.tilesPerPack ?? null,
+          })
+        : null;
+      if (measured?.assumed && measured.detail) floorFlags.push(`${line.sku || line.description}: ${measured.detail}`);
+      return {
+        sku: line.sku || null,
+        productName: line.description,
+        category: line.category || null,
+        qty: line.qty,
+        unitWeightKg: line.unitWeightKg,
+        billableUnits: measured?.tiles ?? null,
+        uom: line.uom ?? null,
+        productWidth: line.tileWidth ?? null,
+        dimensionUnit: line.dimensionUnit ?? null,
+      };
+    }),
     postcode: draft.postcode,
     segment: draft.segment as Segment,
     pricing,
@@ -303,8 +370,15 @@ async function priceDraft(draft: QuoteDraft) {
     customerName: draft.customerName,
     postcode: draft.postcode,
     showCost,
-    requirements: result.requirements,
-    warnings: draft.warnings,
+    requirements: showCost ? result.requirements : null,
+    warnings: showCost ? draft.warnings : [],
+    repSummary: result.cost != null && result.customerPrice != null
+      ? {
+          cost: result.cost,
+          price: result.customerPrice,
+          margin: result.customerPrice === 0 ? null : (result.customerPrice - result.cost) / result.customerPrice,
+        }
+      : null,
   };
   if (showCost) {
     view.cost = result.cost;
@@ -312,13 +386,32 @@ async function priceDraft(draft: QuoteDraft) {
     view.marginFloorPrice = result.marginFloorPrice;
     view.minJobChargeConfigured = result.minJobChargeConfigured;
     view.marginFloorConfigured = result.marginFloorConfigured;
-    view.flags = result.flags;
+    view.flags = [...result.flags, ...floorFlags];
     view.provisionalItems = result.provisionalItems;
     view.bigInstallTriggers = result.bigInstallTriggers;
     view.breakdown = result.breakdown;
     view.segment = result.segment;
   }
   return { result, view };
+}
+
+function quoteInputs(draft: QuoteDraft, result: { breakdown: unknown; flags: string[]; notice: string | null; customerPrice: number | null; segment: string | null; markup: number | null }) {
+  return {
+    postcode: draft.postcode,
+    lines: draft.lines,
+    profile: "best-case",
+    source: draft.source,
+    quoteNumber: draft.quoteNumber,
+    saleId: draft.saleId,
+    workings: {
+      breakdown: result.breakdown,
+      flags: result.flags,
+      notice: result.notice,
+      customerPrice: result.customerPrice,
+      segment: result.segment,
+      markup: result.markup,
+    },
+  };
 }
 
 function fixtureNumber(draft: QuoteDraft) {
@@ -345,6 +438,11 @@ function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], remembere
       lineTotal: null,
       unitWeightKg: line.unitWeightKg ?? null,
       productId: line.productId ?? "",
+      uom: line.uom ?? null,
+      tileLength: line.length ?? null,
+      tileWidth: line.width ?? null,
+      dimensionUnit: line.dimensionUnit ?? null,
+      tilesPerPack: line.tilesPerPack ?? null,
     })),
     goodsNet: null,
     warnings,
@@ -443,6 +541,94 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
   }
 }
 
+export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft }> {
+  await requireOperationsUser();
+  try {
+    const file = formData.get("quotePdf");
+    const loaded = file instanceof File && file.size > 0 ? await parseUploadedQuote(null, formData) : await loadFixtureQuote(null, formData);
+    if (!loaded.draft) return loaded;
+    const draft = loaded.draft;
+    const chosen = String(formData.get("segment") ?? "");
+    if (SEGMENTS.includes(chosen as Segment)) draft.segment = chosen;
+    else if (!draft.segment) draft.segment = await rememberedSegment(draft.customerId);
+    if (!SEGMENTS.includes(draft.segment as Segment)) {
+      return { ok: false, message: "Choose a customer segment. Nothing is saved for this customer yet.", draft };
+    }
+    const { result, view } = await priceDraft(draft);
+    if (!result.blockedReason && draft.customerId && draft.segment) {
+      const admin = createAdminClient();
+      if (admin) {
+        await admin.rpc("orbit_remember_segment", {
+          p_cin7_id: draft.customerId,
+          p_name: draft.customerName,
+          p_segment: draft.segment,
+        });
+      }
+    }
+    return {
+      ok: !result.blockedReason,
+      message: result.blockedReason ?? "Install price ready.",
+      quote: view,
+      draft,
+    };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not price that order." };
+  }
+}
+
+export async function loadBookingDays(jobId: string): Promise<{ ok: boolean; message: string; days: { date: string; available: boolean }[] }> {
+  await requireOperationsUser();
+  if (!/^[0-9a-f-]{36}$/i.test(jobId)) return { ok: false, message: "That job was not found.", days: [] };
+  const supabase = await createClient();
+  const requirement = await supabase.rpc("orbit_job_requirements", { p_job_id: jobId });
+  if (requirement.error || !requirement.data) return { ok: false, message: "This job has no required resources yet.", days: [] };
+  const need = requirement.data as {
+    installers: number;
+    licensed_drivers: number;
+    van_size: VanSize;
+    van_count: number;
+    stair_climber: boolean;
+  };
+  const start = new Date();
+  const days = Array.from({ length: 21 }, (_, index) => new Date(start.getTime() + index * 86400000).toISOString().slice(0, 10));
+  const calendar = await supabase.rpc("orbit_calendar", { p_start: days[0], p_end: days[days.length - 1] });
+  if (calendar.error || !calendar.data) return { ok: false, message: "Could not read the calendar.", days: [] };
+  const data = calendar.data as {
+    resources: { id: string; name: string; resource_type: string; has_licence: boolean; insured: boolean }[];
+    reservations: { resource_id: string; job_id: string; day: string }[];
+    unavailability: { resource_id: string; starts_on: string; ends_on: string }[];
+  };
+  const resources: PoolResource[] = data.resources.map((resource) => ({
+    id: resource.id,
+    name: resource.name,
+    resourceType: resource.resource_type,
+    hasLicence: resource.has_licence,
+    insured: resource.insured,
+  }));
+  const priced = days.map((day) => {
+    const busy = new Set<string>();
+    for (const row of data.reservations) {
+      if (row.job_id !== jobId && String(row.day).startsWith(day)) busy.add(row.resource_id);
+    }
+    for (const row of data.unavailability) {
+      if (day >= row.starts_on && day <= row.ends_on) busy.add(row.resource_id);
+    }
+    const plan = planDay(
+      {
+        installers: need.installers,
+        licensedDrivers: need.licensed_drivers,
+        vanSize: need.van_size,
+        vanCount: need.van_count,
+        stairClimber: need.stair_climber,
+      },
+      resources,
+      busy,
+    );
+    return { date: day, available: plan.selectable };
+  });
+  return { ok: true, message: "", days: priced };
+}
+
 export async function createPricedJob(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote }> {
   await requireOperationsUser();
   try {
@@ -466,7 +652,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
         p_segment: draft.segment,
         p_postcode: draft.postcode,
         p_mode: "A",
-        p_inputs: { postcode: draft.postcode, lines: draft.lines, profile: "best-case", source: draft.source, quoteNumber: draft.quoteNumber, saleId: draft.saleId },
+        p_inputs: quoteInputs(draft, result),
         p_finality: result.finality,
         p_provisional: result.provisionalItems,
         p_internal_cost: result.cost,
@@ -509,7 +695,7 @@ export async function createPricedJob(_state: ActionState, formData: FormData): 
       p_customer_type: "",
       p_postcode: draft.postcode,
       p_mode: "A",
-      p_inputs: { postcode: draft.postcode, lines: draft.lines, profile: "best-case", source: draft.source, quoteNumber: draft.quoteNumber },
+      p_inputs: quoteInputs(draft, result),
       p_finality: result.finality,
       p_provisional: result.provisionalItems,
       p_internal_cost: result.cost,

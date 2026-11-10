@@ -78,6 +78,10 @@ export type PricingSettings = {
   custom_deposit_fraction: number;
   large_order_threshold: number;
   variation_rounding_hours: number;
+  sled_track_width_m?: number | null;
+  sled_base_minutes?: number | null;
+  sled_base_length_m?: number | null;
+  sled_extra_minutes_per_m?: number | null;
   change_reason: string | null;
   created_at: string;
 };

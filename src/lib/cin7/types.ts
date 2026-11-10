@@ -18,6 +18,8 @@ export type Cin7QuoteLine = {
   height?: number | null;
   /** Present only when Cin7 sends DimensionsUnits. Otherwise the unit is unknown. */
   dimensionUnit?: string | null;
+  uom?: string | null;
+  tilesPerPack?: number | null;
 };
 
 export type Cin7Quote = {

@@ -7,6 +7,7 @@ export type SkuSyncRow = {
   product_name: string;
   cin7_category: string | null;
   cin7_product_id: string | null;
+  cin7_uom: string | null;
 };
 
 type SyncTarget = {
@@ -63,6 +64,7 @@ export async function syncCin7Products(target: SyncTarget) {
         product_name: text(product.Name) ?? sku,
         cin7_category: text(product.Category),
         cin7_product_id: text(product.ID),
+        cin7_uom: text(product.UOM),
       });
     }
     if (rows.length > 0) {

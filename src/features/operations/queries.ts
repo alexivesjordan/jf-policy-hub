@@ -83,6 +83,11 @@ export type Cin7CategoryDefault = {
   needs_assembly: boolean | null;
   crew: number | null;
   build_minutes: number | null;
+  effort_unit?: "each" | "tile" | "m2" | null;
+  build_location?: "hq" | "site" | null;
+  hq_build_minutes?: number | null;
+  hq_build_crew?: number | null;
+  site_position_minutes?: number | null;
   status: string;
   notes: string | null;
 };
@@ -91,11 +96,18 @@ export type SkuEffortRow = {
   sku: string;
   product_name: string;
   cin7_category: string | null;
+  cin7_uom?: string | null;
   needs_assembly: boolean | null;
   crew: number | null;
   build_minutes: number | null;
+  effort_unit?: "each" | "tile" | "m2" | null;
+  build_location?: "hq" | "site" | null;
+  hq_build_minutes?: number | null;
+  hq_build_crew?: number | null;
+  site_position_minutes?: number | null;
   status: string;
   notes: string | null;
+  suggestion_rule?: string | null;
 };
 
 export async function listCin7CategoryDefaults() {
@@ -120,6 +132,7 @@ export async function listSkuEffort(filters: {
 }) {
   return rpc<{
     review_count: number;
+    name_rule_count?: number;
     total: number;
     categories: string[];
     rows: SkuEffortRow[];
