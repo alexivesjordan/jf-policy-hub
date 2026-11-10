@@ -5,24 +5,32 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { UserMenu } from "@/components/user-menu";
 import type { Profile } from "@/lib/types";
-import { moduleFromPath } from "@/modules/registry";
+import { moduleFromPath, type ModuleNavItem } from "@/modules/registry";
 import { cn } from "@/lib/utils";
 
 export function AppShell({
   profile,
   pending,
   unread,
+  isOwner = false,
+  nav,
   children,
 }: {
   profile: Profile;
   pending: number;
   unread: number;
+  isOwner?: boolean;
+  nav?: ModuleNavItem[];
   children: ReactNode;
 }) {
   const path = usePathname();
   const current = moduleFromPath(path);
   const counts = { pending, unread };
-  const items = (current?.nav ?? []).filter((item) => !item.adminOnly || profile.role === "admin");
+  const items = (nav ?? current?.nav ?? []).filter((item) => {
+    if (item.adminOnly && profile.role !== "admin") return false;
+    if (item.ownerOnly && !isOwner) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
@@ -59,9 +67,10 @@ function SideNav({
   const path = usePathname();
 
   return (
-    <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-3" aria-label="Orbit People">
+    <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-3" aria-label="Module">
       {items.map((item) => {
-        const active = item.href === "/dashboard" ? path === item.href : path === item.href || path.startsWith(`${item.href}/`);
+        const exact = item.href === "/dashboard" || item.href === "/operations";
+        const active = exact ? path === item.href : path === item.href || path.startsWith(`${item.href}/`);
         const count = item.count ? counts[item.count] : 0;
         return (
           <Link
