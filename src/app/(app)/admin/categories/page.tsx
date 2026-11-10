@@ -1,12 +1,12 @@
 import { AutoApplyForm, CategoryForm } from "@/components/admin-forms";
 import { Card } from "@/components/ui";
 import { listCategories } from "@/features/policies/queries";
-import { requireRole } from "@/lib/auth";
+import { requirePeopleEditor } from "@/lib/auth";
 
 export const metadata = { title: "Categories" };
 
 export default async function CategoriesPage() {
-  await requireRole(["admin"]);
+  await requirePeopleEditor();
   const categories = await listCategories();
 
   return (

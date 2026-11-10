@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { moduleAllows } from "./access";
+import { canReviewSuggestions, moduleAllows } from "./access";
 import { hasLevel } from "./module-guard";
 import type { Profile } from "./types";
 
@@ -49,5 +49,12 @@ describe("module access guards", () => {
     assert.equal(hasLevel("view", "edit"), false);
     assert.equal(hasLevel("view", "view"), true);
     assert.equal(hasLevel(undefined, "edit", true), true);
+  });
+
+  it("treats review as a flag and still lets an owner review", () => {
+    assert.equal(canReviewSuggestions(profile({ can_review: true, workspace_role: "member" })), true);
+    assert.equal(canReviewSuggestions(profile({ can_review: false, workspace_role: "admin", role: "admin" })), false);
+    assert.equal(canReviewSuggestions(profile({ can_review: false, workspace_role: "owner" })), true);
+    assert.equal(canReviewSuggestions(profile({ can_review: true, is_active: false })), false);
   });
 });

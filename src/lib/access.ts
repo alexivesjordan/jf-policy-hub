@@ -75,6 +75,13 @@ export function canManageWorkspace(profile: Profile) {
   return profile.role === "admin" || profile.workspace_role === "owner" || profile.workspace_role === "admin";
 }
 
+/** Approve or reject a policy suggestion. A flag, not a role. Owners can always review. */
+export function canReviewSuggestions(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner") return true;
+  return profile.can_review === true;
+}
+
 /** Home screen: People or Operations. People routes still use accessRedirect. */
 export function homeRedirect(profile: Profile | null) {
   if (!profile) return "/login";
