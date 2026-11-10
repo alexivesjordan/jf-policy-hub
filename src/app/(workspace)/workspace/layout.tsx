@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
 export const instant = false;
 
@@ -14,7 +14,7 @@ const nav = [
 ];
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>

@@ -1,14 +1,25 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { dashboardCounts, listPolicies, listRecentVersions } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 import { actorName, formatDate, formatTimestamp, greetingName, londonToday, plusDays } from "@/lib/format";
 import { Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
-import { EmptyState } from "@/components/pulse/states";
+import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 
 export const metadata = { title: "Pulse People" };
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardBody />
+    </Suspense>
+  );
+}
+
+async function DashboardBody() {
+  await connection();
   const profile = await requireUser();
   const today = londonToday();
   const horizon = plusDays(today, 30);
@@ -23,7 +34,7 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow="Pulse People"
         title={`Hello ${greetingName(profile)}`}
-        description="Suggestions waiting for a decision, policies that need a review, and the latest edits."
+        description="What needs a decision, and what changed recently."
       />
 
       <div className="grid gap-4 md:grid-cols-3">

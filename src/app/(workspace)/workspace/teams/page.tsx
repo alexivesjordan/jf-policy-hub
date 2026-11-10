@@ -17,7 +17,7 @@ export default async function TeamsPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Teams"
-        description="Starter teams are Sales, Installs, Aftersales, Operations, Office, and Management. Rename or add a team here. Deleting a team removes its memberships."
+        description="Groups of people who share the same access."
       />
       <form action={saveWorkspaceTeam} className="flex flex-wrap items-end gap-3">
         <label className="text-sm">

@@ -18,7 +18,7 @@ export default async function RolesPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Roles"
-        description="These five roles are fixed. Access is the most permissive grant across a person’s teams, then raised or capped by the role. A user can instead be set to custom access."
+        description="What each role can do in Jordan Pulse."
       />
       <ul className="space-y-3">
         {ROLES.map(([name, detail]) => (

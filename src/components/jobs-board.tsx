@@ -107,7 +107,7 @@ export function JobsBoard({
       <PageHeader
         eyebrow="Pulse Operations"
         title="Jobs"
-        description="The list is the default. Owners can drag a card, or use Move, to change its status. Sales see their own jobs."
+        description="Every install from pricing to handover."
         actions={
           <ToggleGroup
             aria-label="Jobs view"
@@ -131,7 +131,7 @@ export function JobsBoard({
       {rows.length === 0 && !error ? (
         <EmptyState
           title="No jobs for this role"
-          description="Fixture jobs are visible to the install lead, HQ, and the owner. A sales role only sees jobs they own."
+          description="Installs you can see will show up here."
         />
       ) : null}
       {view === "list" ? <JobList jobs={rows} /> : null}

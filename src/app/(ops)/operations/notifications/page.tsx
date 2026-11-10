@@ -19,7 +19,7 @@ export default async function OperationsNotificationsPage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Notifications"
-        description="Operations notes only. HR suggestions stay on the People notifications screen."
+        description="Notes from the install office."
         actions={
           unread ? (
             <form action={markAllPulseNotificationsRead}>

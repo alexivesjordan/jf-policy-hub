@@ -3,14 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Menu } from "lucide-react";
+import { ChevronsUpDown, Menu } from "lucide-react";
 import { NotificationBell, type BellItem } from "@/components/notification-bell";
+import { ModuleGlyph } from "@/components/module-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { canManageWorkspace } from "@/lib/access";
 import type { Profile } from "@/lib/types";
-import { moduleFromPath, type ModuleNavItem } from "@/modules/registry";
+import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
 import { cn } from "@/lib/utils";
+
+function pulseLabel(module: PulseModule) {
+  return module.name.replace(/^Pulse /, "");
+}
 
 export function AppShell({
   profile,
@@ -30,7 +37,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const path = usePathname();
+  const inWorkspace = path.startsWith("/workspace");
   const current = moduleFromPath(path);
+  const heading = inWorkspace ? "Workspace" : current ? pulseLabel(current) : "Jordan Pulse";
   const counts = { pending, unread };
   const items = (nav ?? current?.nav ?? []).filter((item) => {
     if (item.adminOnly && profile.role !== "admin") return false;
@@ -41,12 +50,8 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
       <aside className="hidden flex-col border-line bg-pine text-ink md:sticky md:top-0 md:flex md:h-screen md:border-r">
-        <div className="px-5 py-6">
-          <Link href="/" className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-grey">Jordan Pulse</p>
-            <p className="font-display mt-1 text-xl text-ink">{current?.name ?? "Modules"}</p>
-          </Link>
-          <p className="mt-1 text-xs text-grey">{current?.tagline}</p>
+        <div className="px-3 py-4">
+          <PulseSwitcher profile={profile} heading={heading} currentId={inWorkspace ? "workspace" : current?.id} />
         </div>
         <SideNav items={items} counts={counts} />
         <div className="mt-auto border-t border-line px-3 py-3">
@@ -55,16 +60,17 @@ export function AppShell({
       </aside>
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-paper/95 px-3 py-2 backdrop-blur">
-          <MobileNav items={items} counts={counts} title={current?.name ?? "Jordan Pulse"} tagline={current?.tagline ?? ""} />
-          <Link href="/" className="mr-auto min-w-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden">
-            <span className="block truncate text-sm font-semibold">{current?.name ?? "Jordan Pulse"}</span>
-          </Link>
+          <MobileNav
+            items={items}
+            counts={counts}
+            title={heading}
+            profile={profile}
+            currentId={inWorkspace ? "workspace" : current?.id}
+          />
+          <p className="mr-auto text-sm font-semibold md:hidden">{heading}</p>
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell items={notifications} />
             <ThemeToggle />
-            <div className="md:hidden">
-              <UserMenu profile={profile} placement="down" className="max-w-[9rem]" />
-            </div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
@@ -73,16 +79,92 @@ export function AppShell({
   );
 }
 
+function PulseSwitcher({
+  profile,
+  heading,
+  currentId,
+}: {
+  profile: Profile;
+  heading: string;
+  currentId?: string;
+}) {
+  const choices = pulseModules.filter((module) => {
+    const level = profile.levels?.[module.id as keyof NonNullable<Profile["levels"]>];
+    if (level === "none") return false;
+    return true;
+  });
+  return (
+    <Popover>
+      <PopoverTrigger className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-left outline-none hover:bg-ink/5 focus-visible:ring-3 focus-visible:ring-ring/50">
+        <span className="min-w-0">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-grey">Jordan Pulse</span>
+          <span className="font-display mt-1 block truncate text-xl text-ink">{heading}</span>
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 text-grey" aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-1">
+        <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Switch Pulse</p>
+        <ul>
+          {choices.map((module) => {
+            const soon = module.status === "coming-soon";
+            const active = module.id === currentId;
+            const body = (
+              <>
+                <ModuleGlyph name={module.icon} className="size-4" />
+                <span className="min-w-0 flex-1 truncate">{pulseLabel(module)}</span>
+                {soon ? <span className="text-[11px] uppercase tracking-wide text-grey">Soon</span> : null}
+              </>
+            );
+            return (
+              <li key={module.id}>
+                {soon ? (
+                  <span className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-grey">{body}</span>
+                ) : (
+                  <Link
+                    href={module.href}
+                    className={cn(
+                      "flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      active ? "bg-red text-white" : "text-ink hover:bg-muted",
+                    )}
+                  >
+                    {body}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+          {canManageWorkspace(profile) ? (
+            <li>
+              <Link
+                href="/workspace"
+                className={cn(
+                  "flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  currentId === "workspace" ? "bg-red text-white" : "text-ink hover:bg-muted",
+                )}
+              >
+                <span className="size-4" aria-hidden="true" />
+                Workspace
+              </Link>
+            </li>
+          ) : null}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function MobileNav({
   items,
   counts,
   title,
-  tagline,
+  profile,
+  currentId,
 }: {
   items: { href: string; label: string; count?: "pending" | "unread"; disabled?: boolean }[];
   counts: { pending: number; unread: number };
   title: string;
-  tagline: string;
+  profile: Profile;
+  currentId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -96,10 +178,14 @@ function MobileNav({
       </SheetTrigger>
       <SheetContent side="left" className="bg-pine text-ink">
         <SheetHeader>
-          <SheetTitle>Jordan Pulse</SheetTitle>
-          <SheetDescription>{title}{tagline ? ` · ${tagline}` : ""}</SheetDescription>
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          <SheetDescription className="sr-only">{title}</SheetDescription>
+          <PulseSwitcher profile={profile} heading={title} currentId={currentId} />
         </SheetHeader>
         <SideNav items={items} counts={counts} onNavigate={() => setOpen(false)} />
+        <SheetFooter>
+          <UserMenu profile={profile} />
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

@@ -11,7 +11,7 @@ export default async function SalesHomePage() {
       <PageHeader
         eyebrow="Pulse Sales"
         title="Install quoting"
-        description="Price an install from a Cin7 order number or a quote PDF. The effort table and pricing settings stay with the install team."
+        description="Price an install and hand it to the office."
         actions={<TextLink href="/sales/quote">Price a quote</TextLink>}
       />
     </div>

@@ -6,13 +6,13 @@ import { listMyNotifications } from "@/features/policies/queries";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
 
 export default function OperationsLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
@@ -78,7 +78,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   return (
     <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>
       {isOwner && !cin7IsConnected() ? (
-        <p className="mb-6 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-ink">Cin7 not connected.</p>
+        <p className="mb-6 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-ink">Live orders are not connected yet.</p>
       ) : null}
       {children}
     </AppShell>

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useActionState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Upload } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Banner, Button, Input, Select } from "@/components/pulse/ui";
 import { EmptyState } from "@/components/pulse/states";
 import { bulkUpdateSkuEffort, importSkuEffort } from "@/features/operations/effort-actions";
@@ -62,6 +64,10 @@ export function EffortDataTable({
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkState, bulkAction, bulkPending] = useActionState(bulkUpdateSkuEffort, null);
   const [imported, importCsv, importing] = useActionState(importSkuEffort, null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const router = useRouter();
+  const searchTimer = useRef<number | null>(null);
 
   const visible = useMemo(() => {
     const copy = [...rows];
@@ -90,6 +96,17 @@ export function EffortDataTable({
     return `/operations/settings?${next.toString()}`;
   }
 
+  function pushFilters(next: Partial<Filters>) {
+    const merged = { ...filters, ...next };
+    const params = new URLSearchParams();
+    if (merged.search) params.set("search", merged.search);
+    if (merged.category) params.set("category", merged.category);
+    if (merged.status) params.set("status", merged.status);
+    if (merged.needsAssembly) params.set("needs", merged.needsAssembly);
+    const queryText = params.toString();
+    router.replace(queryText ? `/operations/settings?${queryText}` : "/operations/settings");
+  }
+
   function toggleAll(checked: boolean) {
     setSelected((current) => {
       const next = { ...current };
@@ -100,96 +117,54 @@ export function EffortDataTable({
 
   return (
     <div className="space-y-4">
-      <form method="get" className="grid gap-3 rounded-2xl border border-border bg-muted/40 p-3 md:grid-cols-4">
-        <label className="text-sm font-semibold md:col-span-2">
-          <span className="mb-1 block text-muted-foreground">Search</span>
-          <Input name="search" defaultValue={filters.search} placeholder="SKU or product" />
-        </label>
-        <label className="text-sm font-semibold">
-          <span className="mb-1 block text-muted-foreground">Cin7 category</span>
-          <Select name="category" searchable defaultValue={filters.category} aria-label="Cin7 category">
-            <option value="">All categories</option>
-            {categories.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-sm font-semibold">
-          <span className="mb-1 block text-muted-foreground">Status</span>
-          <Select name="status" defaultValue={filters.status} aria-label="Status">
-            <option value="">All</option>
-            <option value="suggested">Suggested</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="name-rule">Name rule</option>
-          </Select>
-        </label>
-        <label className="text-sm font-semibold">
-          <span className="mb-1 block text-muted-foreground">Needs assembly</span>
-          <Select name="needs" defaultValue={filters.needsAssembly} aria-label="Needs assembly">
-            <option value="">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-            <option value="unknown">Unknown</option>
-          </Select>
-        </label>
-        <div className="flex flex-wrap items-end gap-2 md:col-span-3">
-          <Button type="submit" variant="secondary">Filter</Button>
-          <Link href="/operations/settings" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold underline decoration-primary">Clear</Link>
-        </div>
-      </form>
-
-      <div className="flex flex-wrap items-end justify-between gap-3 text-sm">
-        <a className="font-semibold text-foreground underline decoration-primary" href={`/api/orbit/effort-export?${query.toString()}`}>Export CSV</a>
-        <form action={importCsv} className="flex flex-wrap items-end gap-3">
-          <label className="text-sm font-semibold">
-            <span className="mb-1 block text-muted-foreground">Import CSV, keyed by SKU</span>
-            <input name="csv" type="file" accept=".csv,text/csv" className="text-sm" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm font-semibold sm:col-span-2">
+            <span className="mb-1 block text-muted-foreground">Search</span>
+            <Input
+              name="search"
+              defaultValue={filters.search}
+              placeholder="SKU or product"
+              aria-label="Search"
+              onChange={(event) => {
+                const value = event.target.value;
+                if (searchTimer.current) window.clearTimeout(searchTimer.current);
+                searchTimer.current = window.setTimeout(() => pushFilters({ search: value }), 250);
+              }}
+            />
           </label>
-          <Button type="submit" variant="secondary" disabled={importing}>{importing ? "Importing..." : "Import"}</Button>
-        </form>
+          <label className="text-sm font-semibold">
+            <span className="mb-1 block text-muted-foreground">Category</span>
+            <Select name="category" searchable defaultValue={filters.category} aria-label="Category" onChange={(event) => pushFilters({ category: event.target.value })}>
+              <option value="">All categories</option>
+              {categories.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </Select>
+          </label>
+          <label className="text-sm font-semibold">
+            <span className="mb-1 block text-muted-foreground">Status</span>
+            <Select name="status" defaultValue={filters.status} aria-label="Status" onChange={(event) => pushFilters({ status: event.target.value })}>
+              <option value="">All</option>
+              <option value="suggested">Suggested</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="name-rule">Name rule</option>
+            </Select>
+          </label>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <a className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold" href={`/api/orbit/effort-export?${query.toString()}`}>Export CSV</a>
+          <Button type="button" variant="secondary" onClick={() => setImportOpen(true)}>
+            <Upload className="size-4" aria-hidden="true" />
+            Import
+          </Button>
+        </div>
       </div>
       {imported ? <Banner tone={imported.ok ? "success" : "error"}>{imported.message}</Banner> : null}
-
-      <form action={bulkAction} className="space-y-3 rounded-2xl border border-border p-3">
-        {selectedSkus.map((sku) => <input key={sku} type="hidden" name="sku" value={sku} />)}
-        <p className="text-sm text-muted-foreground">{selectedSkus.length} selected on this page. Values below apply to the selection.</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <FieldSelect label="Needs install time" name="needsAssembly" defaultValue="">
-            <option value="">Leave</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-            <option value="unknown">Unknown</option>
-          </FieldSelect>
-          <NumberField label="Crew" name="crew" max={6} />
-          <NumberField label="Minutes" name="minutes" max={480} />
-          <FieldSelect label="Unit" name="effortUnit" defaultValue="">
-            <option value="">Leave</option>
-            <option value="each">Each</option>
-            <option value="tile">Tile</option>
-            <option value="m2">m²</option>
-          </FieldSelect>
-          <FieldSelect label="Built at" name="buildLocation" defaultValue="">
-            <option value="">Leave</option>
-            <option value="site">Site</option>
-            <option value="hq">HQ</option>
-          </FieldSelect>
-          <NumberField label="HQ minutes" name="hqMinutes" max={480} />
-          <NumberField label="HQ crew" name="hqCrew" max={6} />
-          <NumberField label="Placement minutes" name="placementMinutes" max={480} />
-          <label className="text-sm font-semibold sm:col-span-2">
-            <span className="mb-1 block text-muted-foreground">Notes</span>
-            <Input name="notes" />
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" name="intent" value="apply" disabled={bulkPending || selectedSkus.length === 0}>Apply to selected</Button>
-          <Button type="submit" name="intent" value="confirm" variant="secondary" disabled={bulkPending || selectedSkus.length === 0}>Confirm selected</Button>
-        </div>
-        {bulkState ? <Banner tone={bulkState.ok ? "success" : "error"}>{bulkState.message}</Banner> : null}
-      </form>
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} action={importCsv} pending={importing} />
 
       {visible.length === 0 ? (
-        <EmptyState title="No products on this page" description="Sync from Cin7, or clear the filters." />
+        <EmptyState title="No products on this page" description="Try a different search, or clear the filters." />
       ) : (
         <>
           <ul className="space-y-3 md:hidden">
@@ -283,8 +258,62 @@ export function EffortDataTable({
 
       {editingRow ? <InlineEdit key={editingRow.sku} row={editingRow} onClose={() => setEditing(null)} /> : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">Page {page + 1} of {pageCount}. {total} products. Column sorting stays on this page.</p>
+      {selectedSkus.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold">{selectedSkus.length} selected</p>
+            <div className="flex gap-2">
+              <Button type="button" onClick={() => setEditOpen(true)}>Edit</Button>
+              <Button type="button" variant="secondary" onClick={() => setSelected({})}>Clear</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto bg-paper sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit {selectedSkus.length} selected</DialogTitle>
+            <DialogDescription>Blank fields stay as they are. Confirm marks the rows as checked.</DialogDescription>
+          </DialogHeader>
+          <form action={bulkAction} className="grid gap-3 sm:grid-cols-2">
+            {selectedSkus.map((sku) => <input key={sku} type="hidden" name="sku" value={sku} />)}
+            <FieldSelect label="Needs install time" name="needsAssembly" defaultValue="">
+              <option value="">Leave</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="unknown">Unknown</option>
+            </FieldSelect>
+            <NumberField label="Crew" name="crew" max={6} />
+            <NumberField label="Minutes" name="minutes" max={480} />
+            <FieldSelect label="Unit" name="effortUnit" defaultValue="">
+              <option value="">Leave</option>
+              <option value="each">Each</option>
+              <option value="tile">Tile</option>
+              <option value="m2">m²</option>
+            </FieldSelect>
+            <FieldSelect label="Built at" name="buildLocation" defaultValue="">
+              <option value="">Leave</option>
+              <option value="site">Site</option>
+              <option value="hq">HQ</option>
+            </FieldSelect>
+            <NumberField label="HQ minutes" name="hqMinutes" max={480} />
+            <NumberField label="HQ crew" name="hqCrew" max={6} />
+            <NumberField label="Placement minutes" name="placementMinutes" max={480} />
+            <label className="text-sm font-semibold sm:col-span-2">
+              <span className="mb-1 block text-muted-foreground">Notes</span>
+              <Input name="notes" />
+            </label>
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <Button type="submit" name="intent" value="apply" disabled={bulkPending}>Apply</Button>
+              <Button type="submit" name="intent" value="confirm" variant="secondary" disabled={bulkPending}>Confirm</Button>
+            </div>
+            {bulkState ? <div className="sm:col-span-2"><Banner tone={bulkState.ok ? "success" : "error"}>{bulkState.message}</Banner></div> : null}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-16 text-sm">
+        <p className="text-muted-foreground">Page {page + 1} of {pageCount}. {total} products.</p>
         <div className="flex gap-2">
           {page > 0 ? <Link className="inline-flex min-h-11 items-center rounded-full border border-border px-4 font-semibold" href={hrefFor(page - 1)}>Previous</Link> : null}
           {total > (page + 1) * PAGE_SIZE ? <Link className="inline-flex min-h-11 items-center rounded-full border border-border px-4 font-semibold" href={hrefFor(page + 1)}>Next</Link> : null}
@@ -304,6 +333,106 @@ function sortValue(row: SkuEffortRow, key: SortKey) {
   if (key === "crew") return row.crew ?? -1;
   if (key === "minutes") return row.build_minutes ?? row.hq_build_minutes ?? -1;
   return row.status;
+}
+
+const IMPORT_TEMPLATE = "sku,product_name,cin7_category,needs_assembly,crew,build_minutes,effort_unit,build_location,hq_build_minutes,hq_build_crew,site_position_minutes,status,notes\nJF-BENCH-01,Adjustable bench,Benches,yes,2,45,each,site,,,,confirmed,\n";
+
+function previewCsv(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.split(","))
+    .filter((row) => row.some((cell) => cell.trim()));
+}
+
+function ImportDialog({
+  open,
+  onOpenChange,
+  action,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  action: (formData: FormData) => void;
+  pending: boolean;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string[][]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [fileName, setFileName] = useState("");
+
+  async function take(file: File | null) {
+    setProblem(null);
+    setFileName(file?.name ?? "");
+    if (fileRef.current) {
+      const transfer = new DataTransfer();
+      if (file) transfer.items.add(file);
+      fileRef.current.files = transfer.files;
+    }
+    if (!file) {
+      setPreview([]);
+      return;
+    }
+    const rows = previewCsv(await file.text());
+    const header = rows[0]?.map((cell) => cell.trim().toLowerCase()) ?? [];
+    if (!header.includes("sku")) {
+      setProblem("The file needs a header row with a sku column.");
+      setPreview([]);
+      return;
+    }
+    setPreview(rows.slice(0, 6));
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto bg-paper sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Import effort</DialogTitle>
+          <DialogDescription>Upload a CSV keyed by SKU. Nothing is saved until you apply it.</DialogDescription>
+        </DialogHeader>
+        <a className="text-sm font-semibold underline decoration-primary" download="effort-template.csv" href={`data:text/csv,${encodeURIComponent(IMPORT_TEMPLATE)}`}>
+          Download template
+        </a>
+        <label
+          className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border px-4 py-6 text-center"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            void take(event.dataTransfer.files[0] ?? null);
+          }}
+        >
+          <Upload className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+          <span className="text-sm font-semibold">{fileName || "Drop a CSV here, or choose a file"}</span>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={(event) => void take(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        {problem ? <p className="text-sm text-destructive">{problem}</p> : null}
+        {preview.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-left text-xs">
+              <tbody>
+                {preview.map((row, index) => (
+                  <tr key={index} className="border-t border-border first:border-t-0">
+                    {row.slice(0, 4).map((cell, cellIndex) => (
+                      <td key={cellIndex} className="px-2 py-1.5">{cell || "—"}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="px-2 py-2 text-xs text-muted-foreground">First rows only. Apply saves every row in the file.</p>
+          </div>
+        ) : null}
+        <form action={action}>
+          <input ref={fileRef} name="csv" type="file" className="sr-only" tabIndex={-1} />
+          <Button type="submit" disabled={pending || !fileName || Boolean(problem)}>{pending ? "Importing..." : "Apply import"}</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function FieldSelect({ label, name, defaultValue, children }: { label: string; name: string; defaultValue: string; children: ReactNode }) {

@@ -1,8 +1,9 @@
+import { Suspense } from "react";
 import { CategoryDefaultEditor, CategoryGapEditor, SkuEffortEditor, SyncProductsButton } from "@/components/effort-table";
 import { PricingForm, TermsForm } from "@/components/operations-forms";
 import { Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
-import { EmptyState, ErrorState } from "@/components/pulse/states";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/pulse/states";
 import { getOfficeContext, listCategoriesWithoutDefault, listCin7CategoryDefaults, listSkuEffort, readOwnerSettings, readTerms } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 
@@ -10,9 +11,21 @@ function one(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-export const metadata = { title: "Pricing" };
+export const metadata = { title: "Effort table" };
 
-export default async function SettingsPage({
+export default function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <SettingsBody searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SettingsBody({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -29,7 +42,7 @@ export default async function SettingsPage({
     return (
       <PageHeader
         eyebrow="Pulse Operations"
-        title="Pricing"
+        title="Effort table"
         description="Only the named owner can view and change pricing and the charges grid."
       />
     );
@@ -49,8 +62,8 @@ export default async function SettingsPage({
     <div className="space-y-8">
       <PageHeader
         eyebrow="Pulse Operations"
-        title="Pricing"
-        description="Markups live on the pricing settings table. Each save appends a version. Minimum job charge and margin floor stay “not configured” until a number is entered."
+        title="Effort table"
+        description="Markups, category defaults, and how long each product takes to install."
         actions={<SyncProductsButton />}
       />
 
@@ -109,9 +122,7 @@ export default async function SettingsPage({
         <div>
           <h2 className="font-display text-2xl">Effort table</h2>
           <p className="mt-2 max-w-2xl text-sm text-grey">
-            One row per Cin7 SKU. Sync fills suggested rows from the category default and never changes a confirmed row.
-            Needs review: {effort ? effort.review_count : "—"}.
-            {effort?.name_rule_count ? ` ${effort.name_rule_count} match a name rule (pin-loaded machines built at HQ, or sled tracks) and stay here until confirmed.` : ""}
+            How long each product takes to install. {effort ? `${effort.review_count} still need a check.` : ""}
           </p>
         </div>
         <div className="mt-4">

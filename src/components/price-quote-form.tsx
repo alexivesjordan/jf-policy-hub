@@ -82,7 +82,7 @@ export function PriceQuoteForm({
       <div className="space-y-6">
         {previewToggle}
         <form action={sellOrder} className="space-y-4">
-          <Field label="Cin7 sales order" hint={cin7Connected ? "For example SO-00490. A saved segment for this customer is used if you leave the segment blank." : "Fixture numbers such as FIXTURE-Q-1001 while Cin7 is not connected."}>
+          <Field label="Order number" hint="For example SO-00490. Leave the segment if this customer has been priced before.">
             <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
           </Field>
           <Field label="Segment" hint="Leave this on the saved segment when this customer has been priced before.">
@@ -97,7 +97,7 @@ export function PriceQuoteForm({
         </form>
         <form action={sellOrder} className="grid gap-4 md:grid-cols-[1fr_auto]">
           <input type="hidden" name="segment" value={segmentChoice} />
-          <Field label="Or upload the quote PDF" hint="Text is extracted in the app. The file is not stored.">
+          <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
             <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
           </Field>
           <div className="md:pt-7">
@@ -111,6 +111,7 @@ export function PriceQuoteForm({
           </div>
         ) : null}
         {sold && !selling ? <Banner tone={sold.ok ? "success" : "error"}>{sold.message}</Banner> : null}
+        {created && !created.ok ? <Banner tone="error">{created.message}</Banner> : null}
         {summary && quote?.notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 text-sm leading-6 text-ink">{quote.notice}</blockquote> : null}
         {summary ? (
           <div className="rounded-3xl border border-line bg-card px-6 py-6">
@@ -145,10 +146,7 @@ export function PriceQuoteForm({
     <div className="space-y-6">
       {previewToggle}
       <form action={loadQuote} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field
-          label="Cin7 order number"
-          hint={cin7Connected ? "Looks up the sales order, for example SO-00490." : "Fixture numbers such as FIXTURE-Q-1001. Cin7 not connected."}
-        >
+        <Field label="Order number" hint="For example SO-00490.">
           <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
         </Field>
         <div className="md:pt-7">
@@ -156,7 +154,7 @@ export function PriceQuoteForm({
         </div>
       </form>
       <form action={parsePdf} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field label="Or upload the quote PDF" hint="Text is extracted in the app. The file is not stored.">
+        <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
           <Input name="quotePdf" type="file" accept="application/pdf,.pdf" />
         </Field>
         <div className="md:pt-7">
@@ -182,7 +180,7 @@ export function PriceQuoteForm({
             <Field label="Site postcode">
               <Input name="postcode" value={draft.postcode} onChange={(event) => setDraft({ ...draft, postcode: event.target.value })} required autoCapitalize="characters" />
             </Field>
-            <Field label="Segment" hint="Cin7 has no segment. This choice is remembered for the customer. HubSpot segment is still to come.">
+            <Field label="Segment" hint="We remember this for the customer next time.">
               <Select name="segment" required value={draft.segment} onChange={(event) => setDraft({ ...draft, segment: event.target.value })}>
                 <option value="">Choose a segment</option>
                 {SEGMENTS.map(([value, label]) => (

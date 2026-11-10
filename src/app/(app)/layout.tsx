@@ -4,13 +4,13 @@ import type { BellItem } from "@/components/notification-bell";
 import { listPulseNotifications } from "@/features/operations/queries";
 import { requireUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
 
 export const instant = false;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>

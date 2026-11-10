@@ -1,14 +1,25 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { BookFixtureForm, UnavailabilityForm } from "@/components/calendar-forms";
 import { Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
-import { ErrorState } from "@/components/pulse/states";
+import { ErrorState, PageSkeleton } from "@/components/pulse/states";
 import { getOfficeContext, listJobs } from "@/features/operations/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Resource Availability" };
 
-export default async function CalendarPage() {
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CalendarBody />
+    </Suspense>
+  );
+}
+
+async function CalendarBody() {
+  await connection();
   await requireOperationsUser();
   const context = await getOfficeContext();
   const canEdit = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner";
@@ -31,10 +42,38 @@ export default async function CalendarPage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Resource Availability"
-        description="Crews, vans, and the stair climber for this week. Unavailability and fixture booking are manual. Lynnstar is not connected."
+        description="Who is free to install this week."
       />
       {calendar.error ? <ErrorState title="The calendar did not load" description={calendar.error.message} /> : null}
-      <div className="overflow-x-auto rounded-3xl border border-line">
+      <div className="space-y-4 md:hidden">
+        {days.map((day) => {
+          const key = iso(day);
+          const label = day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
+          return (
+            <section key={key} className="rounded-3xl border border-line bg-card px-4 py-4">
+              <h2 className="font-semibold">{label}</h2>
+              <ul className="mt-3 space-y-2">
+                {data.resources.map((resource) => {
+                  const held = data.reservations.filter((item) => item.resource_id === resource.id && item.day.startsWith(key));
+                  const off = data.unavailability.some((item) => item.resource_id === resource.id && key >= item.starts_on && key <= item.ends_on);
+                  const weekendCrew = resource.resource_type === "installer" && [0, 6].includes(new Date(`${key}T12:00:00Z`).getUTCDay());
+                  const detail = off || weekendCrew ? "Unavailable" : held.map((item) => `${item.kind} ${item.cin7_number ?? ""}`).join(", ") || "Free";
+                  return (
+                    <li key={resource.id} className="flex items-start justify-between gap-3 text-sm">
+                      <span>
+                        <span className="block font-semibold">{resource.name}</span>
+                        <span className="text-xs text-grey">{resource.resource_type}</span>
+                      </span>
+                      <span className="text-right text-grey">{detail}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto rounded-3xl border border-line md:block">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>
             <tr className="text-left text-grey">

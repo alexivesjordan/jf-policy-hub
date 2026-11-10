@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const variantClass = {
-  primary: "bg-primary text-primary-foreground shadow-[0_0_24px_rgba(206,0,55,0.28)] hover:bg-primary/90",
+  primary: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
   secondary: "border-border bg-card text-foreground hover:bg-muted",
   ghost: "text-foreground hover:bg-muted",
   danger: "border border-destructive bg-transparent text-foreground hover:bg-destructive/10",

@@ -16,13 +16,9 @@ export default async function SalesQuotePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={cin7Connected ? "Pulse Sales · Cin7 Core" : "Pulse Sales · fixture quotes"}
+        eyebrow="Pulse Sales"
         title="Install quoting"
-        description={
-          cin7Connected
-            ? "Enter a Cin7 order number, such as SO-00490, or upload a quote PDF. Create job opens the booking calendar."
-            : "Cin7 is not connected, so an order number loads a fixture quote. You can also upload a Cin7 Core quote PDF."
-        }
+        description="Enter an order number or upload a quote. Then book the install."
       />
       <PriceQuoteForm cin7Connected={cin7Connected} showInternal={showInternal} canPreviewSales={canPreviewSales} />
     </div>

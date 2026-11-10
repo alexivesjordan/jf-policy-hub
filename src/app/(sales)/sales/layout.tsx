@@ -5,13 +5,13 @@ import { getOfficeContext, listPulseNotifications } from "@/features/operations/
 import { listMyNotifications } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
 
 export default function SalesLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>

@@ -1,20 +1,35 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { listCategories, listPolicies } from "@/features/policies/queries";
 import { formatDate, londonToday, needsDocument, plusDays, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
 import { Badge, Button, Input, Select, TextLink } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
-import { EmptyState } from "@/components/pulse/states";
+import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 import { requireUser } from "@/lib/auth";
 
 export const instant = false;
 export const metadata = { title: "Policies" };
 
-export default async function PoliciesPage({
+export default function PoliciesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <PoliciesBody searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function PoliciesBody({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  await connection();
   await requireUser();
   const params = await searchParams;
   const q = oneParam(params.q) ?? "";
@@ -40,7 +55,7 @@ export default async function PoliciesPage({
       <PageHeader
         eyebrow="Pulse People"
         title="Policies"
-        description="Upload a finished Word or PDF file into a placeholder, or open a policy and write it here."
+        description="The policies people are expected to follow."
         actions={
           <>
             <TextLink href="/policies/upload">Upload a policy document</TextLink>

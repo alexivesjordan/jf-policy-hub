@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
       <PageHeader
         eyebrow="Pulse People"
         title="Notifications"
-        description="New suggestions and automatic updates appear here. Email can be added later in one place in the code."
+        description="Suggestions and updates for you."
         actions={
           unread ? (
             <form action={markAllNotificationsRead}>

@@ -18,7 +18,7 @@ export default async function TasksPage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Tasks"
-        description="Exceptions, fleet, and countdown items. The list starts empty until someone adds one. Installs does not write tasks yet."
+        description="Open follow-ups for the install office."
       />
       {canCreate ? (
         <Card>
