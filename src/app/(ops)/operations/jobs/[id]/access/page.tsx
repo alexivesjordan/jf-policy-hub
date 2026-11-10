@@ -5,6 +5,7 @@ import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 import { priceVariation, type SiteProfile } from "@/lib/pricer/engine";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
 
@@ -13,8 +14,8 @@ export const metadata = { title: "Access review" };
 export default async function AccessReviewPage({ params }: { params: Promise<{ id: string }> }) {
   await requireOperationsUser();
   const context = await getOfficeContext();
-  if (!context.is_owner && context.ops_role !== "install_lead" && context.ops_role !== "admin_owner") {
-    return <p className="text-ink/75">Only the install lead can review an access form.</p>;
+  if (!hasLevel(context.operations, "edit", context.is_owner)) {
+    return <p className="text-ink/75">You need edit access on Operations to review an access form.</p>;
   }
   const { id } = await params;
   const job = await getJob(id);

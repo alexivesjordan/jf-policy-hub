@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { isCompanyEmail, normaliseEmail } from "@/lib/access";
-import { requireRole, requestOrigin } from "@/lib/auth";
+import { requirePeopleEditor, requireRole } from "@/lib/auth";
+import { authConfirmRedirect } from "@/lib/site-url";
+import { passwordSetupPath } from "@/lib/auth-link";
 import type { ActionState } from "@/lib/action-state";
 import { hasServiceRole } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
@@ -74,10 +76,9 @@ export async function inviteUser(_prev: ActionState, formData: FormData): Promis
     };
   }
 
-  const origin = await requestOrigin();
   const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
-    redirectTo: `${origin}/auth/confirm`,
+    redirectTo: authConfirmRedirect(passwordSetupPath()),
   });
 
   if (inviteError) {
@@ -131,7 +132,7 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function createCategory(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole(["admin"]);
+  await requirePeopleEditor();
   const name = clean(formData.get("name"));
   const slug = slugify(name);
   if (!name || !slug) return { ok: false, message: "Enter a category name." };
@@ -165,7 +166,7 @@ export async function createCategory(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function setAutoApply(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole(["admin"]);
+  await requirePeopleEditor();
   const id = clean(formData.get("categoryId"));
   const allowed = formData.get("allowed") === "yes";
   const supabase = await createClient();

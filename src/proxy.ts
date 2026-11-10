@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { passwordLinkHandoff } from "@/lib/auth-link";
 
 const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/api/amendments", "/api/policies"];
 /** Cron calls this with no session. The route itself rejects a missing Bearer CRON_SECRET. */
@@ -41,6 +42,9 @@ export async function proxy(request: NextRequest) {
   const isPublic = path === CRON_SYNC_PATH || PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
 
   if (!user && !isPublic) {
+    const handoff = passwordLinkHandoff(path, request.nextUrl.searchParams);
+    if (handoff) return NextResponse.redirect(new URL(handoff, request.url));
+
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

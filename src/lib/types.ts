@@ -20,6 +20,7 @@ export type Profile = {
   role: Role;
   is_active: boolean;
   access_granted: boolean;
+  can_review?: boolean;
   last_sign_in_at: string | null;
   created_at: string;
   updated_at: string;

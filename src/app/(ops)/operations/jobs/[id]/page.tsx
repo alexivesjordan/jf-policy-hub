@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { formatDate, formatTimestamp } from "@/lib/format";
+import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 
 export const metadata = { title: "Job" };
@@ -28,9 +29,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   }
   if (!job) notFound();
   const requirements = await getJobRequirements(id).catch(() => null);
-  const internal = context.is_owner || context.ops_role === "install_lead" || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
-  const canPreviewSales = context.is_owner || context.ops_role === "admin_owner" || context.ops_role === "ops_manager";
-  const canOverride = canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner });
+  const internal = hasLevel(context.operations, "edit", context.is_owner);
+  const canPreviewSales = context.is_owner;
+  const canOverride = canOverrideRequirements({ isOwner: context.is_owner });
   const workings = internal ? await (await createClient()).rpc("orbit_job_workings", { p_job_id: id }) : { data: null };
   const saved = workings.data as { breakdown?: QuoteBreakdown; flags?: string[]; notice?: string | null; customerPrice?: number | null; segment?: string | null; markup?: number | null } | null;
 

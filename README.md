@@ -111,24 +111,22 @@ Authentication → URL configuration:
 
 | Setting | Value |
 | --- | --- |
-| Site URL | `https://jf-policy-hub.vercel.app` with no trailing slash. Use `http://localhost:3000` only on a local project. |
-| Redirect URLs | `https://jf-policy-hub.vercel.app/auth/callback`, `https://jf-policy-hub.vercel.app/auth/confirm`, `http://localhost:3000/auth/callback`, `http://localhost:3000/auth/confirm`. A wildcard `https://jf-policy-hub.vercel.app/**` is fine as well. |
+| Site URL | `https://pulse.jordanfitness.com` with no trailing slash. Use `http://localhost:3000` only on a local project. |
+| Redirect URLs | `https://pulse.jordanfitness.com/**`, `http://localhost:3000/**`. The wildcard covers `/auth/confirm` and the `next` query on invite and recovery. |
 
-Authentication → Emails → Templates. Leave the defaults in place. On the free tier, Supabase refuses template edits while it is still sending mail itself. The default invite and reset emails are enough: both land on `/auth/confirm`, then on the set-password page.
-
-`supabase/templates/invite.html` and `supabase/templates/recovery.html` are for later, after custom SMTP is switched on and template edits are allowed. Those links use `token_hash`, and `/auth/confirm` accepts that as well as the default redirect shapes.
+Set `NEXT_PUBLIC_SITE_URL` to the same origin. Invite, magic-link, and recovery `redirect_to` use that value, or `https://$VERCEL_URL` when it is blank. The branded templates in `supabase/templates` (`invite`, `confirmation`, `recovery`, `magic_link`, `email_change`) link to `/auth/confirm` with `token_hash`. That route verifies the token and, for invite and recovery, lands on `/account/password?setup=1`. Paste those templates into Authentication → Emails after custom SMTP is on. Supabase refuses template edits while it is still sending mail itself.
 
 `alex.ives@jordanfitness.com` already has an account and no password. Forgot password is the way to set one. Do not turn public sign-up back on to do that.
 
 Someone who is not invited can still end up with an auth user if they are added in the dashboard. The app shows “No access yet” until an administrator invites that `@jordanfitness.com` address. Any other domain never receives access.
 
-Later, when DNS for the sending domain is verified, point Supabase at Resend under Authentication → Emails → SMTP:
+Point Supabase at Resend under Authentication → Emails → SMTP once DNS for the sending domain is verified:
 
 - Host `smtp.resend.com`, port `465` (or `587`)
 - Username `resend`, password the Resend API key
-- Sender name `Jordan Pulse`, sender email an address on the verified domain
+- Sender name `Jordan Pulse`, sender email `pulse@jordanfitness.com`
 
-Until that is on, Supabase’s own mailer sends the invite and reset emails. No application code change is required for the switch.
+Until that is on, Supabase’s own mailer sends the invite and reset emails, and the hosted templates stay on the defaults. Those defaults still redirect to `/auth/confirm`.
 
 ## Migrations
 

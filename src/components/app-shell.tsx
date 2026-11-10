@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { NotificationBell, type BellItem } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
+import { moduleAllows } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, type ModuleNavItem } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ export function AppShell({
   const current = moduleFromPath(path);
   const counts = { pending, unread };
   const items = (nav ?? current?.nav ?? []).filter((item) => {
-    if (item.adminOnly && profile.role !== "admin") return false;
+    if (item.adminOnly && !moduleAllows(profile, "people", "edit")) return false;
     if (item.ownerOnly && !isOwner) return false;
     return true;
   });

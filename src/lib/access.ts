@@ -19,14 +19,29 @@ export function safeNextPath(value: string | null | undefined, fallback = "/") {
   return value;
 }
 
-function levelAllows(profile: Profile, moduleId: "people" | "operations" | "sales", need: "view" | "edit") {
+function levelAllows(profile: Profile, moduleId: "people" | "service" | "supply" | "operations" | "sales" | "finance", need: "view" | "edit") {
   const level = profile.levels?.[moduleId] as AccessLevel | undefined;
   if (!level) return null;
   return allows(level, need);
 }
 
+/** Effective module access. A workspace owner can do everything. */
+export function moduleAllows(
+  profile: Profile,
+  moduleId: "people" | "service" | "supply" | "operations" | "sales" | "finance",
+  need: "view" | "edit",
+) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner") return true;
+  const resolved = levelAllows(profile, moduleId, need);
+  if (resolved != null) return resolved;
+  const enabled = profile.modules?.some((module) => module.module_id === moduleId && module.enabled) ?? false;
+  return enabled;
+}
+
 export function canUsePeople(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner") return true;
   const resolved = levelAllows(profile, "people", "view");
   if (resolved != null) return resolved;
   if (profile.role === "admin") return true;
@@ -44,14 +59,12 @@ export function accessRedirect(profile: Profile | null) {
 }
 
 export function canUseOperations(profile: Profile) {
-  if (!profile.access_granted || !profile.is_active) return false;
-  const resolved = levelAllows(profile, "operations", "view");
-  if (resolved != null) return resolved;
-  return profile.modules?.some((module) => module.module_id === "operations" && module.enabled) ?? false;
+  return moduleAllows(profile, "operations", "view");
 }
 
 export function canUseSales(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner") return true;
   const resolved = levelAllows(profile, "sales", "view");
   if (resolved != null) return resolved;
   if (profile.modules?.some((module) => module.module_id === "sales" && module.enabled)) return true;
@@ -60,6 +73,13 @@ export function canUseSales(profile: Profile) {
 
 export function canManageWorkspace(profile: Profile) {
   return profile.role === "admin" || profile.workspace_role === "owner" || profile.workspace_role === "admin";
+}
+
+/** Approve or reject a policy suggestion. A flag, not a role. Owners can always review. */
+export function canReviewSuggestions(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner") return true;
+  return profile.can_review === true;
 }
 
 /** Home screen: People or Operations. People routes still use accessRedirect. */

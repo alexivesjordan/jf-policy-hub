@@ -47,6 +47,7 @@ export function deriveJobRequirements(crew: number, lines: RequirementSourceLine
   };
 }
 
-export function canOverrideRequirements(actor: { opsRole: string | null; isOwner: boolean }) {
-  return actor.isOwner || actor.opsRole === "admin_owner" || actor.opsRole === "ops_manager";
+/** Manual job moves and requirement overrides are owner-only. */
+export function canOverrideRequirements(actor: { isOwner: boolean }) {
+  return actor.isOwner;
 }

@@ -29,7 +29,7 @@ export default async function JobsPage({
       jobs={jobs}
       view={view}
       explicit={explicit}
-      canEdit={canOverrideRequirements({ opsRole: context.ops_role, isOwner: context.is_owner })}
+      canEdit={canOverrideRequirements({ isOwner: context.is_owner })}
       error={error}
     />
   );

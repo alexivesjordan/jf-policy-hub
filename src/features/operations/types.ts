@@ -2,6 +2,8 @@ export type OfficeContext = {
   has_module: boolean;
   ops_role: string | null;
   is_owner: boolean;
+  operations?: "none" | "view" | "edit";
+  sales?: "none" | "view" | "edit";
 };
 
 export type JobSummary = {

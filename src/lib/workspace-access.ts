@@ -24,6 +24,7 @@ export function resolveModuleAccess(input: {
   teamGrants: AccessLevel[];
   custom: AccessLevel | null;
 }): AccessLevel {
+  if (input.role === "owner") return "edit";
   if (input.accessMode === "custom") return input.custom ?? "none";
   return applyWorkspaceRole(input.role, mostPermissive(input.teamGrants));
 }
