@@ -13,6 +13,7 @@ export function ThemeToggle() {
 
   function apply(next: "light" | "dark") {
     document.documentElement.dataset.theme = next;
+    document.documentElement.classList.toggle("dark", next === "dark");
     localStorage.setItem(storageKey, next);
     document.cookie = `${storageKey}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
     setTheme(next);

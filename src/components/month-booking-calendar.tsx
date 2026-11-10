@@ -1,41 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useActionState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Banner } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { loadBookingWindow, pencilJobDay } from "@/features/operations/price-actions";
 import type { PoolResource } from "@/lib/pulse/availability";
 import { isWeekend, pencilConfirmLabel, planRange, type RangePlan } from "@/lib/pulse/booking-range";
 import type { JobRequirements } from "@/lib/pulse/requirements";
+import { cn } from "@/lib/utils";
 
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+function isoFromDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function dateFromIso(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
 
 function monthKey(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function monthCells(year: number, month: number) {
-  const first = new Date(Date.UTC(year, month, 1));
-  const pad = (first.getUTCDay() + 6) % 7;
-  const days = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const cells: Array<string | null> = Array.from({ length: pad }, () => null);
-  for (let day = 1; day <= days; day += 1) {
-    cells.push(new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10));
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function MonthBookingCalendar({ jobId }: { jobId: string }) {
-  const [cursor, setCursor] = useState(() => {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  });
+  const [cursor, setCursor] = useState(() => new Date());
   const [installDays, setInstallDays] = useState(1);
   const [canAllowWeekends, setCanAllowWeekends] = useState(false);
   const [allowWeekends, setAllowWeekends] = useState(false);
@@ -45,8 +38,9 @@ export function MonthBookingCalendar({ jobId }: { jobId: string }) {
   const [note, setNote] = useState("Loading the calendar…");
   const [selected, setSelected] = useState<string | null>(null);
   const [state, action, pending] = useActionState(pencilJobDay, null);
-  const today = todayIso();
+  const today = isoFromDate(new Date());
   const key = monthKey(cursor);
+  const weekends = allowWeekends && canAllowWeekends;
 
   useEffect(() => {
     let active = true;
@@ -64,110 +58,129 @@ export function MonthBookingCalendar({ jobId }: { jobId: string }) {
     };
   }, [jobId, key]);
 
-  const cells = useMemo(
-    () => monthCells(cursor.getUTCFullYear(), cursor.getUTCMonth()),
-    [cursor],
-  );
-  const title = cursor.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-  const weekends = allowWeekends && canAllowWeekends;
-  const chosen = selected && requirements
-    ? planRange(requirements, resources, busyByDay, selected, installDays, weekends)
-    : null;
-
   function planFor(iso: string): RangePlan | null {
-    if (!requirements) return null;
+    if (!requirements || iso < today) return null;
+    if (isWeekend(iso) && !weekends) return null;
     return planRange(requirements, resources, busyByDay, iso, installDays, weekends);
   }
 
+  const chosen = selected ? planFor(selected) : null;
+  const range = chosen
+    ? { from: dateFromIso(chosen.dates[0]), to: dateFromIso(chosen.dates[chosen.dates.length - 1]) }
+    : undefined;
+
+  const plans = useMemo(() => {
+    const map = new Map<string, RangePlan>();
+    if (!requirements) return map;
+    const start = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+      const iso = isoFromDate(day);
+      const plan = planFor(iso);
+      if (plan) map.set(iso, plan);
+    }
+    return map;
+    // planFor closes over the loaded window. Recompute when that window changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requirements, resources, busyByDay, cursor, installDays, weekends, today]);
+
   return (
     <div className="rounded-3xl border border-line bg-card px-4 py-5 text-ink sm:px-6">
-      <div className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center">
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-mist" aria-label="Previous month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1)))}>
-          <ChevronLeft aria-hidden="true" className="size-5" />
-        </button>
-        <h3 className="text-center font-display text-2xl">{title}</h3>
-        <button type="button" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-mist" aria-label="Next month" onClick={() => setCursor(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)))}>
-          <ChevronRight aria-hidden="true" className="size-5" />
-        </button>
-      </div>
       {canAllowWeekends ? (
-        <label className="mt-4 flex min-h-11 items-center justify-center gap-3 text-sm font-semibold">
-          <input type="checkbox" className="size-5 accent-red" checked={allowWeekends} onChange={(event) => { setAllowWeekends(event.target.checked); setSelected(null); }} />
+        <label className="mb-3 flex min-h-11 items-center justify-center gap-3 text-sm font-semibold">
+          <input
+            type="checkbox"
+            className="size-5 accent-red"
+            checked={allowWeekends}
+            onChange={(event) => {
+              setAllowWeekends(event.target.checked);
+              setSelected(null);
+            }}
+          />
           Allow weekends
         </label>
       ) : null}
-      <div className="mt-4 grid grid-cols-7 text-center text-xs font-semibold text-grey">
-        {WEEKDAYS.map((label, index) => <div key={`${label}-${index}`} className="py-2">{label}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-y-1">
-        {cells.map((iso, index) => {
-          if (!iso) return <div key={`pad-${index}`} />;
-          const past = iso < today;
-          const weekend = isWeekend(iso);
-          const lockedWeekend = weekend && !weekends;
-          const plan = past || lockedWeekend ? null : planFor(iso);
-          const bookable = Boolean(plan?.selectable);
-          const inRange = Boolean(chosen?.dates.includes(iso));
-          const className = [
-            "relative mx-auto flex h-11 w-11 items-center justify-center rounded-full text-sm",
-            past || lockedWeekend ? "cursor-default text-grey/60" : "cursor-pointer",
-            bookable && !inRange ? "day-bookable" : "",
-            inRange ? "day-selected" : "",
-            iso === today ? "day-today" : "",
-          ].join(" ");
-          const body = <span>{Number(iso.slice(8))}</span>;
-          if (past || (!plan && !lockedWeekend)) {
-            return <div key={iso} className={className}>{body}</div>;
-          }
-          if (lockedWeekend || !plan) {
+      <Calendar
+        mode="range"
+        weekStartsOn={1}
+        month={cursor}
+        onMonthChange={setCursor}
+        selected={range}
+        onSelect={(_next, trigger) => {
+          if (!trigger) return;
+          const iso = isoFromDate(trigger);
+          const plan = plans.get(iso);
+          if (plan?.selectable) setSelected(iso);
+        }}
+        disabled={(date) => {
+          const iso = isoFromDate(date);
+          if (iso < today) return true;
+          if (isWeekend(iso) && !weekends) return true;
+          return false;
+        }}
+        modifiers={{
+          bookable: (date) => Boolean(plans.get(isoFromDate(date))?.selectable),
+        }}
+        modifiersClassNames={{ bookable: "day-bookable rounded-full" }}
+        components={{
+          DayButton: (props) => {
+            const iso = isoFromDate(props.day.date);
+            const plan = plans.get(iso);
+            const button = <CalendarDay {...props} bookable={Boolean(plan?.selectable)} inRange={Boolean(chosen?.dates.includes(iso))} today={iso === today} />;
+            if (!plan) return button;
             return (
-              <div key={iso} className="group relative">
-                <button type="button" className={className}>{body}</button>
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-48 -translate-x-1/2 rounded-2xl border border-line bg-paper p-3 text-left text-xs text-grey shadow-lg group-hover:block group-focus-within:block">
-                  Weekends are closed unless an owner allows them.
-                </div>
-              </div>
+              <HoverCard>
+                <HoverCardTrigger render={button} />
+                <HoverCardContent className="w-60">
+                  {plan.lines.map((line) => (
+                    <p key={line.id} className="flex items-start gap-2 py-1">
+                      <span className={line.available ? "text-[#146c36]" : "text-red"} aria-hidden="true">{line.available ? "✓" : "✕"}</span>
+                      <span>
+                        <span className="font-semibold">{line.label}</span>
+                        <span className="mt-0.5 block text-muted-foreground">{line.detail}</span>
+                      </span>
+                    </p>
+                  ))}
+                  {plan.lines.length === 0 ? <p className="text-muted-foreground">No resources are on the calendar yet.</p> : null}
+                </HoverCardContent>
+              </HoverCard>
             );
-          }
-          return (
-            <div key={iso} className="group relative">
-              <button
-                type="button"
-                className={className}
-                aria-pressed={inRange}
-                aria-label={iso}
-                onClick={() => {
-                  if (bookable) setSelected(iso);
-                }}
-              >
-                {body}
-              </button>
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-56 -translate-x-1/2 rounded-2xl border border-line bg-paper p-3 text-left text-xs shadow-lg group-hover:block group-focus-within:block">
-                {plan.lines.map((line) => (
-                  <p key={line.id} className="flex items-start gap-2 py-1 text-ink">
-                    <span className={line.available ? "text-[#146c36]" : "text-red"} aria-hidden="true">{line.available ? "✓" : "✕"}</span>
-                    <span>
-                      <span className="font-semibold">{line.label}</span>
-                      <span className="mt-0.5 block text-grey">{line.detail}</span>
-                    </span>
-                  </p>
-                ))}
-                {plan.lines.length === 0 ? <p className="text-grey">No resources are on the calendar yet.</p> : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          },
+        }}
+        className="mx-auto"
+      />
       {note ? <p className="mt-4 text-sm text-grey">{note}</p> : null}
       <form action={action} className="mt-5">
         <input type="hidden" name="jobId" value={jobId} />
         <input type="hidden" name="day" value={selected ?? ""} />
         <input type="hidden" name="allowWeekends" value={weekends ? "yes" : "no"} />
-        <button type="submit" disabled={!chosen?.selectable || pending} className="min-h-11 w-full rounded-full bg-ink px-4 py-3 text-sm font-semibold text-paper disabled:opacity-40">
+        <Button type="submit" disabled={!chosen?.selectable || pending} className="min-h-11 w-full rounded-full">
           {pending ? "Pencilling…" : chosen ? pencilConfirmLabel(chosen.dates, weekends) : "Choose a start day"}
-        </button>
+        </Button>
       </form>
       {state ? <div className="mt-4"><Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner></div> : null}
     </div>
+  );
+}
+
+function CalendarDay({
+  bookable,
+  inRange,
+  today,
+  className,
+  ...props
+}: ComponentProps<"button"> & { bookable: boolean; inRange: boolean; today: boolean }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex size-9 items-center justify-center rounded-full text-sm",
+        bookable && !inRange && "day-bookable",
+        inRange && "day-selected",
+        today && "day-today",
+        className,
+      )}
+      {...props}
+    />
   );
 }

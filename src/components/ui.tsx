@@ -1,5 +1,9 @@
 import Link from "next/link";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { Badge as ShadcnBadge } from "@/components/ui/badge";
+import { Button as ShadcnButton } from "@/components/ui/button";
+import { Card as ShadcnCard } from "@/components/ui/card";
+import { Input as ShadcnInput } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger" = "primary") {
@@ -12,13 +16,28 @@ export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger
   );
 }
 
+const shadcnVariant = {
+  primary: "default",
+  secondary: "outline",
+  ghost: "ghost",
+  danger: "destructive",
+} as const;
+
 export function Button({
   className,
   variant = "primary",
   type = "button",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
-  return <button type={type} className={cn(buttonClass(variant), className)} {...props} />;
+  return (
+    <ShadcnButton
+      variant={shadcnVariant[variant]}
+      nativeButton
+      type={type}
+      className={cn(buttonClass(variant), "h-auto", className)}
+      {...props}
+    />
+  );
 }
 
 export function TextLink({
@@ -53,7 +72,7 @@ const controlClass =
   "w-full rounded-2xl border border-line bg-field px-3 py-2.5 text-base text-ink outline-none ring-red transition focus:border-red focus:ring-2 focus:shadow-[0_0_0_4px_rgba(206,0,55,0.28)]";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(controlClass, props.className)} />;
+  return <ShadcnInput {...props} className={cn(controlClass, "h-auto", props.className)} />;
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -88,7 +107,7 @@ export function Banner({
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn("rounded-3xl border border-line bg-card p-5 shadow-sm", className)}>{children}</section>;
+  return <ShadcnCard className={cn("rounded-3xl border-line bg-card p-5 text-ink shadow-sm", className)}>{children}</ShadcnCard>;
 }
 
 export function Badge({
@@ -99,7 +118,8 @@ export function Badge({
   children: ReactNode;
 }) {
   return (
-    <span
+    <ShadcnBadge
+      variant="outline"
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
         tone === "neutral" && "border border-line bg-transparent text-grey",
@@ -113,6 +133,6 @@ export function Badge({
       )}
     >
       {children}
-    </span>
+    </ShadcnBadge>
   );
 }

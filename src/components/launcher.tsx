@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ModuleGlyph } from "@/components/module-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { canUsePeople } from "@/lib/access";
+import { canUsePeople, canUseSales } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 import { pulseModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,9 @@ export function Launcher({ profile }: { profile: Profile | null }) {
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
           {pulseModules.map((module) => {
             const soon = module.status === "coming-soon";
-            const locked = module.id === "people" && profile ? !canUsePeople(profile) : false;
+            const locked = profile
+              ? (module.id === "people" && !canUsePeople(profile)) || (module.id === "sales" && !canUseSales(profile))
+              : false;
             if (locked) {
               return (
                 <li key={module.id}>
