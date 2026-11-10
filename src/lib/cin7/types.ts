@@ -6,7 +6,18 @@ export type Cin7QuoteLine = {
   sku: string | null;
   productName: string;
   category: string | null;
+  /** Cin7 product Category text. Not a Pulse category slug. */
+  cin7Category?: string | null;
+  /** Cin7 ProductID from the sale line. */
+  productId?: string | null;
   qty: number;
+  /** Product.Weight when Cin7 reports kilograms. */
+  unitWeightKg?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  /** Present only when Cin7 sends DimensionsUnits. Otherwise the unit is unknown. */
+  dimensionUnit?: string | null;
 };
 
 export type Cin7Quote = {
@@ -16,7 +27,14 @@ export type Cin7Quote = {
   customerRef: string;
   segment: Cin7Segment;
   customerType: Cin7CustomerType;
+  postcode?: string | null;
+  /** Cin7 CustomerID. Not a name or address. */
+  customerId?: string | null;
   lines: Cin7QuoteLine[];
+  /** Order lines were empty, so quote lines were used. */
+  usedQuoteLines?: boolean;
+  /** A positive weight was ignored because it was not in kilograms. */
+  weightIgnored?: boolean;
 };
 
 /**

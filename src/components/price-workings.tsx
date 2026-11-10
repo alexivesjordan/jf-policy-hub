@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 
 function money(value: number) {
@@ -10,18 +11,26 @@ export function PriceWorkings({
   customerPrice,
   segment,
   markup,
+  flags = [],
 }: {
   breakdown: QuoteBreakdown;
   notice: string | null;
   customerPrice: number;
   segment: string | null;
   markup: number | null;
+  flags?: string[];
 }) {
   const cheaper = [breakdown.commute, breakdown.stayOvernight].slice().sort((a, b) => a.cost - b.cost)[0];
 
   return (
     <div className="space-y-4 text-sm text-ink">
       {notice ? <blockquote className="rounded-3xl border border-red bg-card px-5 py-4 leading-6">{notice}</blockquote> : null}
+      {flags.filter((flag) => flag.startsWith("Needs review:")).map((flag) => (
+        <p key={flag} className="rounded-2xl border border-line bg-card px-4 py-3 text-sm text-grey">
+          {flag}{" "}
+          <Link href="/operations/settings?status=suggested" className="font-semibold text-ink underline decoration-red">Open the effort table</Link>
+        </p>
+      ))}
       <section className="rounded-3xl border border-line bg-card px-5 py-4">
         <h2 className="font-display text-2xl">Line classification</h2>
         <div className="mt-3 overflow-x-auto">

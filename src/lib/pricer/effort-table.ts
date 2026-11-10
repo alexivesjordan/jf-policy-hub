@@ -27,6 +27,9 @@ export type EffortRow = {
   pumpTruckOk: boolean;
   floorFixing: "Y" | "N" | "maybe";
   reviewFlag: string | null;
+  /** Set on rows loaded from the SKU effort table. Null means the effort is unknown. */
+  needsAssembly?: boolean | null;
+  status?: "suggested" | "confirmed";
 };
 
 function num(value: string): number | null {

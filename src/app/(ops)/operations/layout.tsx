@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
+import { cin7IsConnected } from "@/lib/cin7/client";
 import { requireOperationsUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { pulseModules } from "@/modules/registry";
@@ -75,6 +76,9 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>
+      {isOwner && !cin7IsConnected() ? (
+        <p className="mb-6 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-ink">Cin7 not connected.</p>
+      ) : null}
       {children}
     </AppShell>
   );

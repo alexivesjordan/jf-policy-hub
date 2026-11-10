@@ -77,7 +77,7 @@ describe("mode A", () => {
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.5 * 100) / 100);
   });
 
-  it("does not invent a price for an unknown category", () => {
+  it("prices an unknown category as a 2-man 2-hour assembly and flags it", () => {
     const result = priceInstall({
       mode: "A",
       postcode: "NR1 1AA",
@@ -86,8 +86,54 @@ describe("mode A", () => {
       lines: [{ productName: "Mystery widget", category: "widgets", qty: 1 }],
       table,
     });
-    assert.match(result.blockedReason ?? "", /No instant price/);
-    assert.equal(result.customerPrice, null);
+    assert.equal(result.blockedReason, null);
+    assert.equal(result.lines[0]?.match, "unknown");
+    assert.equal(result.lines[0]?.row?.buildCrew, 2);
+    assert.equal(result.lines[0]?.row?.buildMinutes, 120);
+    assert.ok(result.customerPrice != null && result.customerPrice > 0);
+    assert.ok(result.flags.some((flag) => flag.startsWith("Needs review: Mystery widget")));
+    assert.equal("flags" in forSales(result), false);
+  });
+
+  it("uses a Cin7 category default and does not build loose kit", () => {
+    const defaults = [
+      { category: "Treadmills", buildCrew: 2, buildMinutes: 120, note: "Machine", needsAssembly: true as const },
+      { category: "Kettlebells", buildCrew: 1, buildMinutes: 0, note: "Kit", needsAssembly: false as const },
+      { category: "Other", buildCrew: 2, buildMinutes: 120, note: "Unknown", needsAssembly: null },
+    ];
+    const treadmill = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "trade",
+      lines: [{ sku: "NEW-1", productName: "Commercial treadmill", category: "Treadmills", qty: 1 }],
+      table,
+      categoryDefaults: defaults,
+    });
+    assert.equal(treadmill.lines[0]?.match, "category_default");
+    assert.equal(treadmill.lines[0]?.row?.buildMinutes, 120);
+    const bell = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "trade",
+      lines: [{ sku: "KB-1", productName: "Cast kettlebell", category: "Kettlebells", qty: 1 }],
+      table,
+      categoryDefaults: defaults,
+    });
+    assert.equal(bell.lines[0]?.match, "handling_only");
+    assert.equal(bell.lines[0]?.row?.buildMinutes, 0);
+    const other = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "trade",
+      lines: [{ sku: "X-1", productName: "Unlisted item", category: "Other", qty: 1 }],
+      table,
+      categoryDefaults: defaults,
+    });
+    assert.equal(other.lines[0]?.match, "unknown");
+    assert.ok(other.flags.some((flag) => flag.includes("Unlisted item")));
   });
 
   it("applies the minimum job charge only when it is set", () => {

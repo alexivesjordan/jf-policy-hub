@@ -77,6 +77,8 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser and server, protected by RLS. Must be present at build time. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only. Invites and the research-agent API. Never expose it to the browser. |
 | `RESEARCH_AGENT_TOKEN` | Server only. Bearer token for `POST /api/amendments` and `GET /api/policies`. Use a long random string. |
+| `CIN7_ACCOUNT_ID` | Server only. Cin7 Core account id. If either Cin7 value is missing, order lookup stays on the fixture adapter. |
+| `CIN7_APPLICATION_KEY` | Server only. Cin7 Core application key. Never expose it to the browser. |
 
 3. Apply the migrations (next section), then set the Authentication values in [Sign-in settings](#sign-in-settings).
 
