@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ModuleGlyph } from "@/components/module-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { canUsePeople, canUseSales } from "@/lib/access";
-import type { Profile } from "@/lib/types";
+import { canManageWorkspace, canUsePeople, canUseSales } from "@/lib/access";
+import type { Profile, PulseModuleId } from "@/lib/types";
 import { pulseModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,8 @@ export function Launcher({ profile }: { profile: Profile | null }) {
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
           {pulseModules.map((module) => {
             const soon = module.status === "coming-soon";
+            const level = profile?.levels?.[module.id as PulseModuleId];
+            if (profile?.levels && !soon && level === "none") return null;
             const locked = profile
               ? (module.id === "people" && !canUsePeople(profile)) || (module.id === "sales" && !canUseSales(profile))
               : false;
@@ -78,6 +80,11 @@ export function Launcher({ profile }: { profile: Profile | null }) {
             );
           })}
         </ul>
+        {profile && canManageWorkspace(profile) ? (
+          <Link href="/workspace" className="mx-auto mt-8 inline-flex min-h-11 items-center rounded-full border border-line bg-card px-4 text-sm font-semibold text-ink">
+            Workspace settings
+          </Link>
+        ) : null}
       </main>
     </div>
   );
