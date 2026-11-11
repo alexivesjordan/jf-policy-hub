@@ -26,6 +26,8 @@ const TEAM_ORDER = ["Sales", "Installs", "Aftersales", "Operations", "Office", "
 export type WorkspaceDirectoryUser = {
   id: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   full_name: string | null;
   workspace_role: string;
   access_mode: "follow" | "custom";
@@ -64,9 +66,16 @@ export function WorkspaceUserCard({
     <li className="rounded-3xl border border-line bg-card p-5">
       <form action={saveWorkspaceUser} className="space-y-4">
         <input type="hidden" name="userId" value={person.id} />
-        <div>
-          <p className="font-semibold text-ink">{person.full_name || person.email}</p>
-          <p className="text-sm text-grey">{person.email}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">First name</span>
+            <input name="firstName" required defaultValue={person.first_name ?? ""} className="w-full rounded-xl border border-line bg-paper px-3 py-2" />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">Last name</span>
+            <input name="lastName" required defaultValue={person.last_name ?? ""} className="w-full rounded-xl border border-line bg-paper px-3 py-2" />
+          </label>
+          <p className="text-sm text-grey sm:col-span-2">{person.email}</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Select name="workspaceRole" value={role} aria-label="Role" className="w-full sm:w-56" onChange={(event) => setRole(event.target.value)}>

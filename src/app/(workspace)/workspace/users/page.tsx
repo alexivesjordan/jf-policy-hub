@@ -39,8 +39,12 @@ export default async function WorkspaceUsersPage() {
           <Input name="email" type="email" required placeholder="name@jordanfitness.com" />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-grey">Name</span>
-          <Input name="fullName" required />
+          <span className="mb-1 block text-grey">First name</span>
+          <Input name="firstName" required autoComplete="given-name" />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-grey">Last name</span>
+          <Input name="lastName" required autoComplete="family-name" />
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-grey">Role</span>

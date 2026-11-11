@@ -45,6 +45,7 @@ export function UserMenu({
         {canManageWorkspace(profile) ? (
           <DropdownMenuItem render={<Link href="/workspace" />}>Workspace</DropdownMenuItem>
         ) : null}
+        <DropdownMenuItem render={<Link href="/account/name" />}>Your name</DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/account/password" />}>Change password</DropdownMenuItem>
         <form action={signOut}>
           <DropdownMenuItem nativeButton render={<button type="submit" className="w-full text-left" />}>

@@ -25,6 +25,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { messageFromError } from "@/lib/errors";
 import type { ActionState } from "@/lib/action-state";
+import { ingestDraft } from "@/lib/quotes/ingest";
+import { priceIngestedService, type ServiceQuoteView } from "@/features/sales/service-actions";
 
 const SEGMENTS = ["independent", "franchisee", "trade", "big_corporate"] as const;
 
@@ -76,6 +78,7 @@ export type PricedQuote = ReturnType<typeof forSales> & {
   minJobChargeConfigured?: boolean;
   marginFloorConfigured?: boolean;
   flags?: string[];
+  service?: ServiceQuoteView | null;
   provisionalItems?: string[];
   bigInstallTriggers?: string[];
 };
@@ -438,7 +441,7 @@ function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], remembere
       description: line.productName,
       qty: line.qty,
       category: line.cin7Category ?? line.category ?? "",
-      lineTotal: null,
+      lineTotal: line.lineNet ?? null,
       unitWeightKg: line.unitWeightKg ?? null,
       productId: line.productId ?? "",
       uom: line.uom ?? null,
@@ -540,10 +543,11 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
         });
       }
     }
+    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(ingestDraft(draft)) : null;
     return {
       ok: !result.blockedReason,
-      message: result.blockedReason ?? "Best-case price ready. Create the job when you want it booked.",
-      quote: view,
+      message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Best-case price ready. Create the job when you want it booked."),
+      quote: { ...view, service },
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not price that quote." };
@@ -575,10 +579,11 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
         });
       }
     }
+    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(ingestDraft(draft)) : null;
     return {
       ok: !result.blockedReason,
-      message: result.blockedReason ?? "Install price ready.",
-      quote: view,
+      message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
+      quote: { ...view, service },
       draft,
     };
   } catch (error) {

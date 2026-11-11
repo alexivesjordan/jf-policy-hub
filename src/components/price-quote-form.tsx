@@ -103,6 +103,10 @@ export function PriceQuoteForm({
               ))}
             </Select>
           </Field>
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="alsoService" value="yes" />
+            Also quote proactive maintenance and extended warranty
+          </label>
           <Button type="submit" disabled={selling || creating}>{selling ? "Calculating…" : "Submit"}</Button>
         </form>
         <form action={sellOrder} className="space-y-4">
@@ -110,7 +114,11 @@ export function PriceQuoteForm({
           <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
             <QuoteFileDrop />
           </Field>
-          <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="alsoService" value="yes" />
+            Also quote proactive maintenance and extended warranty
+          </label>
+          <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Price PDF"}</Button>
         </form>
         {selling ? (
           <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
