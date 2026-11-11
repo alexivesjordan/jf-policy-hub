@@ -57,9 +57,13 @@ function shippingPostcode(customer: Record<string, unknown> | null, sale: Record
 function orderDocument(sale: Record<string, unknown>) {
   const order = record(sale.Order);
   const orderLines = list(order?.Lines);
-  if (orderLines.length > 0) return { document: order, lines: orderLines, fromQuote: false };
-  const quote = record(sale.Quote);
-  return { document: quote, lines: list(quote?.Lines), fromQuote: true };
+  const source = orderLines.length > 0 ? order : record(sale.Quote);
+  return {
+    document: source,
+    lines: list(source?.Lines),
+    charges: list(source?.AdditionalCharges),
+    fromQuote: orderLines.length === 0,
+  };
 }
 
 function productsOf(body: unknown) {
@@ -100,10 +104,16 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
   }
   if (!sale || !saleId(sale)) return null;
 
-  const { document, lines, fromQuote } = orderDocument(sale);
+  const { document, lines, charges, fromQuote } = orderDocument(sale);
   const priced = lines.filter((line) => (amount(line.Quantity) ?? 0) > 0);
+  const pricedCharges = charges.filter((charge) => (amount(charge.Quantity) ?? 1) > 0);
   const money = resolveCin7LineNets(
     priced.map((line) => ({ total: amount(line.Total), tax: amount(line.Tax) })),
+    pricedCharges.map((charge) => ({
+      description: text(charge.Description) ?? "Additional charge",
+      total: amount(charge.Total),
+      tax: amount(charge.Tax),
+    })),
     { beforeTax: amount(document?.TotalBeforeTax), includingTax: amount(document?.Total) },
   );
   const products = new Map<string, Record<string, unknown>>();
@@ -153,9 +163,10 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     postcode: shippingPostcode(customer, sale),
     customerId,
     lines: quoteLines,
+    additionalCharges: money.charges,
     usedQuoteLines: fromQuote && quoteLines.length > 0,
     taxStripped: money.taxStripped,
-    moneyWarning: money.warning,
+    moneyFlags: money.flags,
     weightIgnored: priced.some((line) => {
       const product = products.get(text(line.ProductID) ?? text(line.SKU) ?? "");
       const raw = product ? amount(product.Weight) : null;

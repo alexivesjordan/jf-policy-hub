@@ -72,8 +72,8 @@ describe("service quote engine", () => {
     assert.equal(site.knownOnlySensitivity.annualPm, 1695);
     assert.equal(site.knownOnlySensitivity.twiceYearlyPm, 3095);
     assert.equal(site.knownOnlySensitivity.extendedWarrantyOneOff, 2195);
-    assert.ok(result.flags.some((flag) => flag.includes("Identity")));
-    assert.equal(result.flags.some((flag) => flag.includes("management approval")), false);
+    assert.ok(result.flags.some((flag) => flag.code === "manual_review"));
+    assert.equal(result.flags.some((flag) => flag.code === "multi_site_approval"), false);
     const customer = customerProposalText(result);
     assert.equal(customer.includes("99 + 59"), false);
     assert.equal(customer.includes("1.30"), false);
@@ -94,7 +94,7 @@ describe("service quote engine", () => {
         ],
       }],
     });
-    assert.ok(result.flags.some((flag) => flag.includes("GOODS NET RECONCILIATION")));
+    assert.ok(result.flags.some((flag) => flag.code === "goods_net_discrepancy" && flag.difference !== 0));
     assert.equal(result.sites[0]?.prices.extendedWarrantyOneOff, 0);
     assert.equal(result.sites[0]?.prices.annualBundleYear1, null);
   });
@@ -118,6 +118,6 @@ describe("service quote engine", () => {
     });
     assert.equal(result.portfolioPm?.annualPmAllSites, 3135);
     assert.equal(result.portfolioPm?.twiceYearlyPmAllSites, 5790);
-    assert.ok(result.flags.some((flag) => flag === "Bundle and portfolio discount needs management approval."));
+    assert.ok(result.flags.some((flag) => flag.code === "multi_site_approval"));
   });
 });

@@ -1,10 +1,16 @@
+import { quoteFlag, type QuoteFlag } from "@/lib/quotes/flags";
+
 /** Cin7 Core sale lines carry Total and Tax separately. Total is not assumed to be ex VAT. */
 
-const TOLERANCE = 0.1;
+const TOLERANCE_PENCE = 10;
 
 export type Cin7LineMoney = {
   total: number | null;
   tax: number | null;
+};
+
+export type Cin7ChargeMoney = Cin7LineMoney & {
+  description: string;
 };
 
 export type Cin7OrderMoney = {
@@ -12,11 +18,17 @@ export type Cin7OrderMoney = {
   includingTax: number | null;
 };
 
+export type ResolvedCharge = {
+  description: string;
+  amountNet: number;
+};
+
 export type LineNetResolution = {
   lineNets: (number | null)[];
-  /** True when line Total matched the tax-inclusive order total and tax was removed. */
+  charges: ResolvedCharge[];
+  /** True when line and charge totals matched the tax-inclusive order total and tax was removed. */
   taxStripped: boolean;
-  warning: string | null;
+  flags: QuoteFlag[];
 };
 
 function pence(value: number) {
@@ -27,50 +39,79 @@ function round2(value: number) {
   return pence(value) / 100;
 }
 
-function withinTenPence(left: number, right: number) {
-  return Math.abs(pence(left) - pence(right)) <= TOLERANCE * 100;
+function sumPence(values: (number | null)[]) {
+  let sum = 0;
+  for (const value of values) {
+    if (value != null) sum += pence(value);
+  }
+  return sum;
+}
+
+function withinTenPence(sumInPence: number, target: number) {
+  return Math.abs(sumInPence - pence(target)) <= TOLERANCE_PENCE;
+}
+
+function pounds(difference: number) {
+  return `£${Math.abs(difference).toFixed(2)}`;
 }
 
 /**
- * Use line Total when the sum matches the order total before tax.
- * When the sum matches the order total including tax instead, use Total − Tax and flag it.
- * Otherwise the line nets are left unset.
+ * Reconcile sum(line Total) + sum(charge Total) with the order total.
+ * A mismatch keeps the line totals and records the gap. It does not wipe the lines.
  */
-export function resolveCin7LineNets(lines: Cin7LineMoney[], order: Cin7OrderMoney): LineNetResolution {
-  const empty = lines.map(() => null);
-  if (lines.length === 0) return { lineNets: [], taxStripped: false, warning: null };
-  if (lines.some((line) => line.total == null)) {
-    return {
-      lineNets: empty,
-      taxStripped: false,
-      warning: "Cin7 did not send a line total for every row. Those lines are priced at £0 until the PDF is used.",
-    };
+export function resolveCin7LineNets(
+  lines: Cin7LineMoney[],
+  charges: Cin7ChargeMoney[],
+  order: Cin7OrderMoney,
+): LineNetResolution {
+  const flags: QuoteFlag[] = [];
+  const lineNets = lines.map((line) => (line.total == null ? null : round2(line.total)));
+  const chargeNets = charges.map((charge) => ({
+    description: charge.description,
+    amountNet: charge.total == null ? 0 : round2(charge.total),
+  }));
+  if (lines.some((line) => line.total == null) || charges.some((charge) => charge.total == null)) {
+    flags.push(
+      quoteFlag(
+        "cin7_line_total_missing",
+        "Cin7 did not send a total for every product line or additional charge. A missing total is stored as £0.",
+      ),
+    );
   }
-  const sum = round2(lines.reduce((total, line) => total + (line.total ?? 0), 0));
+  const combined = sumPence(lineNets) + sumPence(chargeNets.map((charge) => charge.amountNet));
   if (order.beforeTax == null && order.includingTax == null) {
-    return {
-      lineNets: empty,
-      taxStripped: false,
-      warning: "Cin7 did not send an order total, so line totals were not used. Those lines are priced at £0 until the PDF is used.",
-    };
+    flags.push(quoteFlag("cin7_order_total_missing", "Cin7 did not send an order total, so the line totals could not be checked."));
+    return { lineNets, charges: chargeNets, taxStripped: false, flags };
   }
-  if (order.beforeTax != null && withinTenPence(sum, order.beforeTax)) {
-    return { lineNets: lines.map((line) => round2(line.total ?? 0)), taxStripped: false, warning: null };
+  if (order.beforeTax != null && withinTenPence(combined, order.beforeTax)) {
+    return { lineNets, charges: chargeNets, taxStripped: false, flags };
   }
-  if (order.includingTax != null && withinTenPence(sum, order.includingTax)) {
-    const missingTax = lines.some((line) => line.tax == null);
-    return {
-      lineNets: lines.map((line) => (line.tax == null || line.total == null ? null : round2(line.total - line.tax))),
-      taxStripped: true,
-      warning: missingTax
-        ? "Cin7 line totals include tax, but a line has no Tax amount. Tax was removed where it was present. A line with no Tax is priced at £0."
-        : "Cin7 line totals include tax. Tax was removed from each line.",
-    };
+  if (order.includingTax != null && withinTenPence(combined, order.includingTax)) {
+    const strippedLines = lines.map((line, index) => {
+      if (line.total == null) return null;
+      if (line.tax == null) return lineNets[index];
+      return round2(line.total - line.tax);
+    });
+    const strippedCharges = charges.map((charge) => ({
+      description: charge.description,
+      amountNet: charge.total == null || charge.tax == null ? round2(charge.total ?? 0) : round2(charge.total - charge.tax),
+    }));
+    flags.push(
+      quoteFlag(
+        "cin7_tax_included",
+        "Cin7 totals include tax. Tax was removed from each product line and additional charge.",
+      ),
+    );
+    return { lineNets: strippedLines, charges: strippedCharges, taxStripped: true, flags };
   }
-  return {
-    lineNets: empty,
-    taxStripped: false,
-    warning:
-      "Cin7 line totals do not match the order total before tax or the order total including tax within £0.10. Those lines are priced at £0 until the PDF is used.",
-  };
+  const target = order.beforeTax ?? order.includingTax ?? 0;
+  const difference = round2(combined / 100 - target);
+  flags.push(
+    quoteFlag(
+      "cin7_totals_mismatch",
+      `Cin7 product lines plus additional charges differ from the order total before tax by ${pounds(difference)}. The line totals were kept.`,
+      difference,
+    ),
+  );
+  return { lineNets, charges: chargeNets, taxStripped: false, flags };
 }

@@ -1,3 +1,5 @@
+import type { QuoteFlag } from "@/lib/quotes/flags";
+
 export type Cin7CustomerType = "credit" | "proforma" | "leasing" | null;
 export type Cin7Segment = "independent" | "franchisee" | "trade" | "big_corporate" | null;
 
@@ -39,10 +41,12 @@ export type Cin7Quote = {
   usedQuoteLines?: boolean;
   /** A positive weight was ignored because it was not in kilograms. */
   weightIgnored?: boolean;
+  /** Additional charges from the same Order or Quote section as the lines. Ex VAT. */
+  additionalCharges?: { description: string; amountNet: number }[];
   /** Line Total matched the tax-inclusive order total, so Tax was removed. */
   taxStripped?: boolean;
-  /** Set when line totals could not be used as net, or tax was removed. */
-  moneyWarning?: string | null;
+  /** Money checks. Select these by code; do not match the message text. */
+  moneyFlags?: QuoteFlag[];
 };
 
 /**

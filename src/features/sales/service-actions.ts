@@ -5,6 +5,7 @@ import { classifyLine, type ClassificationRule } from "@/lib/service-quote/class
 import { calculateServiceQuote, type ServiceQuoteResult } from "@/lib/service-quote/engine";
 import { buildServiceProposal } from "@/lib/service-quote/proposal";
 import { DEFAULT_SERVICE_RATES, type ServiceRates } from "@/lib/service-quote/rates";
+import { type QuoteFlag, type QuoteFlagCode } from "@/lib/quotes/flags";
 import { ingestCin7Quote, ingestPdfBytes, quoteCacheKey, type IngestedQuote } from "@/lib/quotes/ingest";
 import { requireSalesUser } from "@/lib/auth";
 import { moduleAllows } from "@/lib/access";
@@ -20,8 +21,11 @@ export type ServiceQuoteView = {
   prices: ServiceQuoteResult["sites"];
   portfolioPm: ServiceQuoteResult["portfolioPm"];
   warnings: string[];
-  /** Null for a sales rep. Owner, admin, and operations edit see the flags and audit. */
-  flags: string[] | null;
+  /**
+   * Cin7 money flags are always included. Review flags are null unless the
+   * caller is an owner, admin, or operations edit. Select by `code`.
+   */
+  flags: QuoteFlag[] | null;
   audit: Pick<ServiceQuoteResult, "goodsNetFromLines" | "goodsNetDiscrepancy" | "sites" | "assumptions"> | null;
 };
 
@@ -161,6 +165,9 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
   }, rates);
 
   const seeFlags = flagsAllowed.data === true || profile.workspace_role === "owner" || profile.workspace_role === "admin" || moduleAllows(profile, "operations", "edit");
+  result.flags = [...ingested.flags, ...result.flags];
+  const moneyCodes: QuoteFlagCode[] = ["cin7_totals_mismatch", "cin7_tax_included", "cin7_order_total_missing", "cin7_line_total_missing"];
+  const visible = seeFlags ? result.flags : result.flags.filter((flag) => moneyCodes.includes(flag.code));
   let id: string | null = null;
   if (rateId) {
     const saved = await supabase.rpc("service_save_quote", {
@@ -188,7 +195,7 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
     prices: result.sites,
     portfolioPm: result.portfolioPm,
     warnings: ingested.warnings,
-    flags: seeFlags ? result.flags : null,
+    flags: visible.length ? visible : null,
     audit: seeFlags
       ? { goodsNetFromLines: result.goodsNetFromLines, goodsNetDiscrepancy: result.goodsNetDiscrepancy, sites: result.sites, assumptions: result.assumptions }
       : null,
