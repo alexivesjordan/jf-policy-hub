@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { readCin7Sale, type Cin7Getter } from "./read-sale";
+import { readCin7BookingDetails, readCin7Sale, type Cin7Getter } from "./read-sale";
 
 const saleId = "11111111-1111-4111-8111-111111111111";
 const customerId = "22222222-2222-4222-8222-222222222222";
@@ -92,6 +92,10 @@ describe("Cin7 sale read", () => {
     assert.equal(dumped.includes("Secret Road"), false);
     assert.equal(dumped.includes("Anonymised Road"), false);
     assert.equal(dumped.includes("Accounts lane"), false);
+    const details = await readCin7BookingDetails("SO-00490", get);
+    assert.equal(details?.siteAddress?.includes("1 Anonymised Road"), true);
+    assert.equal(details?.contactEmail, "hidden@example.com");
+    assert.equal(JSON.stringify(quote).includes("1 Anonymised Road"), false);
   });
 
   it("ignores a weight that is not in kilograms", async () => {

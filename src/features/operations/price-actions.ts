@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
+import { cin7IsConnected, getCin7Client, loadCin7BookingDetails } from "@/lib/cin7/client";
 import { fillMissingSkuCategories } from "@/lib/cin7/missing-product";
 import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -10,6 +10,7 @@ import { seesInstallBreakdown } from "@/lib/pulse/quote-access";
 import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
+import { jobSpanDays } from "@/lib/pulse/install-booking";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
@@ -70,6 +71,8 @@ export type PricedQuote = ReturnType<typeof forSales> & {
   customerName: string;
   postcode: string;
   jobId?: string;
+  /** Server id for Book install. The priced working detail is not on this object. */
+  savedQuoteId?: string;
   showCost: boolean;
   requirements: JobRequirements | null;
   repSummary?: { cost: number; price: number; margin: number | null } | null;
@@ -451,6 +454,58 @@ async function priceDraft(draft: QuoteDraft) {
   return { result, view };
 }
 
+async function rememberInstallQuote(
+  draft: QuoteDraft,
+  result: { breakdown: QuoteBreakdown | null; flags: string[]; customerPrice: number | null; requirements: { installers: number; licensedDrivers: number; vanSize: string; vanCount: number; stairClimber: boolean } | null },
+  service: ServiceQuoteView | null,
+) {
+  if (result.customerPrice == null || !result.requirements || !result.breakdown) return null;
+  const contact = draft.source === "cin7" ? await loadCin7BookingDetails(draft.quoteNumber) : null;
+  const span = jobSpanDays(result.breakdown.days, result.breakdown.hq?.personHours ?? 0, result.requirements.installers);
+  const site = service?.prices[0]?.prices;
+  const supabase = await createClient();
+  const saved = await supabase.rpc("install_save_quote", {
+    p_order_number: draft.quoteNumber,
+    p_payload: {
+      goodsNet: draft.goodsNet,
+      installPrice: result.customerPrice,
+      customerName: draft.customerName,
+      siteAddress: contact?.siteAddress ?? (draft.postcode || null),
+      contactName: contact?.contactName ?? null,
+      contactEmail: contact?.contactEmail ?? null,
+      contactPhone: contact?.contactPhone ?? null,
+      cin7SaleId: draft.saleId || null,
+      cin7CustomerId: draft.customerId || null,
+      serviceQuoteId: service?.id ?? null,
+      proposalPath: null,
+      totalDays: span.totalDays,
+      requirements: result.requirements,
+      flags: { install: result.flags, service: service?.flags ?? [] },
+      hqBuild: result.breakdown.hq
+        ? { personHours: result.breakdown.hq.personHours, lines: result.breakdown.hq.lines }
+        : { personHours: 0, lines: [] },
+      siteInstall: { days: result.breakdown.days, nights: result.breakdown.nights, onSiteHours: result.breakdown.onSiteHours },
+      warranty: site
+        ? {
+            annual: site.annualPm,
+            twice: site.twiceYearlyPm,
+            extension: site.extendedWarrantyOneOff,
+            annualBundle: site.annualBundleYear1,
+            twiceBundle: site.twiceBundleYear1,
+          }
+        : null,
+      lines: draft.lines.map((line) => ({
+        sku: line.sku,
+        description: line.description,
+        qty: line.qty,
+        category: line.category,
+        lineNet: line.lineTotal,
+      })),
+    },
+  });
+  return typeof saved.data === "string" ? saved.data : null;
+}
+
 function quoteInputs(draft: QuoteDraft, result: { breakdown: unknown; flags: string[]; notice: string | null; customerPrice: number | null; segment: string | null; markup: number | null }) {
   return {
     postcode: draft.postcode,
@@ -595,10 +650,11 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
       }
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
+    const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Best-case price ready. Create the job when you want it booked."),
-      quote: { ...view, service },
+      quote: { ...view, service, savedQuoteId: savedQuoteId ?? undefined },
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not price that quote." };
@@ -631,10 +687,11 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       }
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
+    const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
-      quote: { ...view, service },
+      quote: { ...view, service, savedQuoteId: savedQuoteId ?? undefined },
       draft,
     };
   } catch (error) {

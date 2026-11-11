@@ -2,7 +2,7 @@ import "server-only";
 
 import { Cin7RequestBlocked } from "@/lib/cin7/allowlist";
 import { createFixtureCin7Client } from "@/lib/cin7/fixture-adapter";
-import { readCin7Sale } from "@/lib/cin7/read-sale";
+import { readCin7BookingDetails, readCin7Sale } from "@/lib/cin7/read-sale";
 import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7ReadClient } from "@/lib/cin7/types";
 
@@ -33,4 +33,11 @@ export function getCin7Client(): Cin7ReadClient {
       return readCin7Sale(id, (path, query) => cin7Get({ ...keys, path, query }));
     },
   };
+}
+
+/** Address and contact for the install record. Null when Cin7 is not connected. */
+export async function loadCin7BookingDetails(orderNumber: string) {
+  const keys = credentials();
+  if (!keys) return null;
+  return readCin7BookingDetails(orderNumber, (path, query) => cin7Get({ ...keys, path, query }));
 }

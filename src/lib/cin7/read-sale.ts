@@ -39,19 +39,30 @@ function weightKg(product: Record<string, unknown>) {
   return weight;
 }
 
-function shippingPostcode(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+function customerAddress(customer: Record<string, unknown> | null) {
   const addresses = list(customer?.Addresses);
   const shipping = addresses.filter((address) => text(address.Type) === "Shipping");
   const billing = addresses.filter((address) => text(address.Type) === "Billing");
-  const chosen =
+  return (
     shipping.find((address) => address.DefaultForType === true) ??
     shipping[0] ??
     billing.find((address) => address.DefaultForType === true) ??
-    billing[0];
-  const fromCustomer = text(chosen?.Postcode);
-  const fromSale = text(record(sale.ShippingAddress)?.Postcode);
-  const raw = fromCustomer ?? fromSale;
+    billing[0] ??
+    null
+  );
+}
+
+function shippingPostcode(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+  const raw = text(customerAddress(customer)?.Postcode) ?? text(record(sale.ShippingAddress)?.Postcode);
   return raw ? normaliseUkPostcode(raw) : null;
+}
+
+function addressLines(address: Record<string, unknown> | null) {
+  if (!address) return null;
+  const parts = [text(address.Line1), text(address.Line2), text(address.City), text(address.Postcode)].filter(
+    (part): part is string => Boolean(part),
+  );
+  return parts.length ? parts.join(", ") : null;
 }
 
 function orderDocument(sale: Record<string, unknown>) {
@@ -172,6 +183,31 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       const raw = product ? amount(product.Weight) : null;
       return product != null && weightKg(product) == null && raw != null && raw > 0;
     }),
+  };
+}
+
+/** Site address and contact for the install record. Not copied onto the priced quote. */
+export async function readCin7BookingDetails(orderNumberOrId: string, get: Cin7Getter) {
+  const lookup = orderNumberOrId.trim();
+  if (!lookup) return null;
+  let sale: Record<string, unknown> | null = null;
+  if (GUID.test(lookup)) {
+    sale = record(await get("sale", { ID: lookup }));
+  } else {
+    if (!ORDER_NUMBER.test(lookup)) return null;
+    const listed = await findSale(lookup, get);
+    const id = listed ? saleId(listed) : null;
+    if (!id) return null;
+    sale = record(await get("sale", { ID: id }));
+  }
+  if (!sale) return null;
+  const customerId = text(sale.CustomerID);
+  const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
+  return {
+    siteAddress: addressLines(customerAddress(customer) ?? record(sale.ShippingAddress)),
+    contactName: text(sale.Contact) ?? text(customer?.Name),
+    contactEmail: text(sale.Email) ?? text(customer?.Email),
+    contactPhone: text(sale.Phone) ?? text(customer?.Phone),
   };
 }
 
