@@ -1,7 +1,6 @@
 import { serviceQuotePlaceholder } from "@/lib/sales/service-quote";
 
-function money(value: number | null) {
-  if (value == null) return "Not connected";
+function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
 
@@ -19,12 +18,12 @@ export function ServiceQuoteResult({ installPrice }: { installPrice: number | nu
   return (
     <section className="rounded-3xl border border-line bg-card px-6 py-6">
       <h2 className="font-display text-2xl">Install, maintenance and warranty</h2>
-      <p className="mt-2 text-sm text-grey">Maintenance and warranty prices are not connected yet. The install price above is the only live figure.</p>
+      <p className="mt-2 text-sm text-grey">Maintenance and warranty prices are not connected yet.</p>
       <dl className="mt-4 divide-y divide-border">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-baseline justify-between gap-4 py-3">
             <dt className="text-sm text-ink">{label}</dt>
-            <dd className={value == null ? "text-sm text-grey" : "font-display text-2xl"}>{money(value)}</dd>
+            <dd className={value == null ? "text-sm text-grey" : "font-display text-2xl"}>{value == null ? "—" : money(value)}</dd>
           </div>
         ))}
       </dl>

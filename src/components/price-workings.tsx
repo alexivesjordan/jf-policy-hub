@@ -2,6 +2,85 @@ import Link from "next/link";
 import { QuoteNotice } from "@/components/quote-notice";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 
+const SETTING_LABELS: Record<string, string> = {
+  handover_minutes: "handover time",
+  cover_cost_per_unit: "cover cost per unit",
+  leave_behind_pack_cost: "leave-behind pack cost",
+  food_trigger: "when food is charged",
+  hq_handling_minutes: "HQ handling time",
+  deck_cost_per_unit: "deck cost per unit",
+  crate_capacity_kg: "crate capacity",
+  lorry_tail_lift_kg: "lorry tail-lift weight limit",
+  min_job_charge: "minimum job charge",
+  margin_floor_pct: "margin floor",
+  site_prep_minutes: "site preparation time",
+  weight_band_midpoint: "weight-band midpoint",
+  tag_cost_per_unit: "tag cost per unit",
+  contingency_base: "base contingency",
+  contingency_high_complexity: "high-complexity contingency",
+  contingency_difficult_access: "difficult-access contingency",
+  hq_unpack_crate_minutes_per_100kg: "time to unpack a crate",
+};
+
+function settingKey(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function plainSetting(value: string) {
+  const key = settingKey(value);
+  return SETTING_LABELS[key] ?? value.trim().replace(/_/g, " ");
+}
+
+function isSettingKey(value: string) {
+  const key = settingKey(value);
+  return Boolean(SETTING_LABELS[key]) || /^[a-z0-9_]+$/.test(value.trim());
+}
+
+function missingSettings(unset: string[]) {
+  const labels = [...new Set(unset.filter(isSettingKey).map(plainSetting))];
+  if (!labels.length) return "Nothing else is missing.";
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+function assumptionText(assumptions: string[]) {
+  if (!assumptions.length) return "No extra assumptions.";
+  const labels = assumptions.filter(isSettingKey).map(plainSetting);
+  const notes = assumptions.filter((item) => !isSettingKey(item)).map(plainSentence);
+  const lead = labels.length ? labels.join(", ") : "";
+  return [lead, ...notes].filter(Boolean).join(". ");
+}
+
+function plainSentence(value: string) {
+  return value
+    .replace(/[a-z0-9]+(?:_[a-z0-9]+)+/gi, (token) => plainSetting(token))
+    .replace(/\bUNSET\b/g, "not set")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function plainPayment(gate: string) {
+  if (gate.includes("Customer type not set")) {
+    return gate.replace("Customer type not set.", "Customer type is not set, so the payment terms are not chosen yet.");
+  }
+  return gate;
+}
+
+function segmentSentence(segment: string | null, markup: number | null) {
+  const who = segment === "independent"
+    ? "an independent customer"
+    : segment === "franchisee"
+      ? "a franchisee"
+      : segment === "trade"
+        ? "a trade customer"
+        : segment === "big_corporate"
+          ? "a big corporate customer"
+          : "a customer whose segment is not set";
+  if (markup == null) return `This is ${who}. No markup is set.`;
+  const percent = Math.round(markup * 1000) / 10;
+  return `This is ${who}. The markup on cost is ${percent}%.`;
+}
+
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
@@ -69,8 +148,8 @@ export function PriceWorkings({
               <p key={line.productName}>{line.qty}× {line.productName} → {line.minutes} min × {line.crew} crew</p>
             ))}
             <p>HQ person-hours {breakdown.hq.personHours} → labour {money(breakdown.hq.labour)}</p>
-            <p>Handling: {breakdown.hq.handling}. Decks: {breakdown.hq.materials}. Crates: {breakdown.hq.crates} ({breakdown.hq.crateHours} h).</p>
-            <p>{breakdown.hq.transport}</p>
+            <p>Handling is not set. Deck cost is not set. Crates are to be confirmed ({breakdown.hq.crateHours} h).</p>
+            <p>A tail-lift lorry is the default. The tail-lift weight limit is not set, so that check is flagged and not priced.</p>
             <p>HQ subtotal {money(breakdown.hq.subtotal)}</p>
           </div>
         ) : (
@@ -79,7 +158,7 @@ export function PriceWorkings({
       </section>
       <section className="rounded-3xl border border-line bg-card px-5 py-4">
         <h2 className="font-display text-2xl">Site install</h2>
-        <p className="mt-2">Site prep {breakdown.prepMinutes} min. Handover {breakdown.handover}.</p>
+        <p className="mt-2">Site prep {breakdown.prepMinutes} min. Handover time is not set yet.</p>
         <p>On site {breakdown.onSiteHours} h. Carry {breakdown.carryHours} h. Travel {breakdown.travelHours} h ({breakdown.roundTripMiles} miles, {breakdown.milesMethod}).</p>
         <ul className="mt-2 space-y-1">
           {breakdown.buildLines.map((line) => (
@@ -111,13 +190,36 @@ export function PriceWorkings({
         <p>Contingency {Math.round(breakdown.contingencyRate * 100)}% = {money(breakdown.siteContingency)}. Site subtotal {money(breakdown.siteCost)}.</p>
       </section>
       <section className="rounded-3xl border border-line bg-card px-5 py-4">
-        <p>BIG INSTALL {breakdown.bigInstall ? `Y (${breakdown.bigInstallTriggers.join(", ") || "flagged"})` : "N"}</p>
-        <p className="mt-2">{breakdown.paymentGate}</p>
-        <p className="mt-2">Assumptions: {breakdown.assumptions.length ? breakdown.assumptions.join("; ") : "none"}</p>
-        <p>UNSET: {breakdown.unset.join(", ")}</p>
-        <p className="mt-3">Segment {segment ?? "—"} at {markup == null ? "—" : `${Math.round(markup * 1000) / 10}%`}.</p>
+        <p>{segmentSentence(segment, markup)}</p>
         <p className="font-display mt-2 text-3xl">{money(customerPrice)} ex VAT</p>
         <p className="text-grey">Internal cost {money(breakdown.siteCost + breakdown.hqCost)}</p>
+        <details open className="group mt-4 rounded-2xl border border-border">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            Assumptions and missing settings
+          </summary>
+          <dl className="space-y-3 px-4 pb-4 text-sm">
+            <div>
+              <dt className="font-semibold">{breakdown.bigInstall ? "This is a big install" : "This is not a big install"}</dt>
+              <dd className="mt-1 text-grey">
+                {breakdown.bigInstall
+                  ? `Photos or a walkthrough are required before booking${breakdown.bigInstallTriggers.length ? `: ${breakdown.bigInstallTriggers.map(plainSetting).join(", ")}` : ""}.`
+                  : "Photos and a walkthrough are not required before booking."}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Payment terms</dt>
+              <dd className="mt-1 text-grey">{plainPayment(breakdown.paymentGate)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Not yet set in the effort table</dt>
+              <dd className="mt-1 text-grey">{missingSettings(breakdown.unset)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Assumptions used for this price</dt>
+              <dd className="mt-1 text-grey">{assumptionText(breakdown.assumptions)}</dd>
+            </div>
+          </dl>
+        </details>
       </section>
     </div>
   );

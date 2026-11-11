@@ -91,8 +91,7 @@ export const pulseModules: PulseModule[] = [
     nav: [
       { href: "/sales", label: "Overview" },
       { href: "/sales/quote", label: "Install quoting" },
-      { href: "/sales/maintenance", label: "Proactive maintenance packages", disabled: true },
-      { href: "/sales/warranties", label: "Extended warranties", disabled: true },
+      { href: "/sales/warranties", label: "Warranties and Servicing", disabled: true },
     ],
   },
   {
