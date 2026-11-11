@@ -1,11 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
-import { InstallPriceNotes, PriceWorkings } from "@/components/price-workings";
-import { QuoteNotice } from "@/components/quote-notice";
+import { QuoteLineFields } from "@/components/quote-line-fields";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,29 +101,10 @@ export function PriceQuoteForm({
           </div>
         ) : null}
         {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
-        {summary && quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
-        {summary ? (
-          <div className="rounded-3xl border border-line bg-card px-6 py-6">
-            <dl className="space-y-3 text-ink">
-              <div>
-                <dt className="text-sm text-grey">Install cost</dt>
-                <dd className="font-display text-4xl">{money(summary.cost)}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-grey">Recommended price</dt>
-                <dd className="font-display text-4xl">{money(summary.price)}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-grey">Margin</dt>
-                <dd className="text-2xl font-semibold">{summary.margin == null ? "—" : `${Math.round(summary.margin * 1000) / 10}%`}</dd>
-              </div>
-            </dl>
-          </div>
-        ) : null}
-        {quote?.priceNotes ? <InstallPriceNotes notes={quote.priceNotes} /> : null}
+        {summary ? <InstallPriceCard price={summary.price} quoteNumber={quote?.quoteNumber} postcode={quote?.postcode} /> : null}
         {includeService && quote?.service ? (
           <>
-            <ServiceQuoteResult service={quote.service} installPrice={summary?.price ?? null} />
+            <ServiceQuoteResult service={quote.service} />
             <ProposalButton quoteId={quote.service.id} />
           </>
         ) : null}
@@ -192,62 +171,7 @@ export function PriceQuoteForm({
           {draft.warnings.map((warning) => (
             <Banner key={warning} tone="warning">{warning}</Banner>
           ))}
-          <div className="overflow-x-auto rounded-3xl border border-line">
-            <table className="w-full min-w-[40rem] border-collapse text-sm">
-              <thead>
-                <tr className="text-left text-grey">
-                  <th className="px-3 py-2">SKU</th>
-                  <th className="px-3 py-2">Description</th>
-                  <th className="px-3 py-2">Qty</th>
-                  <th className="px-3 py-2">Cin7 category</th>
-                  <th className="px-3 py-2">Line total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {draft.lines.map((line, index) => (
-                  <tr key={`${line.sku}-${index}`} className="border-t border-line">
-                    <td className="px-3 py-2">
-                      <input type="hidden" name="lineSku" value={line.sku} />
-                      <input type="hidden" name="lineProductId" value={line.productId} />
-                      <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
-                      <input type="hidden" name="lineUom" value={line.uom ?? ""} />
-                      <input type="hidden" name="lineTileLength" value={line.tileLength ?? ""} />
-                      <input type="hidden" name="lineTileWidth" value={line.tileWidth ?? ""} />
-                      <input type="hidden" name="lineDimensionUnit" value={line.dimensionUnit ?? ""} />
-                      <input type="hidden" name="lineTilesPerPack" value={line.tilesPerPack ?? ""} />
-                      <span className="font-mono text-xs text-ink">{line.sku || "—"}</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        name="lineDescription"
-                        value={line.description}
-                        onChange={(event) => updateLine(setDraft, draft, index, { description: event.target.value })}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        name="lineQty"
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={line.qty}
-                        onChange={(event) => updateLine(setDraft, draft, index, { qty: Number(event.target.value) })}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-ink">
-                      <input type="hidden" name="lineCategory" value={line.category} />
-                      {line.category || "—"}
-                    </td>
-                    <td className="px-3 py-2 text-ink">
-                      <input type="hidden" name="lineTotal" value={line.lineTotal ?? ""} />
-                      {line.lineTotal == null ? "—" : line.lineTotal.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {draft.internalNote ? <p className="text-sm text-grey">{draft.internalNote}</p> : null}
+          <QuoteLineFields lines={draft.lines} />
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pricing}>{pricing ? "Pricing..." : "Price best case"}</Button>
             {priced?.ok ? (
@@ -260,54 +184,12 @@ export function PriceQuoteForm({
       ) : null}
 
       {draft && (priced || created) ? <Banner tone={(created ?? priced)?.ok ? "success" : "error"}>{(created ?? priced)?.message}</Banner> : null}
-      {quote?.showCost && quote.breakdown && quote.customerPrice != null ? (
-        <PriceWorkings
-          breakdown={quote.breakdown}
-          notice={quote.notice}
-          customerPrice={quote.customerPrice}
-          segment={quote.segment ?? null}
-          markup={quote.markup ?? null}
-          flags={quote.flags ?? []}
-        />
-      ) : quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
-      {quote?.warnings.map((warning) => <Banner key={warning} tone="warning">{warning}</Banner>)}
-      {quote?.requirements ? (
-        <div className="rounded-3xl border border-line bg-card px-5 py-4 text-sm text-ink">
-          <p className="font-semibold">Required resources</p>
-          <p className="mt-2 text-grey">Set by the pricer. A sales rep cannot edit these.</p>
-          <ul className="mt-3 space-y-1">
-            <li>{quote.requirements.installers} installer{quote.requirements.installers === 1 ? "" : "s"}</li>
-            <li>{quote.requirements.licensedDrivers} licensed driver{quote.requirements.licensedDrivers === 1 ? "" : "s"}</li>
-            <li>{quote.requirements.vanCount} {quote.requirements.vanSize === "crafter" ? "Crafter" : "small van"}{quote.requirements.vanCount === 1 ? "" : "s"}</li>
-            <li>Stair climber {quote.requirements.stairClimber ? "yes" : "no"}</li>
-          </ul>
-        </div>
-      ) : null}
+      {quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
       {includeService && quote?.service ? (
         <>
-          <ServiceQuoteResult service={quote.service} installPrice={quote.customerPrice} />
+          <ServiceQuoteResult service={quote.service} />
           <ProposalButton quoteId={quote.service.id} />
         </>
-      ) : null}
-      {quote && quote.customerPrice != null && !quote.breakdown ? (
-        <div className="rounded-3xl border border-line bg-card px-5 py-4">
-          <p className="text-sm text-grey">{quote.quoteNumber} · {quote.postcode}</p>
-          <p className="font-display mt-2 text-4xl">
-            {new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(quote.customerPrice)}
-          </p>
-          <p className="mt-2 text-sm text-grey">Customer price ex VAT · {quote.finality === "final" ? "Final for best-case access" : "Provisional"}</p>
-          {quote.showCost ? (
-            <div className="mt-4 space-y-1 border-t border-line pt-4 text-sm text-grey">
-              <p>Internal cost {quote.cost == null ? "—" : `£${quote.cost.toFixed(2)}`}</p>
-              <p>Markup {quote.markup == null ? "—" : `${Math.round(quote.markup * 1000) / 10}%`}</p>
-            </div>
-          ) : null}
-          {quote.jobId ? (
-            <Link href={`/operations/jobs/${quote.jobId}/schedule`} className="mt-4 inline-block text-sm font-semibold text-ink underline decoration-red">
-              Pencil a day
-            </Link>
-          ) : null}
-        </div>
       ) : null}
     </div>
   );
@@ -364,14 +246,14 @@ function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
 
-function updateLine(
-  setDraft: (draft: QuoteDraft) => void,
-  draft: QuoteDraft,
-  index: number,
-  patch: Partial<QuoteDraft["lines"][number]>,
-) {
-  setDraft({
-    ...draft,
-    lines: draft.lines.map((line, lineIndex) => (lineIndex === index ? { ...line, ...patch } : line)),
-  });
+function InstallPriceCard({ price, quoteNumber, postcode }: { price: number; quoteNumber?: string; postcode?: string }) {
+  return (
+    <div className="rounded-3xl border border-line bg-card px-6 py-6">
+      {quoteNumber || postcode ? <p className="text-sm text-grey">{[quoteNumber, postcode].filter(Boolean).join(" · ")}</p> : null}
+      <p className="mt-2 text-sm text-grey">Install price</p>
+      <p className="font-display text-4xl">{money(price)}</p>
+      <p className="mt-2 text-sm text-grey">ex VAT</p>
+    </div>
+  );
 }
+

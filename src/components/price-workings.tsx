@@ -36,13 +36,6 @@ function isSettingKey(value: string) {
   return Boolean(SETTING_LABELS[key]) || /^[a-z0-9_]+$/.test(value.trim());
 }
 
-function missingSettings(unset: string[]) {
-  const labels = [...new Set(unset.filter(isSettingKey).map(plainSetting))];
-  if (!labels.length) return "Nothing else is missing.";
-  if (labels.length === 1) return labels[0];
-  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
-}
-
 function isBuildRecipe(value: string) {
   return /crew\s*\d|build minutes|hq build|site position|person-hours|\blabour\b|assembly team/i.test(value) || value.length > 240;
 }
@@ -101,20 +94,28 @@ export type InstallPriceNotesData = {
   flags?: string[];
 };
 
-export function InstallPriceNotes({ notes }: { notes: InstallPriceNotesData }) {
+/** A short list. Per-line weight and SKU notes are folded into one line each. */
+export function compactPriceFlags(notes: InstallPriceNotesData) {
+  const flags = (notes.flags ?? []).filter((flag) => !/^Crew plan:/i.test(flag) && !isBuildRecipe(flag));
   const items = [
     notes.bigInstall
-      ? `This is a big install. Photos or a walkthrough are required before booking${notes.bigInstallTriggers.length ? `: ${notes.bigInstallTriggers.map(plainSetting).join(", ")}` : ""}.`
+      ? "This is a big install. Photos or a walkthrough are required before booking."
       : "This is not a big install. Photos and a walkthrough are not required before booking.",
     plainPayment(notes.paymentGate),
-    `Not yet set: ${missingSettings(notes.unset)}`,
-    assumptionText(notes.assumptions),
-    ...(notes.flags ?? [])
-      .filter((flag) => !/^Crew plan:/i.test(flag) && !isBuildRecipe(flag))
-      .filter((flag) => flag.startsWith("Needs review:") || !/UNSET|not set|not configured/i.test(flag))
-      .map((flag) => (flag.startsWith("Needs review:") ? flag.replace(/ Confirm them on the Pricing page\./, "") : plainSentence(flag))),
-  ].filter((item) => item && !/\b1\.30\b|risk formula/i.test(item) && item !== "No extra assumptions." && item !== "Not yet set: Nothing else is missing.");
+  ];
+  const missing = notes.unset.filter(isSettingKey);
+  if (missing.length === 1) items.push(`${plainSetting(missing[0])} is not set yet.`);
+  else if (missing.length > 1) items.push("Some effort-table settings are not set yet.");
+  const needsReview = flags.filter((flag) => flag.startsWith("Needs review:"));
+  if (needsReview.length === 1) items.push(needsReview[0].replace(/ Confirm them on the Pricing page\./, ""));
+  else if (needsReview.length > 1) items.push("Some products still need a confirmed install time.");
+  if (flags.some((flag) => /weight unknown|weight estimated/i.test(flag))) items.push("Some product weights were estimated or missing.");
+  if (flags.some((flag) => /SKU blank|no SKU/i.test(flag))) items.push("Some lines have no SKU, so they were matched by name.");
+  return items.filter((item) => item && !/\b1\.30\b|risk formula/i.test(item)).slice(0, 6);
+}
 
+export function InstallPriceNotes({ notes }: { notes: InstallPriceNotesData }) {
+  const items = compactPriceFlags(notes);
   return (
     <section className="rounded-3xl border border-line bg-card px-6 py-5">
       <h3 className="font-display text-xl">Things that may affect this price</h3>

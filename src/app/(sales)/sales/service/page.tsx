@@ -53,7 +53,7 @@ export default async function ServiceQuotePage() {
             </section>
             <section className="space-y-3">
               <h2 className="font-display text-xl">SKU and category mapping</h2>
-              <p className="text-sm text-grey">A matching rule overrides the built-in name check.</p>
+              <p className="text-sm text-grey">Set a SKU or a name to a category. This is not the list of lines on an order.</p>
               <ClassificationEditor rules={rules} canEdit={canEdit} />
             </section>
           </QuoteSettingsButton>
