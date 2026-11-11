@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
 import { readCin7Sale, type Cin7Getter } from "./read-sale";
 
@@ -31,7 +33,10 @@ function fixtureGet(): { get: Cin7Getter; calls: string[] } {
         ShippingAddress: { Line1: "1 Secret Road", City: "Ipswich", Postcode: "PE30 4JJ" },
         Order: {
           SaleOrderNumber: "SO-00490",
-          Lines: [{ ProductID: productId, SKU: "JF-C2SE-2", Name: "Concept2 SkiErg", Quantity: 2, Total: 10 }],
+          Lines: [{ ProductID: productId, SKU: "JF-C2SE-2", Name: "Concept2 SkiErg", Quantity: 2, Price: 5, Tax: 0, Total: 10 }],
+          TotalBeforeTax: 10,
+          Tax: 0,
+          Total: 10,
         },
       };
     }
@@ -70,6 +75,9 @@ describe("Cin7 sale read", () => {
     assert.equal(quote.segment, null);
     assert.equal(quote.lines[0].sku, "JF-C2SE-2");
     assert.equal(quote.lines[0].qty, 2);
+    assert.equal(quote.lines[0].lineNet, 10);
+    assert.equal(quote.taxStripped, false);
+    assert.equal(quote.moneyWarning, null);
     assert.equal(quote.lines[0].unitWeightKg, 26);
     assert.equal(quote.lines[0].cin7Category, "Cardio");
     assert.equal(quote.lines[0].category, null);
@@ -98,5 +106,22 @@ describe("Cin7 sale read", () => {
     const quote = await readCin7Sale("SO-00490", wrapped);
     assert.equal(quote?.lines[0].unitWeightKg, null);
     assert.equal(quote?.weightIgnored, true);
+  });
+
+  it("strips tax on a recorded order when line totals include it", async () => {
+    const order = JSON.parse(
+      readFileSync(path.join(process.cwd(), "src/lib/cin7/fixtures/so-00490-order-ex-tax.json"), "utf8"),
+    ) as { Lines: { Tax: number; Total: number }[] };
+    for (const line of order.Lines) line.Total = Math.round((line.Total + line.Tax) * 100) / 100;
+    const { get } = fixtureGet();
+    const wrapped: Cin7Getter = async (pathName, query) => {
+      const body = await get(pathName, query);
+      if (pathName !== "sale" || !body || typeof body !== "object") return body;
+      return { ...(body as Record<string, unknown>), Order: order };
+    };
+    const quote = await readCin7Sale("SO-00490", wrapped);
+    assert.deepEqual(quote?.lines.map((line) => line.lineNet), [679.17, 195.83]);
+    assert.equal(quote?.taxStripped, true);
+    assert.match(quote?.moneyWarning ?? "", /include tax/);
   });
 });

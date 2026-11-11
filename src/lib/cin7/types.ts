@@ -11,7 +11,7 @@ export type Cin7QuoteLine = {
   /** Cin7 ProductID from the sale line. */
   productId?: string | null;
   qty: number;
-  /** Line net ex VAT when the sale line includes Total. */
+  /** Line net ex VAT after checking Total against the order totals. Null when that check fails. */
   lineNet?: number | null;
   /** Product.Weight when Cin7 reports kilograms. */
   unitWeightKg?: number | null;
@@ -39,6 +39,10 @@ export type Cin7Quote = {
   usedQuoteLines?: boolean;
   /** A positive weight was ignored because it was not in kilograms. */
   weightIgnored?: boolean;
+  /** Line Total matched the tax-inclusive order total, so Tax was removed. */
+  taxStripped?: boolean;
+  /** Set when line totals could not be used as net, or tax was removed. */
+  moneyWarning?: string | null;
 };
 
 /**

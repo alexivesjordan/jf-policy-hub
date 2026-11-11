@@ -1,3 +1,4 @@
+import { resolveCin7LineNets } from "@/lib/cin7/line-nets";
 import { tilesPerPackFromProduct } from "@/lib/pricer/flooring";
 import { normaliseUkPostcode } from "@/lib/quotes/postcode";
 import type { Cin7Quote, Cin7QuoteLine } from "@/lib/cin7/types";
@@ -53,10 +54,12 @@ function shippingPostcode(customer: Record<string, unknown> | null, sale: Record
   return raw ? normaliseUkPostcode(raw) : null;
 }
 
-function orderLines(sale: Record<string, unknown>) {
-  const order = list(record(sale.Order)?.Lines);
-  if (order.length > 0) return { lines: order, fromQuote: false };
-  return { lines: list(record(sale.Quote)?.Lines), fromQuote: true };
+function orderDocument(sale: Record<string, unknown>) {
+  const order = record(sale.Order);
+  const orderLines = list(order?.Lines);
+  if (orderLines.length > 0) return { document: order, lines: orderLines, fromQuote: false };
+  const quote = record(sale.Quote);
+  return { document: quote, lines: list(quote?.Lines), fromQuote: true };
 }
 
 function productsOf(body: unknown) {
@@ -97,8 +100,12 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
   }
   if (!sale || !saleId(sale)) return null;
 
-  const { lines, fromQuote } = orderLines(sale);
+  const { document, lines, fromQuote } = orderDocument(sale);
   const priced = lines.filter((line) => (amount(line.Quantity) ?? 0) > 0);
+  const money = resolveCin7LineNets(
+    priced.map((line) => ({ total: amount(line.Total), tax: amount(line.Tax) })),
+    { beforeTax: amount(document?.TotalBeforeTax), includingTax: amount(document?.Total) },
+  );
   const products = new Map<string, Record<string, unknown>>();
   for (const line of priced) {
     const productId = text(line.ProductID);
@@ -113,7 +120,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
 
   const customerId = text(sale.CustomerID) ?? text(listed?.CustomerID);
   const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
-  const quoteLines: Cin7QuoteLine[] = priced.map((line) => {
+  const quoteLines: Cin7QuoteLine[] = priced.map((line, index) => {
     const productId = text(line.ProductID);
     const sku = text(line.SKU);
     const product = products.get(productId ?? sku ?? "") ?? {};
@@ -124,7 +131,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       cin7Category: text(product.Category),
       productId,
       qty: amount(line.Quantity) ?? 0,
-      lineNet: amount(line.Total),
+      lineNet: money.lineNets[index] ?? null,
       unitWeightKg: weightKg(product),
       length: amount(product.Length),
       width: amount(product.Width),
@@ -147,6 +154,8 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     customerId,
     lines: quoteLines,
     usedQuoteLines: fromQuote && quoteLines.length > 0,
+    taxStripped: money.taxStripped,
+    moneyWarning: money.warning,
     weightIgnored: priced.some((line) => {
       const product = products.get(text(line.ProductID) ?? text(line.SKU) ?? "");
       const raw = product ? amount(product.Weight) : null;

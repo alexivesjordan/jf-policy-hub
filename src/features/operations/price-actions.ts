@@ -429,6 +429,7 @@ function fixtureNumber(draft: QuoteDraft) {
 function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], rememberedSegment = ""): QuoteDraft {
   const warnings: string[] = [];
   if (quote.weightIgnored) warnings.push("A Cin7 product weight was not in kilograms, so it was left blank.");
+  if (quote.moneyWarning) warnings.push(quote.moneyWarning);
   if (source === "cin7" && !quote.postcode) warnings.push("No shipping postcode came back from Cin7. Enter the site postcode.");
   return {
     quoteNumber: quote.number,
