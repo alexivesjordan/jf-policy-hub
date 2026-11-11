@@ -20,6 +20,8 @@ export type ServiceQuoteView = {
   prices: ServiceQuoteResult["sites"];
   portfolioPm: ServiceQuoteResult["portfolioPm"];
   warnings: string[];
+  /** Delivery and install. Not part of maintenance, the warranty, or a bundle. */
+  deliveryInstall: { description: string; amountNet: number }[];
   /** Select these by `code`. Everyone who can open the quote sees them. */
   flags: QuoteFlag[];
   audit: Pick<ServiceQuoteResult, "goodsNetFromLines" | "goodsNetDiscrepancy" | "assumptions">;
@@ -187,6 +189,10 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
     prices: result.sites,
     portfolioPm: result.portfolioPm,
     warnings: ingested.warnings,
+    deliveryInstall: ingested.deliveryInstallLines.map((line) => ({
+      description: line.description,
+      amountNet: line.amountNet,
+    })),
     flags: result.flags,
     audit: {
       goodsNetFromLines: result.goodsNetFromLines,

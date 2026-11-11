@@ -68,6 +68,20 @@ export function ServiceQuoteResult({
           </div>
         );
       })}
+      {(service.deliveryInstall ?? []).length > 0 ? (
+        <div className="rounded-3xl border border-line bg-card px-6 py-5">
+          <h3 className="font-display text-xl">Delivery and install</h3>
+          <p className="mt-1 text-sm text-grey">Used to check the order total. Not included in maintenance, the warranty, or a bundle.</p>
+          <dl className="mt-3 space-y-2 text-sm">
+            {(service.deliveryInstall ?? []).map((line) => (
+              <div key={`${line.description}-${line.amountNet}`} className="flex justify-between gap-4">
+                <dt>{line.description}</dt>
+                <dd>{money(line.amountNet)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
       <div className="rounded-3xl border border-line bg-card px-6 py-5">
         <h3 className="font-display text-xl">Things that may affect this price</h3>
         {flags.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
@@ -75,7 +89,7 @@ export function ServiceQuoteResult({
         )}
         {service.audit ? (
           <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between gap-4"><dt>Total of the lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Total of the product lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Difference from the order total</dt><dd>{service.audit.goodsNetDiscrepancy == null ? "The order total was not on the quote" : money(service.audit.goodsNetDiscrepancy)}</dd></div>
             {auditNotes.length > 0 ? (
               <div>

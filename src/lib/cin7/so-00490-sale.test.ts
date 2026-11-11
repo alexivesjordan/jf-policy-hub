@@ -90,6 +90,7 @@ describe("anonymised SO-00490 sale", () => {
     const prices = result.sites[0]?.prices;
     assert.ok(prices);
     assert.equal(result.goodsNetFromLines, 49066.53);
+    assert.equal(result.goodsNetFromLines + 5750, ingested.orderNet);
     assert.equal(result.goodsNetDiscrepancy, 0);
     assert.equal(result.flags.some((flag) => flag.code === "cin7_tax_included" || flag.code === "goods_net_missing"), false);
     assert.equal(prices.pmUnits, 20);
