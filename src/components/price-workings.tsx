@@ -43,10 +43,15 @@ function missingSettings(unset: string[]) {
   return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
 }
 
+function isBuildRecipe(value: string) {
+  return /crew\s*\d|build minutes|hq build|site position|person-hours|\blabour\b|assembly team/i.test(value) || value.length > 240;
+}
+
 function assumptionText(assumptions: string[]) {
-  if (!assumptions.length) return "No extra assumptions.";
-  const labels = assumptions.filter(isSettingKey).map(plainSetting);
-  const notes = assumptions.filter((item) => !isSettingKey(item)).map(plainSentence);
+  const shared = assumptions.filter((item) => !isBuildRecipe(item));
+  if (!shared.length) return "No extra assumptions.";
+  const labels = shared.filter(isSettingKey).map(plainSetting);
+  const notes = shared.filter((item) => !isSettingKey(item)).map(plainSentence);
   const lead = labels.length ? labels.join(", ") : "";
   return [lead, ...notes].filter(Boolean).join(". ");
 }
@@ -55,6 +60,8 @@ function plainSentence(value: string) {
   return value
     .replace(/[a-z0-9]+(?:_[a-z0-9]+)+/gi, (token) => plainSetting(token))
     .replace(/\bUNSET\b/g, "not set")
+    .replace(/GENERIC PROVISIONAL/gi, "provisional")
+    .replace(/SKU blank - add Cin7 SKU so quote lines match exactly\.?/gi, "no SKU, so it is matched by name.")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -83,6 +90,39 @@ function segmentSentence(segment: string | null, markup: number | null) {
 
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
+}
+
+export type InstallPriceNotesData = {
+  bigInstall: boolean;
+  bigInstallTriggers: string[];
+  paymentGate: string;
+  unset: string[];
+  assumptions: string[];
+  flags?: string[];
+};
+
+export function InstallPriceNotes({ notes }: { notes: InstallPriceNotesData }) {
+  const items = [
+    notes.bigInstall
+      ? `This is a big install. Photos or a walkthrough are required before booking${notes.bigInstallTriggers.length ? `: ${notes.bigInstallTriggers.map(plainSetting).join(", ")}` : ""}.`
+      : "This is not a big install. Photos and a walkthrough are not required before booking.",
+    plainPayment(notes.paymentGate),
+    `Not yet set: ${missingSettings(notes.unset)}`,
+    assumptionText(notes.assumptions),
+    ...(notes.flags ?? [])
+      .filter((flag) => !/^Crew plan:/i.test(flag) && !isBuildRecipe(flag))
+      .filter((flag) => flag.startsWith("Needs review:") || !/UNSET|not set|not configured/i.test(flag))
+      .map((flag) => (flag.startsWith("Needs review:") ? flag.replace(/ Confirm them on the Pricing page\./, "") : plainSentence(flag))),
+  ].filter((item) => item && !/\b1\.30\b|risk formula/i.test(item) && item !== "No extra assumptions." && item !== "Not yet set: Nothing else is missing.");
+
+  return (
+    <section className="rounded-3xl border border-line bg-card px-6 py-5">
+      <h3 className="font-display text-xl">Things that may affect this price</h3>
+      {items.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{items.map((item) => <li key={item}>{item}</li>)}</ul>
+      )}
+    </section>
+  );
 }
 
 export function PriceWorkings({
@@ -193,34 +233,24 @@ export function PriceWorkings({
         <p>{segmentSentence(segment, markup)}</p>
         <p className="font-display mt-2 text-3xl">{money(customerPrice)} ex VAT</p>
         <p className="text-grey">Internal cost {money(breakdown.siteCost + breakdown.hqCost)}</p>
-        <details open className="group mt-4 rounded-2xl border border-border">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            Assumptions and missing settings
-          </summary>
-          <dl className="space-y-3 px-4 pb-4 text-sm">
-            <div>
-              <dt className="font-semibold">{breakdown.bigInstall ? "This is a big install" : "This is not a big install"}</dt>
-              <dd className="mt-1 text-grey">
-                {breakdown.bigInstall
-                  ? `Photos or a walkthrough are required before booking${breakdown.bigInstallTriggers.length ? `: ${breakdown.bigInstallTriggers.map(plainSetting).join(", ")}` : ""}.`
-                  : "Photos and a walkthrough are not required before booking."}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold">Payment terms</dt>
-              <dd className="mt-1 text-grey">{plainPayment(breakdown.paymentGate)}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold">Not yet set in the effort table</dt>
-              <dd className="mt-1 text-grey">{missingSettings(breakdown.unset)}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold">Assumptions used for this price</dt>
-              <dd className="mt-1 text-grey">{assumptionText(breakdown.assumptions)}</dd>
-            </div>
-          </dl>
-        </details>
       </section>
+      <InstallPriceNotes
+        notes={{
+          bigInstall: breakdown.bigInstall,
+          bigInstallTriggers: breakdown.bigInstallTriggers,
+          paymentGate: breakdown.paymentGate,
+          unset: breakdown.unset,
+          assumptions: breakdown.assumptions,
+        }}
+      />
+      {breakdown.assumptions.some(isBuildRecipe) ? (
+        <section className="rounded-3xl border border-line bg-card px-5 py-4">
+          <h2 className="font-display text-2xl">Build notes</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-grey">
+            {breakdown.assumptions.filter(isBuildRecipe).map((note) => <li key={note}>{plainSentence(note)}</li>)}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

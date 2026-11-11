@@ -6,8 +6,7 @@ import { calculateServiceQuote, type ServiceQuoteResult } from "@/lib/service-qu
 import { buildServiceProposal } from "@/lib/service-quote/proposal";
 import { DEFAULT_SERVICE_RATES, type ServiceRates } from "@/lib/service-quote/rates";
 import { ingestCin7Quote, ingestPdfBytes, quoteCacheKey, type IngestedQuote } from "@/lib/quotes/ingest";
-import { requireSalesUser } from "@/lib/auth";
-import { moduleAllows } from "@/lib/access";
+import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { getCin7Client } from "@/lib/cin7/client";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/action-state";
@@ -20,9 +19,8 @@ export type ServiceQuoteView = {
   prices: ServiceQuoteResult["sites"];
   portfolioPm: ServiceQuoteResult["portfolioPm"];
   warnings: string[];
-  /** Null for a sales rep. Owner, admin, and operations edit see the flags and audit. */
-  flags: string[] | null;
-  audit: Pick<ServiceQuoteResult, "goodsNetFromLines" | "goodsNetDiscrepancy" | "sites" | "assumptions"> | null;
+  flags: string[];
+  audit: Pick<ServiceQuoteResult, "goodsNetFromLines" | "goodsNetDiscrepancy" | "assumptions">;
 };
 
 function ratesFromRow(row: Record<string, unknown> | null): { id: string | null; rates: ServiceRates } {
@@ -113,12 +111,11 @@ export async function loadServiceFromPdf(_state: ActionState, formData: FormData
 }
 
 export async function priceIngestedService(ingested: IngestedQuote): Promise<ServiceQuoteView> {
-  const profile = await requireSalesUser();
+  await requireSalesUser();
   const supabase = await createClient();
-  const [rateRow, ruleRow, flagsAllowed] = await Promise.all([
+  const [rateRow, ruleRow] = await Promise.all([
     supabase.rpc("service_current_rates"),
     supabase.rpc("service_list_rules"),
-    supabase.rpc("service_can_see_flags"),
   ]);
   const { id: rateId, rates } = ratesFromRow((rateRow.data ?? null) as Record<string, unknown> | null);
   const rules = (Array.isArray(ruleRow.data) ? ruleRow.data : []).map((row) => {
@@ -160,7 +157,6 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
     }],
   }, rates);
 
-  const seeFlags = flagsAllowed.data === true || profile.workspace_role === "owner" || profile.workspace_role === "admin" || moduleAllows(profile, "operations", "edit");
   let id: string | null = null;
   if (rateId) {
     const saved = await supabase.rpc("service_save_quote", {
@@ -188,10 +184,12 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
     prices: result.sites,
     portfolioPm: result.portfolioPm,
     warnings: ingested.warnings,
-    flags: seeFlags ? result.flags : null,
-    audit: seeFlags
-      ? { goodsNetFromLines: result.goodsNetFromLines, goodsNetDiscrepancy: result.goodsNetDiscrepancy, sites: result.sites, assumptions: result.assumptions }
-      : null,
+    flags: result.flags,
+    audit: {
+      goodsNetFromLines: result.goodsNetFromLines,
+      goodsNetDiscrepancy: result.goodsNetDiscrepancy,
+      assumptions: result.assumptions.filter((note) => !/\b1\.30\b|risk formula|extension factor/i.test(note)),
+    },
   };
 }
 
@@ -208,8 +206,8 @@ export async function priceServiceQuote(_state: ActionState, formData: FormData)
 }
 
 export async function saveServiceRates(_state: ActionState, formData: FormData): Promise<ActionState> {
-  const profile = await requireSalesUser();
-  if (profile.workspace_role !== "owner" && profile.workspace_role !== "admin") {
+  await requireSalesUser();
+  if (!(await canEditQuoteSettings())) {
     return { ok: false, message: "Only an owner or admin can change these rates." };
   }
   const supabase = await createClient();
@@ -234,8 +232,8 @@ export async function saveServiceRates(_state: ActionState, formData: FormData):
 }
 
 export async function saveClassificationRule(_state: ActionState, formData: FormData): Promise<ActionState> {
-  const profile = await requireSalesUser();
-  if (profile.workspace_role !== "owner" && profile.workspace_role !== "admin") {
+  await requireSalesUser();
+  if (!(await canEditQuoteSettings())) {
     return { ok: false, message: "Only an owner or admin can change classification." };
   }
   const supabase = await createClient();

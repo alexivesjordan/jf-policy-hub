@@ -46,10 +46,14 @@ function plainFlag(flag: string) {
   if (/manual rate\/category override/i.test(text)) {
     return "A manual category needs a written note before it can be used.";
   }
+  if (/Bundle and portfolio discount needs management approval/i.test(text)) {
+    return "This quote covers more than one site. The bundle and portfolio discount needs management approval.";
+  }
   return text.replace(/^[^:]+:\s*/, "").replace(/\s+/g, " ").trim();
 }
 
 function plainAssumption(note: string) {
+  if (/\b1\.30\b|risk formula|extension factor/i.test(note)) return "";
   return note
     .replace("are not in the warranty eligible value", "are not included in the warranty value")
     .replace("eligible parts only", "qualifying parts only");
@@ -63,12 +67,12 @@ export function ServiceQuoteResult({
   installPrice?: number | null;
 }) {
   const sites = service.prices ?? [];
-  const detail = service.flags !== null;
   const missingLinePrices = service.warnings.some((warning) => /line net/i.test(warning));
-  const ownerFlags = [...new Set([
+  const flags = [...new Set([
     ...(missingLinePrices ? ["Some lines did not include a price, so they were counted at £0. Upload the quote PDF to price them."] : []),
-    ...(service.flags ?? []).map(plainFlag),
-  ])];
+    ...service.flags.map(plainFlag),
+  ].filter((flag) => flag && !/\b1\.30\b|risk formula/i.test(flag)))];
+  const auditNotes = (service.audit?.assumptions ?? []).map(plainAssumption).filter(Boolean);
   return (
     <section className="space-y-4">
       {sites.map((site) => {
@@ -101,29 +105,24 @@ export function ServiceQuoteResult({
           </div>
         );
       })}
-      {!detail && missingLinePrices ? (
-        <p className="text-sm text-grey">Some lines need checking. Upload the quote PDF for a full price.</p>
-      ) : null}
-      {detail ? (
-        <div className="rounded-3xl border border-line bg-card px-6 py-5">
-          <h3 className="font-display text-xl">Flags</h3>
-          {ownerFlags.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{ownerFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
-          )}
-          {service.audit ? (
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4"><dt>Total of the lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Difference from the order total</dt><dd>{service.audit.goodsNetDiscrepancy == null ? "The order total was not on the quote" : money(service.audit.goodsNetDiscrepancy)}</dd></div>
-              {service.audit.assumptions.length > 0 ? (
-                <div>
-                  <dt className="font-semibold">Audit notes</dt>
-                  <dd className="mt-1 text-grey">{service.audit.assumptions.map(plainAssumption).join(" ")}</dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="rounded-3xl border border-line bg-card px-6 py-5">
+        <h3 className="font-display text-xl">Things that may affect this price</h3>
+        {flags.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{flags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
+        )}
+        {service.audit ? (
+          <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between gap-4"><dt>Total of the lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Difference from the order total</dt><dd>{service.audit.goodsNetDiscrepancy == null ? "The order total was not on the quote" : money(service.audit.goodsNetDiscrepancy)}</dd></div>
+            {auditNotes.length > 0 ? (
+              <div>
+                <dt className="font-semibold">Audit notes</dt>
+                <dd className="mt-1 text-grey">{auditNotes.join(" ")}</dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
+      </div>
     </section>
   );
 }

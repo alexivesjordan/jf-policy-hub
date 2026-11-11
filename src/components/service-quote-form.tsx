@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { Upload } from "lucide-react";
+import { LockedFields } from "@/components/locked-fields";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { priceServiceQuote, saveClassificationRule, saveServiceRates } from "@/features/sales/service-actions";
@@ -140,7 +141,6 @@ function PercentRate({
         <span className="text-muted-foreground">%</span>
       </span>
       <input type="hidden" name={name} value={Number.isFinite(saved) ? saved : stored} />
-      <span className="mt-1 block text-xs font-normal text-grey">Saved as {Number.isFinite(saved) ? saved.toFixed(2) : stored.toFixed(2)}</span>
     </label>
   );
 }
@@ -148,6 +148,7 @@ function PercentRate({
 export function ServiceRateEditor({ rates, canEdit }: { rates: ServiceRates; canEdit: boolean }) {
   const [state, action, pending] = useActionState(saveServiceRates, null);
   return (
+    <LockedFields locked={!canEdit}>
     <form action={action} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <MoneyRate name="callout" label="Call-out" pounds={rates.callout} disabled={!canEdit} />
@@ -170,9 +171,10 @@ export function ServiceRateEditor({ rates, canEdit }: { rates: ServiceRates; can
           <Input name="reason" disabled={!canEdit} />
         </label>
       </div>
-      {canEdit ? <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save rates"}</Button> : <p className="text-sm text-grey">Only an owner or admin can change these rates.</p>}
+      <Button type="submit" disabled={!canEdit || pending}>{pending ? "Saving…" : "Save rates"}</Button>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
     </form>
+    </LockedFields>
   );
 }
 
@@ -212,11 +214,11 @@ export function ClassificationEditor({ rules, canEdit }: { rules: Classification
           </tbody>
         </table>
       </div>
-      {canEdit ? (
+      <LockedFields locked={!canEdit}>
         <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-semibold">
             <span className="mb-1 block text-muted-foreground">Match</span>
-            <Select name="matchKind" defaultValue="description_contains" aria-label="Match">
+            <Select name="matchKind" defaultValue="description_contains" aria-label="Match" disabled={!canEdit}>
               <option value="description_contains">Description contains</option>
               <option value="category_name">Cin7 category</option>
               <option value="sku">SKU</option>
@@ -224,24 +226,24 @@ export function ClassificationEditor({ rules, canEdit }: { rules: Classification
           </label>
           <label className="text-sm font-semibold">
             <span className="mb-1 block text-muted-foreground">Value</span>
-            <Input name="matchValue" required />
+            <Input name="matchValue" required disabled={!canEdit} />
           </label>
           <label className="text-sm font-semibold">
             <span className="mb-1 block text-muted-foreground">Category</span>
-            <Select name="category" defaultValue="strength_machine" aria-label="Category">
+            <Select name="category" defaultValue="strength_machine" aria-label="Category" disabled={!canEdit}>
               {SERVICE_CATEGORIES.map((category) => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}
             </Select>
           </label>
           <label className="text-sm font-semibold">
             <span className="mb-1 block text-muted-foreground">Priority</span>
-            <Input name="priority" type="number" defaultValue={100} />
+            <Input name="priority" type="number" defaultValue={100} disabled={!canEdit} />
           </label>
           <div className="sm:col-span-2 lg:col-span-4">
-            <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save rule"}</Button>
+            <Button type="submit" disabled={!canEdit || pending}>{pending ? "Saving…" : "Save rule"}</Button>
           </div>
           {state ? <div className="sm:col-span-2 lg:col-span-4"><Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner></div> : null}
         </form>
-      ) : null}
+      </LockedFields>
     </div>
   );
 }

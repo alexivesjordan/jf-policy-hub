@@ -78,6 +78,13 @@ export async function requireWorkspaceAdmin() {
   return profile;
 }
 
+/** Owners and admins. A sales rep passes workspace_can('sales','edit'), so that does not gate these fields. */
+export async function canEditQuoteSettings() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("workspace_is_admin");
+  return !error && data === true;
+}
+
 export async function requireSalesUser() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");

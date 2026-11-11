@@ -14,6 +14,7 @@ import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
+import type { InstallPriceNotesData } from "@/components/price-workings";
 import { effortRowForSku, forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
 import { tilesFromSale } from "@/lib/pricer/flooring";
 import { looksLikeUkPostcode, normaliseUkPostcode } from "@/lib/quotes/postcode";
@@ -71,6 +72,7 @@ export type PricedQuote = ReturnType<typeof forSales> & {
   repSummary?: { cost: number; price: number; margin: number | null } | null;
   warnings: string[];
   breakdown?: QuoteBreakdown | null;
+  priceNotes?: InstallPriceNotesData | null;
   segment?: string | null;
   cost?: number | null;
   markup?: number | null;
@@ -390,6 +392,14 @@ async function priceDraft(draft: QuoteDraft) {
           margin: result.customerPrice === 0 ? null : (result.customerPrice - result.cost) / result.customerPrice,
         }
       : null,
+    priceNotes: {
+      bigInstall: result.breakdown?.bigInstall ?? result.bigInstall,
+      bigInstallTriggers: result.breakdown?.bigInstallTriggers ?? result.bigInstallTriggers,
+      paymentGate: result.breakdown?.paymentGate ?? result.paymentGate,
+      unset: result.breakdown?.unset ?? [],
+      assumptions: (result.breakdown?.assumptions ?? []).filter((note) => !/crew\s*\d|build minutes|hq build|site position|person-hours|\blabour\b|assembly team/i.test(note) && note.length <= 240),
+      flags: [...result.flags, ...floorFlags].filter((flag) => !/^Crew plan:/i.test(flag) && !/\b1\.30\b/.test(flag) && !/crew\s*\d|build minutes|hq build|site position|person-hours|\blabour\b|assembly team/i.test(flag)),
+    },
   };
   if (showCost) {
     view.cost = result.cost;

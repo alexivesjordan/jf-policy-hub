@@ -1,7 +1,7 @@
 import { ClassificationEditor, ServiceQuoteForm, ServiceRateEditor, type ClassificationRuleRow } from "@/components/service-quote-form";
-import { Card } from "@/components/pulse/ui";
+import { QuoteSettingsButton } from "@/components/quote-settings-button";
 import { PageHeader } from "@/components/pulse/page-header";
-import { requireSalesUser } from "@/lib/auth";
+import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { DEFAULT_SERVICE_RATES } from "@/lib/service-quote/rates";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata = { title: "Warranties and Servicing" };
 
 export default async function ServiceQuotePage() {
-  const profile = await requireSalesUser();
+  await requireSalesUser();
+  const canEdit = await canEditQuoteSettings();
   const supabase = await createClient();
   const [rateRow, ruleRow] = await Promise.all([
     supabase.rpc("service_current_rates"),
@@ -33,7 +34,6 @@ export default async function ServiceQuotePage() {
       }
     : DEFAULT_SERVICE_RATES;
   const rules = (Array.isArray(ruleRow.data) ? ruleRow.data : []) as ClassificationRuleRow[];
-  const canEdit = profile.workspace_role === "owner" || profile.workspace_role === "admin";
 
   return (
     <div className="space-y-8">
@@ -41,22 +41,25 @@ export default async function ServiceQuotePage() {
         eyebrow="Pulse Sales"
         title="Warranties and Servicing"
         description="Price proactive maintenance and the five-year parts warranty from an order number or a quote PDF."
+        actions={
+          <QuoteSettingsButton
+            title="Warranty and servicing settings"
+            description="Rates and the rules that decide which category a product uses."
+          >
+            <section className="space-y-3">
+              <h2 className="font-display text-xl">Rate table</h2>
+              <p className="text-sm text-grey">Version {rates.version}. New quotes use the latest saved card.</p>
+              <ServiceRateEditor rates={rates} canEdit={canEdit} />
+            </section>
+            <section className="space-y-3">
+              <h2 className="font-display text-xl">SKU and category mapping</h2>
+              <p className="text-sm text-grey">A matching rule overrides the built-in name check.</p>
+              <ClassificationEditor rules={rules} canEdit={canEdit} />
+            </section>
+          </QuoteSettingsButton>
+        }
       />
       <ServiceQuoteForm cin7Connected={cin7IsConnected()} />
-      {canEdit ? (
-        <>
-          <Card>
-            <h2 className="font-display text-2xl">Rate table</h2>
-            <p className="mt-2 text-sm text-grey">Version {rates.version}. New quotes use the latest saved card.</p>
-            <div className="mt-4"><ServiceRateEditor rates={rates} canEdit={canEdit} /></div>
-          </Card>
-          <Card>
-            <h2 className="font-display text-2xl">SKU and category mapping</h2>
-            <p className="mt-2 text-sm text-grey">A matching rule overrides the built-in name check.</p>
-            <div className="mt-4"><ClassificationEditor rules={rules} canEdit={canEdit} /></div>
-          </Card>
-        </>
-      ) : null}
     </div>
   );
 }

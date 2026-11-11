@@ -202,6 +202,12 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
+  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep";
+  if (fn === "workspace_can") {
+    const moduleName = String(args?.p_module ?? "");
+    if (process.env.PULSE_FIXTURE_ROLE !== "rep") return true;
+    return moduleName === "sales";
+  }
   if (fn === "workspace_my_access") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
@@ -301,10 +307,10 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       settings: null,
       pricing_settings: {
         version: 3,
-        markup_independent: 1.35,
-        markup_franchisee: 1.25,
-        markup_trade: 1.2,
-        markup_big_corporate: 1.15,
+        markup_independent: 0.4,
+        markup_franchisee: 0.4,
+        markup_trade: 0.5,
+        markup_big_corporate: 0.8,
         min_job_charge: 450,
         margin_floor_pct: 0.18,
         custom_deposit_fraction: 0.5,

@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
-import { PriceWorkings } from "@/components/price-workings";
+import { InstallPriceNotes, PriceWorkings } from "@/components/price-workings";
 import { QuoteNotice } from "@/components/quote-notice";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
@@ -122,6 +122,7 @@ export function PriceQuoteForm({
             </dl>
           </div>
         ) : null}
+        {quote?.priceNotes ? <InstallPriceNotes notes={quote.priceNotes} /> : null}
         {includeService && quote?.service ? (
           <>
             <ServiceQuoteResult service={quote.service} installPrice={summary?.price ?? null} />
