@@ -73,6 +73,7 @@ export const pulseModules: PulseModule[] = [
     paths: ["/operations"],
     nav: [
       { href: "/operations", label: "Overview" },
+      { href: "/operations/installs", label: "Installs" },
       { href: "/operations/jobs", label: "Jobs" },
       { href: "/operations/calendar", label: "Resource Availability" },
       { href: "/operations/tasks", label: "Tasks" },
@@ -91,6 +92,7 @@ export const pulseModules: PulseModule[] = [
     nav: [
       { href: "/sales", label: "Overview" },
       { href: "/sales/quote", label: "Install quoting" },
+      { href: "/sales/installs", label: "Installs" },
       { href: "/sales/service", label: "Warranties and Servicing" },
     ],
   },

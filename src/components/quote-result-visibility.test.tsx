@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QuoteLineFields } from "@/components/quote-line-fields";
 import { compactPriceFlags, InstallPriceNotes, type InstallPriceNotesData } from "@/components/price-workings";
+import { InstallSalesView } from "@/components/install-sales-view";
 import { ServiceQuoteResult } from "@/components/service-quote-view";
 
 const notes: InstallPriceNotesData = {
@@ -135,5 +136,29 @@ describe("sales quote results hide line lists", () => {
     assert.equal(warranty.includes("Things that may affect this price"), false);
     assert.equal(servicePage.includes("Things that may affect this price"), false);
     assert.equal(servicePage.includes("ProposalButton"), true);
+  });
+
+  it("keeps operational detail off the sales install page", () => {
+    const html = renderToStaticMarkup(
+      <InstallSalesView
+        install={{
+          orderNumber: "SO-1",
+          installPrice: 1000,
+          customerName: "Gym",
+          startOn: "2026-11-16",
+          endOn: "2026-11-18",
+          flags: ["SECRET-FLAG"],
+          hqBuild: { personHours: 8 },
+          lines: [{ description: "HIDDEN-PRODUCT", qty: 2 }],
+          cin7SaleId: "secret-sale",
+        }}
+      />,
+    );
+    assert.equal(html.includes("SO-1"), true);
+    assert.equal(html.includes("16/11/2026"), true);
+    assert.equal(html.includes("SECRET-FLAG"), false);
+    assert.equal(html.includes("HQ build"), false);
+    assert.equal(html.includes("HIDDEN-PRODUCT"), false);
+    assert.equal(html.includes("secret-sale"), false);
   });
 });

@@ -38,7 +38,7 @@ async function freshDates(quoteId: string, from: string, to: string) {
 }
 
 export async function listInstallStartDates(quoteId: string, from: string, to: string): Promise<InstallActionResult> {
-  await requireSalesUser();
+  await requireInstallReader();
   if (!ID.test(quoteId) || !DAY.test(from) || !DAY.test(to)) {
     return { ok: false, message: "Choose the quote and a date range.", dates: [] };
   }
@@ -96,6 +96,17 @@ export async function moveInstall(installId: string, startDate: string): Promise
     return { ok: false, message: messageFromError(moved.error, "Could not move that install."), dates: [] };
   }
   return { ok: true, message: "Install dates updated.", install: (moved.data ?? null) as Record<string, unknown> | null };
+}
+
+export async function installProposalUrl(path: unknown) {
+  await requireInstallReader();
+  if (typeof path !== "string" || !path) return null;
+  if (path.startsWith("https://") || path.startsWith("http://")) return path;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const signed = await admin.storage.from("service-proposals").createSignedUrl(path, 60 * 10);
+  return signed.data?.signedUrl ?? null;
 }
 
 export async function setInstallStatus(installId: string, status: string): Promise<InstallActionResult> {

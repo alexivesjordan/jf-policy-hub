@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
+import { BookInstallDialog } from "@/components/book-install-dialog";
 import { QuoteLineFields } from "@/components/quote-line-fields";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
@@ -102,6 +103,7 @@ export function PriceQuoteForm({
         ) : null}
         {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
         {summary ? <InstallPriceCard price={summary.price} quoteNumber={quote?.quoteNumber} postcode={quote?.postcode} /> : null}
+        {quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
         {includeService && quote?.service ? (
           <>
             <ServiceQuoteResult service={quote.service} />
@@ -185,6 +187,7 @@ export function PriceQuoteForm({
 
       {draft && (priced || created) ? <Banner tone={(created ?? priced)?.ok ? "success" : "error"}>{(created ?? priced)?.message}</Banner> : null}
       {quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
+      {quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
       {includeService && quote?.service ? (
         <>
           <ServiceQuoteResult service={quote.service} />
@@ -244,6 +247,10 @@ function QuoteFileDrop({ onReady }: { onReady: () => void }) {
 
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
+}
+
+function warrantyPrices(service: { prices?: { prices: { annualPm: number; twiceYearlyPm: number; extendedWarrantyOneOff: number; annualBundleYear1: number | null; twiceBundleYear1: number | null } }[] } | null | undefined) {
+  return service?.prices?.[0]?.prices ?? null;
 }
 
 function InstallPriceCard({ price, quoteNumber, postcode }: { price: number; quoteNumber?: string; postcode?: string }) {

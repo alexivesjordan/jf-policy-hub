@@ -386,7 +386,77 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "orbit_sku_effort_for_pricing") return [];
   if (fn === "orbit_record_fixture_quote" || fn === "orbit_record_cin7_sale") return { job_id: JOB_PRICED };
   if (fn === "orbit_save_job_requirements" || fn === "orbit_remember_segment") return true;
+  if (fn === "install_save_quote") return "11111111-1111-4111-8111-111111111111";
+  if (fn === "install_available_starts") {
+    const from = String(args?.p_from ?? "2026-11-16").slice(0, 10);
+    return [0, 1, 2, 7].map((days) => isoPlus(from, days));
+  }
+  if (fn === "install_book") {
+    const start = String(args?.p_start ?? "2026-11-16").slice(0, 10);
+    return fixtureInstall(start, String(args?.p_warranty ?? "none"), true);
+  }
+  if (fn === "install_calendar") {
+    const rows = [fixtureInstall("2026-11-16", "annual", true), fixtureInstall("2026-11-23", "none", false)];
+    return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
+  }
+  if (fn === "install_read") {
+    const id = String(args?.p_id ?? "");
+    const row = id.endsWith("b2") ? fixtureInstall("2026-11-23", "none", false) : fixtureInstall("2026-11-16", "annual", true);
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") {
+      const source = row as Record<string, unknown>;
+      const sales: Record<string, unknown> = {};
+      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
+        sales[key] = source[key];
+      }
+      return sales;
+    }
+    return row;
+  }
+  if (fn === "install_move") {
+    const start = String(args?.p_start ?? "2026-11-18").slice(0, 10);
+    return fixtureInstall(start, "annual", true);
+  }
+  if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
   return null;
+}
+
+function isoPlus(iso: string, days: number) {
+  const date = new Date(`${iso}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked") {
+  const end = isoPlus(start, 2);
+  return {
+    id: mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
+    orderNumber: mine ? "EXAMPLE-00490" : "SO-1002",
+    goodsNet: 49066.53,
+    installPrice: 4743.62,
+    warrantyOption: warranty === "none" ? null : warranty,
+    warrantyPrice: warranty === "annual" ? 1895 : null,
+    startOn: start,
+    endOn: end,
+    customerName: mine ? "Example Sports Centre" : "Northside Fitness",
+    contactName: "Alex Example",
+    contactEmail: "alex.example@example.com",
+    contactPhone: "01603 000000",
+    siteAddress: "Example Road, Exampletown IP1 9ZZ",
+    status,
+    bookingRepId: mine ? USER_ID : "00000000-0000-4000-8000-000000000003",
+    bookingRepName: mine ? "Alex Ives" : "Riley Hart",
+    proposalPath: mine ? "ops/proposal.docx" : null,
+    serviceQuoteId: mine ? "svc-quote-1" : null,
+    flags: { install: ["Needs review: HIDDEN-RACK"], service: [] },
+    hqBuild: { personHours: 6, lines: [{ productName: "HIDDEN-PRODUCT", qty: 2, minutes: 40, crew: 2 }] },
+    siteInstall: { days: 2, nights: 0, onSiteHours: 8 },
+    crew: 2,
+    vans: { size: "small", count: 1 },
+    resources: [{ id: "res-lee", name: "Lee" }],
+    lines: [{ sku: "HIDDEN-SKU", description: "HIDDEN-PRODUCT", qty: 2, category: "cardio", lineNet: 1000 }],
+    cin7SaleId: "sale-1",
+    cin7CustomerId: "customer-1",
+  };
 }
 
 type Filter = { kind: "eq" | "neq" | "lte" | "null" | "notnull"; column: string; value?: unknown };
