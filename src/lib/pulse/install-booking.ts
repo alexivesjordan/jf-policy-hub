@@ -76,15 +76,17 @@ export function availableStartDates(input: {
   let cursor = input.from;
   const guardLimit = 400;
   let guard = 0;
+  // Saturday and Sunday are never a start date. An owner override can come later.
+  void input.allowWeekends;
   while (cursor <= input.to && guard < guardLimit) {
-    if (input.allowWeekends || !isWeekend(cursor)) {
+    if (!isWeekend(cursor)) {
       const plan = planRange(
         input.requirements,
         input.resources,
         input.busyByDay,
         cursor,
         input.totalDays,
-        input.allowWeekends,
+        false,
       );
       if (plan.selectable && plan.chosenIds.length > 0) dates.push(cursor);
     }
@@ -92,6 +94,11 @@ export function availableStartDates(input: {
     guard += 1;
   }
   return dates;
+}
+
+/** Drops Saturday and Sunday. Used by the booking date list for every role. */
+export function dropWeekendStarts(days: readonly string[]) {
+  return days.filter((day) => !isWeekend(day));
 }
 
 export function reservationKeys(resourceIds: readonly string[], days: readonly string[]) {

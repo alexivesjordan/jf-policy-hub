@@ -4,6 +4,7 @@ import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
+import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -28,7 +29,7 @@ async function requireInstallReader() {
 
 function datesFrom(data: unknown) {
   if (!Array.isArray(data)) return [];
-  return data.map((day) => String(day).slice(0, 10)).filter((day) => DAY.test(day));
+  return dropWeekendStarts(data.map((day) => String(day).slice(0, 10)).filter((day) => DAY.test(day)));
 }
 
 async function freshDates(quoteId: string, from: string, to: string) {

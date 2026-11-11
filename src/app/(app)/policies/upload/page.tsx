@@ -42,7 +42,7 @@ export default async function UploadPage({
       <PageHeader
         eyebrow="Pulse People"
         title="Upload a policy document"
-        description="Choose any draft or active policy, including one that already has a file. Word and PDF files are read into the policy text, and the original file stays attached. Saving creates a new version."
+        description="Word and PDF files are read into the policy text, and the original file stays attached. Saving creates a new version."
       />
       <div className="rounded-3xl border border-line bg-card p-5">
         <UploadForm policies={options} categories={categories} initialPolicyId={initialPolicyId} />

@@ -18,7 +18,6 @@ export default async function RolesPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Roles"
-        description="What each role can do in Jordan Pulse."
       />
       <ul className="space-y-3">
         {ROLES.map(([name, detail]) => (

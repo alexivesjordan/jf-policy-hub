@@ -11,7 +11,7 @@ export function QuoteSettingsButton({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
 }) {
   return (
@@ -23,7 +23,7 @@ export function QuoteSettingsButton({
       <DialogContent className="max-h-[min(85vh,52rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <div className="space-y-8">{children}</div>
       </DialogContent>

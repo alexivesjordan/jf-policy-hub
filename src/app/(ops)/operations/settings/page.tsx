@@ -63,7 +63,6 @@ async function SettingsBody({
       <PageHeader
         eyebrow="Pulse Operations"
         title="Effort table"
-        description="Markups, category defaults, and how long each product takes to install."
         actions={<SyncProductsButton />}
       />
 
@@ -121,7 +120,6 @@ async function SettingsBody({
       <Card>
         <div>
           <h2 className="font-display text-2xl">Effort table</h2>
-          <p className="mt-2 max-w-2xl text-sm text-grey">How long each product takes to install.</p>
           {effort && effort.review_count > 0 ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-3">
               <p className="text-sm font-semibold">{effort.review_count} {effort.review_count === 1 ? "product needs" : "products need"} a review.</p>

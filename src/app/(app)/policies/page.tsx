@@ -55,7 +55,6 @@ async function PoliciesBody({
       <PageHeader
         eyebrow="Pulse People"
         title="Policies"
-        description="The policies people are expected to follow."
         actions={
           <>
             <TextLink href="/policies/upload">Upload a policy document</TextLink>

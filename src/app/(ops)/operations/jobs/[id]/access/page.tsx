@@ -71,7 +71,7 @@ export default async function AccessReviewPage({ params }: { params: Promise<{ i
       <Link href={`/operations/jobs/${id}`} className="text-sm font-semibold underline decoration-red">
         Back to the job
       </Link>
-      <PageHeader eyebrow="Pulse Operations" title="Access review" description={`${job.customer.name}. Mode B compares the form with the best-case price.`} />
+      <PageHeader eyebrow="Pulse Operations" title="Access review" description={job.customer.name} />
       {forms.length === 0 ? (
         <EmptyState title="No access form yet" description="The customer link collects site access before this review can compare it with the price." />
       ) : (

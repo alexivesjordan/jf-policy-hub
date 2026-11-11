@@ -11,7 +11,7 @@ export default async function NewPolicyPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader eyebrow="Pulse People" title="Write a new policy" description="Saving creates the first version. You can also upload a Word file instead." />
+      <PageHeader eyebrow="Pulse People" title="Write a new policy" />
       <PolicyForm categories={categories} people={people} />
     </div>
   );

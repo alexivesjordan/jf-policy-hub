@@ -98,7 +98,6 @@ export function PriceQuoteForm({
         {selling && !readingPdf ? (
           <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
             <p className="font-display text-3xl">Calculating…</p>
-            <p className="mt-2 text-sm text-grey">Fetching the order and pricing the install.</p>
           </div>
         ) : null}
         {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
@@ -202,7 +201,7 @@ function ReadingQuote() {
   return (
     <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
       <p className="font-display text-3xl">Reading quote…</p>
-      <p className="mt-2 text-sm text-grey">Reading the PDF. The file is not kept.</p>
+      <p className="mt-2 text-sm text-grey">The file is not kept.</p>
     </div>
   );
 }

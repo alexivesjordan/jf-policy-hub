@@ -26,7 +26,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
       <PageHeader
         eyebrow="Pulse Operations"
         title="Pencil the install"
-        description={`${job.customer.name}. A green day can start the install. The booking is a pencil for the office to confirm. Tap a day, or use the arrow keys.`}
+        description={job.customer.name}
       />
       {requirements ? (
         <MonthBookingCalendar jobId={job.id} />

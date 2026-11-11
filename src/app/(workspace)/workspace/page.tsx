@@ -11,7 +11,7 @@ export default async function WorkspaceHomePage() {
       <PageHeader
         eyebrow="Jordan Pulse"
         title="Workspace"
-        description="Users, teams, and roles for the whole business. Each person has one role and can belong to more than one team."
+        description="Each person has one role and can belong to more than one team."
       />
       <div className="grid gap-3 sm:grid-cols-3">
         <Link href="/workspace/users" className="rounded-3xl border border-line bg-card p-5 font-semibold text-ink">Users</Link>

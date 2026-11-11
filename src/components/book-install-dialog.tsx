@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { enGB } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/pulse/ui";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { bookInstall, listInstallStartDates } from "@/features/sales/install-actions";
+import { isWeekend } from "@/lib/pulse/booking-range";
 import type { WarrantyChoice } from "@/lib/pulse/install-booking";
 import { ukDate } from "@/components/install-sales-view";
 
@@ -32,6 +33,18 @@ function pounds(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
 
+function useWideScreen() {
+  return useSyncExternalStore(
+    (notify) => {
+      const query = window.matchMedia("(min-width: 768px)");
+      query.addEventListener("change", notify);
+      return () => query.removeEventListener("change", notify);
+    },
+    () => window.matchMedia("(min-width: 768px)").matches,
+    () => false,
+  );
+}
+
 export function BookInstallDialog({
   quoteId,
   warranty,
@@ -39,6 +52,7 @@ export function BookInstallDialog({
   quoteId: string;
   warranty: WarrantyPrices | null;
 }) {
+  const wide = useWideScreen();
   const [open, setOpen] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,7 +72,7 @@ export function BookInstallDialog({
   const choices = warrantyChoices(warranty);
 
   async function confirm() {
-    if (!start) return;
+    if (!start || isWeekend(iso(start))) return;
     setLoading(true);
     const result = await bookInstall(quoteId, iso(start), option);
     setLoading(false);
@@ -79,46 +93,56 @@ export function BookInstallDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) void load(); }}>
       <DialogTrigger render={<Button type="button" />}>Book install</DialogTrigger>
-      <DialogContent className="max-h-[min(85vh,44rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[min(92vh,52rem)] overflow-y-auto sm:max-w-md md:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Book install</DialogTitle>
-          <DialogDescription>Choose a free start date. The job is booked straight away.</DialogDescription>
         </DialogHeader>
         {booked ? (
-          <div className="space-y-3">
+          <div className="space-y-3 text-center">
             <p className="font-semibold">Booked for {ukDate(booked.startOn)} – {ukDate(booked.endOn)}</p>
             {booked.id ? <Link className="font-semibold underline decoration-primary" href={`/sales/installs/${booked.id}`}>Open the install</Link> : null}
           </div>
         ) : (
-          <div className="space-y-4">
-            {loading ? <p className="text-sm text-grey">Checking free dates…</p> : null}
-            {message ? <p className="text-sm">{message}</p> : null}
-            {!loading && dates.length === 0 ? <p className="text-sm text-grey">No start dates are free in the next six weeks.</p> : null}
-            <Calendar
-              mode="single"
-              locale={enGB}
-              weekStartsOn={1}
-              selected={start}
-              onSelect={setStart}
-              defaultMonth={dates[0] ? new Date(`${dates[0]}T12:00:00`) : undefined}
-              disabled={(date) => !dates.includes(iso(date))}
-            />
+          <div className="space-y-6">
+            {loading ? <p className="text-center text-sm text-grey">Checking free dates…</p> : null}
+            {message ? <p className="text-center text-sm">{message}</p> : null}
+            {!loading && dates.length === 0 ? <p className="text-center text-sm text-grey">No start dates are free in the next six weeks.</p> : null}
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                locale={enGB}
+                weekStartsOn={1}
+                numberOfMonths={wide ? 2 : 1}
+                selected={start}
+                onSelect={(day) => {
+                  if (!day || isWeekend(iso(day))) return;
+                  setStart(day);
+                }}
+                defaultMonth={dates[0] ? new Date(`${dates[0]}T12:00:00`) : undefined}
+                disabled={(date) => isWeekend(iso(date)) || !dates.includes(iso(date))}
+                className="mx-auto [--cell-size:2.75rem]"
+              />
+            </div>
             {choices.length > 1 ? (
-              <fieldset className="space-y-2">
+              <fieldset className="mx-auto w-full max-w-xl space-y-1">
                 <legend className="text-sm font-semibold">Maintenance and warranty</legend>
                 {choices.map((choice) => (
-                  <label key={choice.value} className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                  <label key={choice.value} className="flex min-h-11 items-center justify-between gap-3 rounded-xl px-2 text-sm hover:bg-muted">
                     <span className="flex items-center gap-2">
                       <input type="radio" name="warrantyOption" checked={option === choice.value} onChange={() => setOption(choice.value)} />
                       {choice.label}
                     </span>
-                    <span>{choice.price == null ? "" : pounds(choice.price)}</span>
+                    <span className="tabular-nums">{choice.price == null ? "" : pounds(choice.price)}</span>
                   </label>
                 ))}
               </fieldset>
             ) : null}
-            <Button type="button" disabled={!start || loading} onClick={() => void confirm()}>Confirm booking</Button>
           </div>
+        )}
+        {booked ? null : (
+          <DialogFooter>
+            <Button type="button" disabled={!start || loading} onClick={() => void confirm()}>Confirm booking</Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

@@ -27,7 +27,6 @@ async function OpsInstalls({
     <InstallCalendarPage
       basePath="/operations/installs"
       title="Installs"
-      description="Booked installs for the office. Open one to see the build, the crew, and the flags."
       searchParams={searchParams}
     />
   );

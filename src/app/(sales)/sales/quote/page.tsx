@@ -51,12 +51,8 @@ export default async function SalesQuotePage() {
       <PageHeader
         eyebrow="Pulse Sales"
         title="Install quoting"
-        description="Enter an order number or upload a quote. Then book the install."
         actions={
-          <QuoteSettingsButton
-            title="Install quoting settings"
-            description="Markups, floors, and how long each category takes to install."
-          >
+          <QuoteSettingsButton title="Install quoting settings">
             <section className="space-y-3">
               <h2 className="font-display text-xl">Markups and floors</h2>
               <PricingForm

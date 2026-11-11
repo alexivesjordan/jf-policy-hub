@@ -40,12 +40,8 @@ export default async function ServiceQuotePage() {
       <PageHeader
         eyebrow="Pulse Sales"
         title="Warranties and Servicing"
-        description="Price proactive maintenance and the five-year parts warranty from an order number or a quote PDF."
         actions={
-          <QuoteSettingsButton
-            title="Warranty and servicing settings"
-            description="Rates and the rules that decide which category a product uses."
-          >
+          <QuoteSettingsButton title="Warranty and servicing settings">
             <section className="space-y-3">
               <h2 className="font-display text-xl">Rate table</h2>
               <p className="text-sm text-grey">Version {rates.version}. New quotes use the latest saved card.</p>
@@ -53,7 +49,7 @@ export default async function ServiceQuotePage() {
             </section>
             <section className="space-y-3">
               <h2 className="font-display text-xl">SKU and category mapping</h2>
-              <p className="text-sm text-grey">Set a SKU or a name to a category. This is not the list of lines on an order.</p>
+              <p className="text-sm text-grey">This is not the list of lines on an order.</p>
               <ClassificationEditor rules={rules} canEdit={canEdit} />
             </section>
           </QuoteSettingsButton>

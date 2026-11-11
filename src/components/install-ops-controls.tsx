@@ -63,7 +63,7 @@ export function InstallOpsControls({
         </div>
         <div>
           <p className="text-sm font-semibold">Move dates</p>
-          <p className="mt-1 text-sm text-grey">{start ? `New start ${format(start, "dd/MM/yyyy", { locale: enGB })}` : "Choose a new start date. dd/mm/yyyy"}</p>
+          {start ? <p className="mt-1 text-sm text-grey">New start {format(start, "dd/MM/yyyy", { locale: enGB })}</p> : null}
           <Calendar
             mode="single"
             locale={enGB}

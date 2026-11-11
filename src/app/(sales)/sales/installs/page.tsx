@@ -14,7 +14,6 @@ export default function SalesInstallsPage({
       <InstallCalendarPage
         basePath="/sales/installs"
         title="Installs"
-        description="Every booked install. My installs shows only the ones you booked."
         searchParams={searchParams}
       />
     </Suspense>

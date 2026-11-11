@@ -4,6 +4,7 @@ import type { PoolResource } from "./availability";
 import {
   availableStartDates,
   claimReservation,
+  dropWeekendStarts,
   createReservationGate,
   jobSpanDays,
   OPS_INSTALL_FIELDS,
@@ -88,6 +89,20 @@ describe("instant install booking", () => {
       allowWeekends: false,
     });
     assert.deepEqual(vanBusyOnFirstDay, ["2026-11-18"]);
+  });
+
+  it("never offers a Saturday or Sunday, including when weekends are allowed", () => {
+    const open = availableStartDates({
+      from: "2026-11-20",
+      to: "2026-11-23",
+      totalDays: 1,
+      requirements,
+      resources,
+      busyByDay: {},
+      allowWeekends: true,
+    });
+    assert.deepEqual(open, ["2026-11-20", "2026-11-23"]);
+    assert.deepEqual(dropWeekendStarts(["2026-11-20", "2026-11-21", "2026-11-22", "2026-11-23"]), ["2026-11-20", "2026-11-23"]);
   });
 
   it("lets one of two simultaneous bookings claim the van", async () => {

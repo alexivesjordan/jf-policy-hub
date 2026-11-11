@@ -12,7 +12,6 @@ export function ProposalButton({ quoteId }: { quoteId: string | null }) {
     <form action={action} className="space-y-3">
       <input type="hidden" name="serviceQuoteId" value={quoteId ?? ""} />
       <Button type="submit" variant="secondary" disabled={pending || !quoteId}>{pending ? "Creating the proposal…" : "Generate proposal"}</Button>
-      {pending ? <p role="status" className="text-sm text-grey">Creating the Word document. It is not created until you press the button.</p> : null}
       {state && !state.ok ? <Banner tone="error">{state.message}</Banner> : null}
       {state?.downloadUrl ? (
         <p className="text-sm">

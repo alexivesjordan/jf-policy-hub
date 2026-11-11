@@ -35,7 +35,6 @@ export default async function WorkspaceUsersPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Users"
-        description="Invite colleagues and choose what they can open."
       />
       <form action={inviteWorkspaceUser} className="grid gap-3 rounded-3xl border border-line bg-card p-5 md:grid-cols-4">
         <label className="text-sm md:col-span-2">

@@ -19,7 +19,6 @@ export default async function OperationsNotificationsPage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Notifications"
-        description="Notes from the install office."
         actions={
           unread ? (
             <form action={markAllPulseNotificationsRead}>

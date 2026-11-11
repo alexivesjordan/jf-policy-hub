@@ -166,9 +166,7 @@ export function MonthBookingCalendar({ jobId }: { jobId: string }) {
             ))}
             {chosen.lines.length === 0 ? <li className="text-sm text-muted-foreground">No resources are on the calendar yet.</li> : null}
           </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">Tap a green day to see who is free. Arrow keys move between days.</p>
-        )}
+        ) : null}
       </div>
       <form action={action} className="mt-5">
         <input type="hidden" name="jobId" value={jobId} />

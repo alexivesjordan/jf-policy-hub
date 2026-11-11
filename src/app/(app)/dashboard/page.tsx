@@ -34,7 +34,6 @@ async function DashboardBody() {
       <PageHeader
         eyebrow="Pulse People"
         title={`Hello ${greetingName(profile)}`}
-        description="What needs a decision, and what changed recently."
       />
 
       <div className="grid gap-4 md:grid-cols-3">

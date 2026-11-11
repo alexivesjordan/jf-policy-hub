@@ -19,7 +19,6 @@ export default async function TasksPage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Tasks"
-        description="Open follow-ups for the install office."
       />
       {canCreate ? (
         <Card>

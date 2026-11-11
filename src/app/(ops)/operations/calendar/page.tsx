@@ -44,7 +44,6 @@ async function CalendarBody() {
       <PageHeader
         eyebrow="Pulse Operations"
         title="Resource Availability"
-        description="Who is free to install this week."
       />
       {calendar.error ? <ErrorState title="The calendar did not load" description={calendar.error.message} /> : null}
       <div className="space-y-4 md:hidden">

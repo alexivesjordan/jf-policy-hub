@@ -37,11 +37,6 @@ async function PasswordContent({
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-16">
       <p className="text-sm font-semibold uppercase tracking-wide text-grey">Jordan Pulse</p>
       <h1 className="font-display mt-2 text-4xl">{setup ? "Choose a password" : "Change password"}</h1>
-      <p className="mt-3 leading-7 text-grey">
-        {setup
-          ? "You will use this password the next time you sign in."
-          : "Choose a new password for your Jordan Fitness account."}
-      </p>
       {saved ? <p className="mt-4 text-sm text-ink">Password saved.</p> : null}
       <div className="mt-6">
         <SetPasswordForm next={setup ? "/" : "/account/password?saved=1"} setup={setup} />

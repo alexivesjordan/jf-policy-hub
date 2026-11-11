@@ -17,12 +17,10 @@ function iso(date: Date) {
 export async function InstallCalendarPage({
   basePath,
   title,
-  description,
   searchParams,
 }: {
   basePath: "/sales/installs" | "/operations/installs";
   title: string;
-  description: string;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
@@ -46,7 +44,7 @@ export async function InstallCalendarPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow={basePath.startsWith("/operations") ? "Pulse Operations" : "Pulse Sales"} title={title} description={description} />
+      <PageHeader eyebrow={basePath.startsWith("/operations") ? "Pulse Operations" : "Pulse Sales"} title={title} />
       {listed.ok ? null : <p className="text-sm">{listed.message}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(previous)}>Previous</Link>

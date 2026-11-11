@@ -50,13 +50,11 @@ export function ServiceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) 
       {reading ? (
         <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
           <p className="font-display text-3xl">Reading quote…</p>
-          <p className="mt-2 text-sm text-grey">Reading the PDF, then pricing maintenance and warranty.</p>
         </div>
       ) : null}
       {pricing && !reading ? (
         <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
           <p className="font-display text-3xl">Calculating…</p>
-          <p className="mt-2 text-sm text-grey">Pricing proactive maintenance and the five-year parts warranty.</p>
         </div>
       ) : null}
       {priced && !pricing && !priced.ok ? <Banner tone="error">{priced.message}</Banner> : null}

@@ -389,7 +389,17 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "install_save_quote") return "11111111-1111-4111-8111-111111111111";
   if (fn === "install_available_starts") {
     const from = String(args?.p_from ?? "2026-11-16").slice(0, 10);
-    return [0, 1, 2, 7].map((days) => isoPlus(from, days));
+    const to = String(args?.p_to ?? isoPlus(from, 42)).slice(0, 10);
+    const dates: string[] = [];
+    let cursor = from;
+    let guard = 0;
+    while (cursor <= to && guard < 130) {
+      const day = new Date(`${cursor}T12:00:00Z`).getUTCDay();
+      if (day !== 0 && day !== 6) dates.push(cursor);
+      cursor = isoPlus(cursor, 1);
+      guard += 1;
+    }
+    return dates;
   }
   if (fn === "install_book") {
     const start = String(args?.p_start ?? "2026-11-16").slice(0, 10);

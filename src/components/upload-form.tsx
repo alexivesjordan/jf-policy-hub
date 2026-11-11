@@ -53,7 +53,6 @@ export function UploadForm({
       ) : (
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">Which policy is this?</legend>
-          <p className="text-sm text-grey">Every draft and active policy is listed, including ones that already have a file.</p>
           <Input
             value={filter}
             onChange={(event) => setFilter(event.target.value)}

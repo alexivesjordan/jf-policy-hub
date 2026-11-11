@@ -107,7 +107,6 @@ export function JobsBoard({
       <PageHeader
         eyebrow="Pulse Operations"
         title="Jobs"
-        description="Every install from pricing to handover."
         actions={
           <ToggleGroup
             aria-label="Jobs view"
@@ -492,9 +491,7 @@ function JobsMonth({ jobs }: { jobs: JobSummary[] }) {
             </ul>
           )}
         </div>
-      ) : (
-        <p className="mt-4 text-sm text-muted-foreground">Tap a day, or use the arrow keys, to see the jobs on it.</p>
-      )}
+      ) : null}
     </div>
   );
 }
