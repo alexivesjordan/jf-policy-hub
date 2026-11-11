@@ -12,6 +12,28 @@ describe("service classification", () => {
     assert.equal(classifyByText("Something entirely unnamed"), "unknown_product");
   });
 
+  it("uses the install effort category before the text rule", () => {
+    assert.equal(classifyLine({ sku: "JF-SB-05", description: "JORDAN Black Slam Ball - 5kg" }).category, "loose_accessory");
+    assert.equal(
+      classifyLine({ sku: "JTRBARSN2-1N-RC", description: "JORDAN 10 - 45kg Rubber Fixed Barbell (5kg increments / 10 Bars) - Straight Bar - Red" }).category,
+      "loose_accessory",
+    );
+    assert.equal(
+      classifyLine({ sku: "JF-PS-PIN-LPD-BLK", description: "JORDAN Performance  Strength - Pin Loaded Lat Pulldown - Black" }).category,
+      "strength_machine",
+    );
+    assert.equal(classifyLine({ sku: "JF-C2SE-FS-2", description: "Concept2 SkiErg Floor Stand" }).category, "loose_accessory");
+    const unnamed = classifyLine({ description: "JORDAN Miscellaneous DHZ (Add Description)", sku: "JL-DMISC" });
+    assert.equal(unnamed.category, "unresolved_dhz");
+    assert.match(unnamed.reasons[0] ?? "", /provisional DHZ/);
+  });
+
+  it("uses a Cin7 category when the effort table does not know the product", () => {
+    const result = classifyLine({ sku: "NEW-1", description: "Unlisted commercial unit", cin7Category: "Treadmills" });
+    assert.equal(result.category, "jordan_cardio");
+    assert.equal(classifyLine({ description: "Unlisted commercial unit", cin7Category: "Other" }).category, "unknown_product");
+  });
+
   it("lets an owner mapping win over the text rule", () => {
     const result = classifyLine(
       { sku: "JF-1", description: "Something entirely unnamed" },

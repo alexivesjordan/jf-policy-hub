@@ -1,3 +1,4 @@
+import { classifyInstallLine } from "@/lib/pricer/engine";
 import { isServiceCategory, type ServiceCategory } from "./rates";
 
 export type ClassificationRule = {
@@ -44,7 +45,60 @@ function fromRules(
   return null;
 }
 
-/** Deterministic fallback when no owner mapping matches. */
+function isUnresolvedDhz(text: string) {
+  return /miscellaneous dhz|add description|missing model|unidentified dhz/.test(text) || (/\bdhz\b/.test(text) && /misc|unspecified|unknown|item missing/.test(text));
+}
+
+function isStorageRack(text: string) {
+  return /dumbbell stand|kettlebell rack|storage rack|plate tree|barbell rack|vertical rack/.test(text);
+}
+
+/** Effort-table category to a service category. Null means this install result does not identify the product. */
+function fromInstallCategory(text: string, install: { category: string | null; match: string }): ServiceCategory | null {
+  if (install.match === "unknown" || install.match === "missing") return null;
+  const category = (install.category ?? "").trim().toLowerCase();
+  if (!category || category === "other") return null;
+  if (install.match === "dhz_generic" && isUnresolvedDhz(text)) return "unresolved_dhz";
+  if (category === "cardio") {
+    if (/concept\s*2|rower?g|skierg|bikeerg/.test(text)) return "concept2_cardio";
+    if (/air\s*bike/.test(text)) return "jordan_cardio_unverified";
+    if (/spin bike|performance spin/.test(text)) return "other_cardio_unverified";
+    return "jordan_cardio";
+  }
+  if (category === "bench") return "adjustable_bench";
+  if (category === "rack-rig" || category === "cable") return isStorageRack(text) ? "storage_rack" : "cable_or_power_rack";
+  if (category === "storage") return "storage_rack";
+  if (category === "strength-selectorised" || category === "strength-plate-loaded") return "strength_machine";
+  if (category === "weights" || category === "accessory" || category === "bar" || category === "mat") return "loose_accessory";
+  if (category === "flooring") return "flooring";
+  return null;
+}
+
+/** Cin7 product category, used when the effort table did not identify the line. */
+function fromCin7Category(text: string, cin7Category: string | null | undefined): ServiceCategory | null {
+  const name = norm(cin7Category);
+  if (!name || name === "other" || name === "functional fitness") return null;
+  if (name === "treadmills" || name === "elliptical trainers") return "jordan_cardio";
+  if (name === "bikes" || name === "ski machines" || name === "rowers") return fromInstallCategory(text, { category: "cardio", match: "category_default" });
+  if (name === "weight benches") return "adjustable_bench";
+  if (name === "rigs & racks") return fromInstallCategory(text, { category: "rack-rig", match: "category_default" });
+  if (name === "gym storage") return "storage_rack";
+  if (
+    name === "dumbbells" ||
+    name === "kettlebells" ||
+    name === "fixed barbells" ||
+    name === "bumper plates" ||
+    name === "functional training balls" ||
+    name === "rope trainers" ||
+    name === "resistance"
+  ) {
+    return "loose_accessory";
+  }
+  if (name === "flooring") return "flooring";
+  return null;
+}
+
+/** Deterministic fallback when the effort table and the Cin7 category do not identify the line. */
 export function classifyByText(description: string, sku = ""): ServiceCategory {
   const text = `${sku} ${description}`.toLowerCase();
   if (/\b(delivery|install|installation|carriage|freight|vat|recycling|packaging removal)\b/.test(text)) return "delivery_install";
@@ -67,7 +121,12 @@ export function classifyLine(
   input: { sku?: string | null; description: string; cin7Category?: string | null },
   rules: ClassificationRule[] = [],
 ): ClassifiedLine {
-  const category = fromRules(input, rules) ?? classifyByText(input.description, input.sku ?? "");
+  const text = `${input.sku ?? ""} ${input.description}`.toLowerCase();
+  const category =
+    fromRules(input, rules) ??
+    fromInstallCategory(text, classifyInstallLine({ sku: input.sku, productName: input.description })) ??
+    fromCin7Category(text, input.cin7Category) ??
+    classifyByText(input.description, input.sku ?? "");
   const reason = REASONS[category];
   return { category, reasons: reason ? [reason] : [] };
 }
