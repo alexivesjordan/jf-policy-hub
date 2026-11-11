@@ -1,45 +1,11 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { confirmGetPlan, continueToPulsePage } from "@/lib/auth-confirm";
+import { confirmGetPlan, confirmRedirect, continueToPulsePage, implicitContinuePage } from "@/lib/auth-confirm";
 import { confirmDestination } from "@/lib/auth-link";
 import { createClient } from "@/lib/supabase/server";
 
 const OTP_TYPES = new Set(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
-
-const IMPLICIT_PAGE = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Signing in</title></head>
-<body style="font-family:Arial,Helvetica,sans-serif;background:#111111;color:#ffffff;padding:32px;">
-<p style="letter-spacing:0.12em;text-transform:uppercase;font-size:12px;color:#c4c4c4;">Jordan Pulse</p>
-<p>Signing you in…</p>
-<script>
-(function () {
-  var hash = new URLSearchParams(location.hash.charAt(0) === "#" ? location.hash.slice(1) : location.hash);
-  var access = hash.get("access_token");
-  var refresh = hash.get("refresh_token");
-  if (!access || !refresh) {
-    location.replace("/login?error=link");
-    return;
-  }
-  var next = new URLSearchParams(location.search).get("next");
-  fetch("/auth/confirm", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ access_token: access, refresh_token: refresh, type: hash.get("type"), next: next })
-  }).then(function (res) { return res.json(); }).then(function (body) {
-    location.replace((body && body.redirect) || "/login?error=link");
-  }).catch(function () {
-    location.replace("/login?error=link");
-  });
-})();
-</script>
-</body>
-</html>`;
-
-function loginRedirect(origin: string) {
-  return NextResponse.redirect(new URL("/login?error=link", origin));
-}
 
 function html(body: string) {
   return new NextResponse(body, {
@@ -51,8 +17,8 @@ export async function GET(request: Request) {
   await connection();
   const url = new URL(request.url);
   const plan = confirmGetPlan(url.searchParams);
-  if (plan === "error") return loginRedirect(url.origin);
-  if (plan === "implicit") return html(IMPLICIT_PAGE);
+  if (plan === "error") return confirmRedirect(url.origin, "/login?error=link");
+  if (plan === "implicit") return html(implicitContinuePage());
   return html(continueToPulsePage(plan));
 }
 
@@ -101,15 +67,15 @@ async function verifyPostedLink(form: FormData, origin: string) {
       type: type as EmailOtpType,
       token_hash: tokenHash,
     });
-    if (error) return loginRedirect(origin);
-    return NextResponse.redirect(new URL(confirmDestination(type, next), origin), 303);
+    if (error) return confirmRedirect(origin, "/login?error=link");
+    return confirmRedirect(origin, confirmDestination(type, next));
   }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) return loginRedirect(origin);
-    return NextResponse.redirect(new URL(confirmDestination(type || null, next), origin), 303);
+    if (error) return confirmRedirect(origin, "/login?error=link");
+    return confirmRedirect(origin, confirmDestination(type || null, next));
   }
 
-  return loginRedirect(origin);
+  return confirmRedirect(origin, "/login?error=link");
 }

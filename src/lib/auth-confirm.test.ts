@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { confirmGetPlan, continueToPulsePage } from "./auth-confirm";
+import { confirmGetPlan, confirmRedirect, continueToPulsePage, implicitContinuePage } from "./auth-confirm";
 
 const TYPES = ["invite", "recovery", "magiclink", "signup", "email_change"] as const;
 
@@ -35,5 +35,21 @@ describe("auth confirm GET", () => {
     assert.equal(getSource.includes("exchangeCodeForSession"), false);
     assert.equal(getSource.includes("setSession"), false);
     assert.match(source.slice(postStart), /verifyOtp/);
+    assert.equal(source.slice(postStart).includes("NextResponse.redirect"), false);
+  });
+
+  it("sends a used or invalid token to the login page with 303", () => {
+    const response = confirmRedirect("https://pulse.jordanfitness.com", "/login?error=link");
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get("location"), "https://pulse.jordanfitness.com/login?error=link");
+  });
+
+  it("waits for Continue before posting an implicit hash token", () => {
+    const page = implicitContinuePage();
+    assert.match(page, /<button type="submit">Continue<\/button>/);
+    assert.match(page, /addEventListener\("submit"/);
+    assert.equal(page.includes("Signing you in"), false);
+    const script = page.slice(page.indexOf("<script>"));
+    assert.equal(script.trimStart().startsWith("<script>\ndocument"), true);
   });
 });
