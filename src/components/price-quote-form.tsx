@@ -6,7 +6,7 @@ import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PriceWorkings } from "@/components/price-workings";
 import { QuoteNotice } from "@/components/quote-notice";
-import { ServiceQuoteResult } from "@/components/service-quote-result";
+import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -83,11 +83,13 @@ export function PriceQuoteForm({
           <Field label="Order number" hint="For example SO-00490.">
             <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
           </Field>
+          <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
           <div className="md:pt-7">
             <Button type="submit" disabled={selling || readingPdf}>{selling && !readingPdf ? "Calculating…" : "Load quote"}</Button>
           </div>
         </form>
         <form ref={pdfForm} action={sellOrder}>
+          <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
           <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
             <QuoteFileDrop onReady={() => { setPdfIntent(true); pdfForm.current?.requestSubmit(); }} />
           </Field>
@@ -120,7 +122,12 @@ export function PriceQuoteForm({
             </dl>
           </div>
         ) : null}
-        {includeService && summary ? <ServiceQuoteResult installPrice={summary.price} /> : null}
+        {includeService && quote?.service ? (
+          <>
+            <ServiceQuoteResult service={quote.service} installPrice={summary?.price ?? null} />
+            <ProposalButton quoteId={quote.service.id} />
+          </>
+        ) : null}
       </div>
     );
   }
@@ -147,6 +154,7 @@ export function PriceQuoteForm({
 
       {draft ? (
         <form action={priceQuote} className="space-y-4">
+          <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
           <input type="hidden" name="source" value={draft.source} />
           <input type="hidden" name="quoteNumber" value={draft.quoteNumber} />
           <input type="hidden" name="customerReference" value={draft.customerReference} />
@@ -264,7 +272,12 @@ export function PriceQuoteForm({
           </ul>
         </div>
       ) : null}
-      {includeService && quote?.customerPrice != null ? <ServiceQuoteResult installPrice={quote.customerPrice} /> : null}
+      {includeService && quote?.service ? (
+        <>
+          <ServiceQuoteResult service={quote.service} installPrice={quote.customerPrice} />
+          <ProposalButton quoteId={quote.service.id} />
+        </>
+      ) : null}
       {quote && quote.customerPrice != null && !quote.breakdown ? (
         <div className="rounded-3xl border border-line bg-card px-5 py-4">
           <p className="text-sm text-grey">{quote.quoteNumber} · {quote.postcode}</p>

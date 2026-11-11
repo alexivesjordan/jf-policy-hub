@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
+let fixtureServiceQuote: { id: string; prices: unknown } | null = null;
 const JOB_BOOKED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
 const JOB_PRICED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
 const JOB_SITE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
@@ -8,6 +9,8 @@ const JOB_SITE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
 const profile = {
   id: USER_ID,
   email: "alex.ives@jordanfitness.com",
+  first_name: "Alex",
+  last_name: "Ives",
   full_name: "Alex Ives",
   role: "admin",
   is_active: true,
@@ -210,6 +213,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: USER_ID,
         email: profile.email,
+        first_name: "Alex",
+        last_name: "Ives",
         full_name: profile.full_name,
         workspace_role: "owner",
         access_mode: "follow",
@@ -220,6 +225,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: "00000000-0000-4000-8000-000000000002",
         email: "sam.cole@jordanfitness.com",
+        first_name: "Sam",
+        last_name: "Cole",
         full_name: "Sam Cole",
         workspace_role: "member",
         access_mode: "follow",
@@ -230,6 +237,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: "00000000-0000-4000-8000-000000000003",
         email: "riley.hart@jordanfitness.com",
+        first_name: "Riley",
+        last_name: "Hart",
         full_name: "Riley Hart",
         workspace_role: "member",
         access_mode: "custom",
@@ -249,6 +258,35 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       { id: "team-management", name: "Management", members: 2 },
     ];
   }
+  if (fn === "service_get_ingest") return null;
+  if (fn === "service_put_ingest") return "ingest-1";
+  if (fn === "service_current_rates") {
+    return {
+      id: "rate-1",
+      label: "2026-11-11-standalone-v1",
+      callout_gbp: 99,
+      per_machine_gbp: 59,
+      uplift: 1.08,
+      twice_yearly_factor: 0.92,
+      cardio_rate: 0.05,
+      strength_rate: 0.03,
+      rack_rate: 0.02,
+      extension_factor: 1.3,
+      per_site_gbp: 150,
+      bundle_incentive_gbp: 195,
+      portfolio_factor: 0.9,
+    };
+  }
+  if (fn === "service_list_rules") {
+    return [{ match_kind: "description_contains", match_value: "bench", category: "adjustable_bench", priority: 10, note: "Benches" }];
+  }
+  if (fn === "service_can_see_flags") return process.env.PULSE_FIXTURE_ROLE !== "rep";
+  if (fn === "service_save_quote") {
+    fixtureServiceQuote = { id: "svc-quote-1", prices: args?.p_prices ?? null };
+    return fixtureServiceQuote.id;
+  }
+  if (fn === "service_read_quote") return fixtureServiceQuote;
+  if (fn === "service_set_proposal_path" || fn === "save_person_name" || fn === "service_save_rates" || fn === "service_upsert_rule") return true;
   if (fn === "orbit_office_context") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
     return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
@@ -443,6 +481,18 @@ export function createFixtureClient() {
     },
     async rpc(fn: string, args?: Record<string, unknown>) {
       return { data: rpcData(fn, args), error: null };
+    },
+    storage: {
+      from() {
+        return {
+          async upload() {
+            return { data: { path: "proposal.docx" }, error: null };
+          },
+          async createSignedUrl(path: string) {
+            return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
+          },
+        };
+      },
     },
   };
   return client as unknown as SupabaseClient;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { Button, Select } from "@/components/pulse/ui";
+import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { saveWorkspaceUser } from "@/features/workspace/actions";
 import { PULSE_MODULE_IDS } from "@/lib/types";
@@ -26,6 +26,8 @@ const TEAM_ORDER = ["Sales", "Installs", "Aftersales", "Operations", "Office", "
 export type WorkspaceDirectoryUser = {
   id: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   full_name: string | null;
   workspace_role: string;
   access_mode: "follow" | "custom";
@@ -65,8 +67,18 @@ export function WorkspaceUserCard({
       <form action={saveWorkspaceUser} className="space-y-4">
         <input type="hidden" name="userId" value={person.id} />
         <div>
-          <p className="font-semibold text-ink">{person.full_name || person.email}</p>
+          <p className="font-semibold text-ink">{person.full_name || `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || person.email}</p>
           <p className="text-sm text-grey">{person.email}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">First name</span>
+            <Input name="firstName" required defaultValue={person.first_name ?? ""} autoComplete="given-name" />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-grey">Last name</span>
+            <Input name="lastName" required defaultValue={person.last_name ?? ""} autoComplete="family-name" />
+          </label>
         </div>
         <div className="flex flex-wrap gap-3">
           <Select name="workspaceRole" value={role} aria-label="Role" className="w-full sm:w-56" onChange={(event) => setRole(event.target.value)}>

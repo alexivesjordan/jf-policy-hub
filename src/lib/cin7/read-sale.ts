@@ -124,6 +124,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       cin7Category: text(product.Category),
       productId,
       qty: amount(line.Quantity) ?? 0,
+      lineNet: amount(line.Total),
       unitWeightKg: weightKg(product),
       length: amount(product.Length),
       width: amount(product.Width),

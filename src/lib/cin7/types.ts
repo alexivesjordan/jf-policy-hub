@@ -11,6 +11,8 @@ export type Cin7QuoteLine = {
   /** Cin7 ProductID from the sale line. */
   productId?: string | null;
   qty: number;
+  /** Line net ex VAT when the sale line includes Total. */
+  lineNet?: number | null;
   /** Product.Weight when Cin7 reports kilograms. */
   unitWeightKg?: number | null;
   length?: number | null;

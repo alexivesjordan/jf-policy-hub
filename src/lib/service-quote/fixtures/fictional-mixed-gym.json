@@ -1,0 +1,36 @@
+{
+  "customer": "Example Sports Centre (fictional demonstration)",
+  "source_document": "Example anonymised multi-page sales order",
+  "quote_number": "EXAMPLE-00490",
+  "quote_date": "2026-11-06",
+  "currency": "GBP",
+  "goods_net": 49066.53,
+  "source_notes": "This is a SANITISED fixture using aggregated/masked product descriptions, not an actual customer quotation. All line prices are ex VAT. Three unidentified supplier lines are deliberately included to demonstrate conservative flags.",
+  "sites": [
+    {
+      "name": "Main Gym",
+      "address": "Example Road, Exampletown, United Kingdom",
+      "line_items": [
+        {"sku": "TREAD-TFT", "description": "Jordan Elite TFT treadmills", "quantity": 3, "line_net": 9135.00, "category": "jordan_cardio"},
+        {"sku": "RECUMBENT", "description": "Jordan Elite recumbent cardio bike", "quantity": 1, "line_net": 1999.00, "category": "jordan_cardio"},
+        {"sku": "UPRIGHT", "description": "Jordan Elite upright cardio bike", "quantity": 2, "line_net": 3757.00, "category": "jordan_cardio"},
+        {"sku": "AIRBIKE", "description": "Jordan Elite air bike - OEM unverified", "quantity": 1, "line_net": 1115.00, "category": "jordan_cardio_unverified"},
+        {"sku": "ELLIP-TFT", "description": "Jordan Elite TFT ellipticals", "quantity": 3, "line_net": 7232.99, "category": "jordan_cardio"},
+        {"sku": "C2-SKI", "description": "Concept2 SkiErg", "quantity": 1, "line_net": 679.17, "category": "concept2_cardio"},
+        {"sku": "C2-ROW", "description": "Concept2 RowErg", "quantity": 2, "line_net": 1650.00, "category": "concept2_cardio"},
+        {"sku": "DHZ-STRENGTH", "description": "Nine separate confirmed DHZ pin-loaded machines (aggregated for test only)", "quantity": 9, "line_net": 10459.03, "category": "strength_machine"},
+        {"sku": "J75-CABLE", "description": "J75 Cable Rack", "quantity": 1, "line_net": 2127.32, "category": "cable_or_power_rack"},
+        {"sku": "J75-POWER", "description": "J75 Compact Power Rack", "quantity": 1, "line_net": 2356.66, "category": "cable_or_power_rack"},
+        {"sku": "BENCH-FID", "description": "Adjustable strength bench", "quantity": 1, "line_net": 239.40, "category": "adjustable_bench"},
+        {"sku": "MISC-DHZ-1", "description": "DHZ item missing model 1", "quantity": 1, "line_net": 1523.31, "category": "unresolved_dhz"},
+        {"sku": "MISC-DHZ-2", "description": "DHZ item missing model 2", "quantity": 1, "line_net": 1523.31, "category": "unresolved_dhz"},
+        {"sku": "MISC-DHZ-3", "description": "DHZ item missing model 3", "quantity": 1, "line_net": 2450.74, "category": "unresolved_dhz"},
+        {"sku": "OTHER-GOODS", "description": "Loose weights, stands, bars, accessories and plates (aggregated for test only)", "quantity": 1, "line_net": 2818.60, "category": "loose_accessory"}
+      ]
+    }
+  ],
+  "additional_charges": [
+    {"description": "Installation and packaging removal", "amount_net": 5000.00},
+    {"description": "Delivery", "amount_net": 750.00}
+  ]
+}

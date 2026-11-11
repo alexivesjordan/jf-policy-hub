@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
 
 const profileColumns =
-  "id, email, full_name, role, is_active, access_granted, can_review, last_sign_in_at, created_at, updated_at";
+  "id, email, first_name, last_name, full_name, role, is_active, access_granted, can_review, last_sign_in_at, created_at, updated_at";
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();

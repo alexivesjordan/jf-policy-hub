@@ -21,8 +21,11 @@ export function InviteForm() {
   const [state, action, pending] = useActionState(inviteUser, null);
   return (
     <form action={action} className="grid gap-4 md:grid-cols-4">
-      <Field label="Name">
-        <Input name="fullName" autoComplete="name" />
+      <Field label="First name">
+        <Input name="firstName" autoComplete="given-name" required />
+      </Field>
+      <Field label="Last name">
+        <Input name="lastName" autoComplete="family-name" required />
       </Field>
       <Field label="Email" hint="@jordanfitness.com">
         <Input name="email" type="email" autoComplete="off" required />
