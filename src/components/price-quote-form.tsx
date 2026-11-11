@@ -6,8 +6,9 @@ import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PriceWorkings } from "@/components/price-workings";
 import { QuoteNotice } from "@/components/quote-notice";
+import { ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
-import { BookingModal } from "@/components/booking-modal";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   createPricedJob,
   loadFixtureQuote,
@@ -27,23 +28,21 @@ const SEGMENTS = [
 
 export function PriceQuoteForm({
   cin7Connected,
-  showInternal,
-  canPreviewSales = false,
+  fullBreakdown,
 }: {
   cin7Connected: boolean;
-  showInternal: boolean;
-  canPreviewSales?: boolean;
+  fullBreakdown: boolean;
 }) {
   const [loaded, loadQuote, loading] = useActionState(loadFixtureQuote, null);
   const [parsed, parsePdf, parsing] = useActionState(parseUploadedQuote, null);
   const [priced, priceQuote, pricing] = useActionState(priceReviewedQuote, null);
   const [created, createJob, creating] = useActionState(createPricedJob, null);
   const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
-  const [bookingJob, setBookingJob] = useState<string | null>(null);
-  const [segmentChoice, setSegmentChoice] = useState("");
-  const [viewAsSales, setViewAsSales] = useState(false);
   const [draft, setDraft] = useState<QuoteDraft | null>(null);
   const [sourceName, setSourceName] = useState<"load" | "pdf" | null>(null);
+  const [includeService, setIncludeService] = useState(false);
+  const [pdfIntent, setPdfIntent] = useState(false);
+  const pdfForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (loaded?.draft) {
@@ -59,10 +58,6 @@ export function PriceQuoteForm({
     }
   }, [parsed]);
 
-  useEffect(() => {
-    if ((!showInternal || viewAsSales) && created?.quote?.jobId) setBookingJob(created.quote.jobId);
-  }, [created, showInternal, viewAsSales]);
-
   const toastedSale = useRef<string | null>(null);
   useEffect(() => {
     if (!sold?.ok || !sold.message || toastedSale.current === sold.message) return;
@@ -70,56 +65,42 @@ export function PriceQuoteForm({
     toast.success(sold.message);
   }, [sold]);
 
-  const viewingSales = !showInternal || viewAsSales;
-  const quote = (created?.quote ?? (viewingSales ? sold?.quote ?? priced?.quote : priced?.quote)) as PricedQuote | undefined;
+  const quote = (created?.quote ?? (!fullBreakdown ? sold?.quote ?? priced?.quote : priced?.quote)) as PricedQuote | undefined;
   const notice = sourceName === "pdf" ? parsed : sourceName === "load" ? loaded : null;
-  const salesDraft = sold?.draft ?? (viewingSales ? draft : null);
-  const previewToggle = showInternal && canPreviewSales ? (
-    <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-ink">
-      <input
-        type="checkbox"
-        className="size-5 accent-red"
-        checked={viewAsSales}
-        onChange={(event) => setViewAsSales(event.target.checked)}
-      />
-      View as sales rep
+  const readingPdf = pdfIntent && (parsing || selling);
+  const serviceToggle = (
+    <label className="flex min-h-11 items-start gap-3 text-sm font-semibold text-ink">
+      <Checkbox checked={includeService} onCheckedChange={(checked) => setIncludeService(checked === true)} />
+      <span>Also quote proactive maintenance and extended warranty</span>
     </label>
-  ) : null;
+  );
 
-  if (viewingSales) {
+  if (!fullBreakdown) {
     const summary = quote?.repSummary;
     return (
       <div className="space-y-6">
-        {previewToggle}
-        <form action={sellOrder} className="space-y-4">
-          <Field label="Order number" hint="For example SO-00490. Leave the segment if this customer has been priced before.">
+        <form action={sellOrder} className="grid gap-4 md:grid-cols-[1fr_auto]">
+          <Field label="Order number" hint="For example SO-00490.">
             <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
           </Field>
-          <Field label="Segment" hint="Leave this on the saved segment when this customer has been priced before.">
-            <Select name="segment" value={segmentChoice} onChange={(event) => setSegmentChoice(event.target.value)}>
-              <option value="">Use the saved segment</option>
-              {SEGMENTS.map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Button type="submit" disabled={selling || creating}>{selling ? "Calculating…" : "Submit"}</Button>
+          <div className="md:pt-7">
+            <Button type="submit" disabled={selling || readingPdf}>{selling && !readingPdf ? "Calculating…" : "Load quote"}</Button>
+          </div>
         </form>
-        <form action={sellOrder} className="space-y-4">
-          <input type="hidden" name="segment" value={segmentChoice} />
+        <form ref={pdfForm} action={sellOrder}>
           <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
-            <QuoteFileDrop />
+            <QuoteFileDrop onReady={() => { setPdfIntent(true); pdfForm.current?.requestSubmit(); }} />
           </Field>
-          <Button type="submit" variant="secondary" disabled={selling}>{selling ? "Calculating…" : "Read PDF"}</Button>
         </form>
-        {selling ? (
+        {serviceToggle}
+        {readingPdf ? <ReadingQuote /> : null}
+        {selling && !readingPdf ? (
           <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
             <p className="font-display text-3xl">Calculating…</p>
             <p className="mt-2 text-sm text-grey">Fetching the order and pricing the install.</p>
           </div>
         ) : null}
         {sold && !selling && !sold.ok ? <Banner tone="error">{sold.message}</Banner> : null}
-        {created && !created.ok ? <Banner tone="error">{created.message}</Banner> : null}
         {summary && quote?.notice ? <QuoteNotice>{quote.notice}</QuoteNotice> : null}
         {summary ? (
           <div className="rounded-3xl border border-line bg-card px-6 py-6">
@@ -137,22 +118,15 @@ export function PriceQuoteForm({
                 <dd className="text-2xl font-semibold">{summary.margin == null ? "—" : `${Math.round(summary.margin * 1000) / 10}%`}</dd>
               </div>
             </dl>
-            {salesDraft ? (
-              <form action={createJob} className="mt-6">
-                <DraftFields draft={salesDraft} />
-                <Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create job"}</Button>
-              </form>
-            ) : null}
           </div>
         ) : null}
-        {bookingJob ? <BookingModal jobId={bookingJob} onClose={() => setBookingJob(null)} /> : null}
+        {includeService && summary ? <ServiceQuoteResult installPrice={summary.price} /> : null}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {previewToggle}
       <form action={loadQuote} className="grid gap-4 md:grid-cols-[1fr_auto]">
         <Field label="Order number" hint="For example SO-00490.">
           <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
@@ -161,12 +135,13 @@ export function PriceQuoteForm({
           <Button type="submit" disabled={loading}>{loading ? "Loading..." : "Load quote"}</Button>
         </div>
       </form>
-      <form action={parsePdf} className="space-y-4">
+      <form ref={pdfForm} action={parsePdf}>
         <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
-          <QuoteFileDrop />
+          <QuoteFileDrop onReady={() => { setPdfIntent(true); pdfForm.current?.requestSubmit(); }} />
         </Field>
-        <Button type="submit" variant="secondary" disabled={parsing}>{parsing ? "Reading..." : "Read PDF"}</Button>
       </form>
+      {serviceToggle}
+      {readingPdf ? <ReadingQuote /> : null}
 
       {notice && !draft ? <Banner tone={notice.ok ? "success" : "error"}>{notice.message}</Banner> : null}
 
@@ -253,7 +228,7 @@ export function PriceQuoteForm({
               </tbody>
             </table>
           </div>
-          {showInternal && draft.internalNote ? <p className="text-sm text-grey">{draft.internalNote}</p> : null}
+          {draft.internalNote ? <p className="text-sm text-grey">{draft.internalNote}</p> : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pricing}>{pricing ? "Pricing..." : "Price best case"}</Button>
             {priced?.ok ? (
@@ -289,6 +264,7 @@ export function PriceQuoteForm({
           </ul>
         </div>
       ) : null}
+      {includeService && quote?.customerPrice != null ? <ServiceQuoteResult installPrice={quote.customerPrice} /> : null}
       {quote && quote.customerPrice != null && !quote.breakdown ? (
         <div className="rounded-3xl border border-line bg-card px-5 py-4">
           <p className="text-sm text-grey">{quote.quoteNumber} · {quote.postcode}</p>
@@ -313,7 +289,16 @@ export function PriceQuoteForm({
   );
 }
 
-function QuoteFileDrop() {
+function ReadingQuote() {
+  return (
+    <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
+      <p className="font-display text-3xl">Reading quote…</p>
+      <p className="mt-2 text-sm text-grey">Reading the PDF. The file is not kept.</p>
+    </div>
+  );
+}
+
+function QuoteFileDrop({ onReady }: { onReady: () => void }) {
   const [fileName, setFileName] = useState("");
 
   function assign(input: HTMLInputElement, file: File | null) {
@@ -321,6 +306,7 @@ function QuoteFileDrop() {
     if (file) transfer.items.add(file);
     input.files = transfer.files;
     setFileName(file?.name ?? "");
+    if (file) onReady();
   }
 
   return (
@@ -340,7 +326,11 @@ function QuoteFileDrop() {
         type="file"
         accept="application/pdf,.pdf"
         className="sr-only"
-        onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          setFileName(file?.name ?? "");
+          if (file) onReady();
+        }}
       />
     </div>
   );
@@ -348,39 +338,6 @@ function QuoteFileDrop() {
 
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
-}
-
-function DraftFields({ draft }: { draft: QuoteDraft }) {
-  return (
-    <>
-      <input type="hidden" name="source" value={draft.source} />
-      <input type="hidden" name="quoteNumber" value={draft.quoteNumber} />
-      <input type="hidden" name="customerReference" value={draft.customerReference} />
-      <input type="hidden" name="customerId" value={draft.customerId} />
-      <input type="hidden" name="saleId" value={draft.saleId} />
-      <input type="hidden" name="internalNote" value={draft.internalNote} />
-      <input type="hidden" name="goodsNet" value={draft.goodsNet ?? ""} />
-      <input type="hidden" name="customerName" value={draft.customerName} />
-      <input type="hidden" name="postcode" value={draft.postcode} />
-      <input type="hidden" name="segment" value={draft.segment} />
-      {draft.lines.map((line, index) => (
-        <span key={`${line.sku}-${index}`}>
-          <input type="hidden" name="lineSku" value={line.sku} />
-          <input type="hidden" name="lineProductId" value={line.productId} />
-          <input type="hidden" name="lineWeight" value={line.unitWeightKg ?? ""} />
-          <input type="hidden" name="lineUom" value={line.uom ?? ""} />
-          <input type="hidden" name="lineTileLength" value={line.tileLength ?? ""} />
-          <input type="hidden" name="lineTileWidth" value={line.tileWidth ?? ""} />
-          <input type="hidden" name="lineDimensionUnit" value={line.dimensionUnit ?? ""} />
-          <input type="hidden" name="lineTilesPerPack" value={line.tilesPerPack ?? ""} />
-          <input type="hidden" name="lineDescription" value={line.description} />
-          <input type="hidden" name="lineQty" value={line.qty} />
-          <input type="hidden" name="lineCategory" value={line.category} />
-          <input type="hidden" name="lineTotal" value={line.lineTotal ?? ""} />
-        </span>
-      ))}
-    </>
-  );
 }
 
 function updateLine(

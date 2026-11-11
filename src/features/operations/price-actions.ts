@@ -5,8 +5,8 @@ import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import { fillMissingSkuCategories } from "@/lib/cin7/missing-product";
 import { cin7Get } from "@/lib/cin7/transport";
 import type { Cin7Quote } from "@/lib/cin7/types";
-import { hasLevel } from "@/lib/module-guard";
-import { requireOperationsUser } from "@/lib/auth";
+import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
+import { seesInstallBreakdown } from "@/lib/pulse/quote-access";
 import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
@@ -329,7 +329,12 @@ async function withLiveCategories(lines: ReviewLine[]) {
 
 async function priceDraft(draft: QuoteDraft) {
   const context = await getOfficeContext();
-  const showCost = hasLevel(context.operations, "edit", context.is_owner);
+  const profile = await getCurrentProfile();
+  const showCost = seesInstallBreakdown({
+    isOwner: context.is_owner,
+    opsRole: context.ops_role,
+    workspaceRole: profile?.workspace_role,
+  });
   const pricing = await pricingConfig();
   const lines = await withLiveCategories(draft.lines);
   draft.lines = lines;
@@ -470,7 +475,7 @@ async function fixturePause() {
 }
 
 export async function loadFixtureQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
-  await requireOperationsUser();
+  await requireSalesUser();
   await fixturePause();
   const number = String(formData.get("quoteNumber") ?? "").trim();
   if (!number) return { ok: false, message: "Enter a quote number." };
@@ -498,7 +503,7 @@ export async function loadFixtureQuote(_state: ActionState, formData: FormData):
 }
 
 export async function parseUploadedQuote(_state: ActionState, formData: FormData): Promise<ActionState & { draft?: QuoteDraft }> {
-  await requireOperationsUser();
+  await requireSalesUser();
   const file = formData.get("quotePdf");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a quote PDF." };
   if (file.size > 8 * 1024 * 1024) return { ok: false, message: "That PDF is larger than 8 MB." };
@@ -524,7 +529,7 @@ export async function parseUploadedQuote(_state: ActionState, formData: FormData
 }
 
 export async function priceReviewedQuote(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote }> {
-  await requireOperationsUser();
+  await requireSalesUser();
   await fixturePause();
   try {
     const { draft, error } = readDraft(formData);
@@ -551,7 +556,7 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
 }
 
 export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft }> {
-  await requireOperationsUser();
+  await requireSalesUser();
   await fixturePause();
   try {
     const file = formData.get("quotePdf");

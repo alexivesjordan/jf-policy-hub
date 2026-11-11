@@ -200,6 +200,9 @@ function tables(): Record<string, Record<string, unknown>[]> {
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "workspace_my_access") {
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
+    }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
   }
   if (fn === "workspace_directory") {
@@ -246,7 +249,10 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       { id: "team-management", name: "Management", members: 2 },
     ];
   }
-  if (fn === "orbit_office_context") return { has_module: true, ops_role: "admin_owner", is_owner: true };
+  if (fn === "orbit_office_context") {
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
+    return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
+  }
   if (fn === "orbit_list_jobs") return jobs;
   if (fn === "orbit_get_job") return jobs.find((row) => row.id === args?.p_job_id) ?? null;
   if (fn === "orbit_list_notifications") return [];
