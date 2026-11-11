@@ -77,7 +77,7 @@ describe("Cin7 sale read", () => {
     assert.equal(quote.lines[0].qty, 2);
     assert.equal(quote.lines[0].lineNet, 10);
     assert.equal(quote.taxStripped, false);
-    assert.equal(quote.moneyWarning, null);
+    assert.deepEqual(quote.moneyFlags, []);
     assert.equal(quote.lines[0].unitWeightKg, 26);
     assert.equal(quote.lines[0].cin7Category, "Cardio");
     assert.equal(quote.lines[0].category, null);
@@ -122,6 +122,6 @@ describe("Cin7 sale read", () => {
     const quote = await readCin7Sale("SO-00490", wrapped);
     assert.deepEqual(quote?.lines.map((line) => line.lineNet), [679.17, 195.83]);
     assert.equal(quote?.taxStripped, true);
-    assert.match(quote?.moneyWarning ?? "", /include tax/);
+    assert.equal(quote?.moneyFlags?.some((flag) => flag.code === "cin7_tax_included"), true);
   });
 });

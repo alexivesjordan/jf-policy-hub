@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Cin7Quote } from "@/lib/cin7/types";
+import type { QuoteFlag } from "@/lib/quotes/flags";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import type { ExtractedQuote } from "@/lib/quotes/types";
@@ -30,9 +31,15 @@ export type IngestedQuote = {
   lines: IngestedLine[];
   deliveryInstallLines: IngestedCharge[];
   warnings: string[];
+  /** Structured checks. Read `code` and `difference`; do not match `message`. */
+  flags: QuoteFlag[];
   /** When a Cin7 order was fetched. Null for a PDF or a draft. */
   fetchedAt: string | null;
 };
+
+function round2(value: number) {
+  return Math.sign(value) * Math.floor(Math.abs(value) * 100 + 0.5) / 100;
+}
 
 export function quoteCacheKey(source: string, material: string) {
   return `${source}:${createHash("sha256").update(material).digest("hex")}`;
@@ -60,6 +67,7 @@ export function ingestExtractedQuote(extracted: ExtractedQuote, source: Ingested
     })),
     deliveryInstallLines: delivery,
     warnings: extracted.warnings,
+    flags: [],
     fetchedAt: null,
   };
 }
@@ -91,6 +99,7 @@ export function ingestDraft(draft: {
     })),
     deliveryInstallLines: [],
     warnings: draft.warnings,
+    flags: [],
     fetchedAt: null,
   };
 }
@@ -110,12 +119,12 @@ export function ingestCin7Quote(quote: Cin7Quote): IngestedQuote {
     lineNet: line.lineNet ?? 0,
     cin7Category: line.cin7Category ?? null,
   }));
-  const goodsNet = lines.reduce((sum, line) => sum + line.lineNet, 0);
-  const warnings: string[] = [];
-  if (quote.moneyWarning) warnings.push(quote.moneyWarning);
-  else if (quote.lines.some((line) => line.lineNet == null)) {
-    warnings.push("Cin7 did not send a line net for every row. Those lines are priced at £0 until the PDF is used.");
-  }
+  const goodsNet = round2(lines.reduce((sum, line) => sum + line.lineNet, 0));
+  const deliveryInstallLines = (quote.additionalCharges ?? []).map((charge) => ({
+    description: charge.description,
+    amountNet: charge.amountNet,
+  }));
+  const chargeNet = round2(deliveryInstallLines.reduce((sum, charge) => sum + charge.amountNet, 0));
   return {
     source: "cin7",
     cacheKey: quoteCacheKey("cin7", quote.number.trim().toLowerCase()),
@@ -123,11 +132,12 @@ export function ingestCin7Quote(quote: Cin7Quote): IngestedQuote {
     customerName: quote.customerName,
     siteName: null,
     postcode: quote.postcode ?? null,
-    goodsNet: goodsNet || null,
-    orderNet: goodsNet || null,
+    goodsNet,
+    orderNet: round2(goodsNet + chargeNet),
     lines,
-    deliveryInstallLines: [],
-    warnings,
+    deliveryInstallLines,
+    warnings: [],
+    flags: quote.moneyFlags ?? [],
     fetchedAt: new Date().toISOString(),
   };
 }

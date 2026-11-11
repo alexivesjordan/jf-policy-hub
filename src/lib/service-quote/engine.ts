@@ -1,3 +1,4 @@
+import { quoteFlag, type QuoteFlag } from "@/lib/quotes/flags";
 import {
   DEFAULT_SERVICE_RATES,
   defaultPmUnits,
@@ -135,9 +136,9 @@ export type ServiceQuoteResult = {
     }[];
     prices: ServiceSitePrices;
     knownOnlySensitivity: ServiceSitePrices;
-    flags: string[];
+    flags: QuoteFlag[];
   }[];
-  flags: string[];
+  flags: QuoteFlag[];
   portfolioPm: { annualPmAllSites: number; twiceYearlyPmAllSites: number; conditions: string } | null;
   assumptions: string[];
 };
@@ -185,7 +186,7 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
     let siteGoods = 0;
     let knownUnits = 0;
     let knownRisk = 0;
-    const flags: string[] = [];
+    const flags: QuoteFlag[] = [];
     const lines = site.lineItems.map((line, lineIndex) => {
       const category = clean(line.category);
       if (!isServiceCategory(category)) throw new Error(`${name}: line ${lineIndex + 1} bad or missing category ${JSON.stringify(category)}`);
@@ -213,9 +214,9 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
       const note = clean(line.reviewNote);
       const review = MANUAL_REVIEW[category];
       if (review) {
-        flags.push(`${name} | ${clean(line.sku) || `line ${lineIndex + 1}`}: ${review}${note ? ` ${note}` : ""}`);
+        flags.push(quoteFlag("manual_review", `${name} | ${clean(line.sku) || `line ${lineIndex + 1}`}: ${review}${note ? ` ${note}` : ""}`));
       } else if ((line.pmUnitsPerItem != null || line.warrantyRate != null) && !note) {
-        flags.push(`${name} | ${description}: manual rate/category override requires documentary approval note.`);
+        flags.push(quoteFlag("manual_override", `${name} | ${description}: manual rate/category override requires documentary approval note.`));
       }
       return {
         sku: clean(line.sku),
@@ -234,8 +235,8 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
     totalGoods += siteGoods;
     const prices = sitePrice(units, round2(risk), rates);
     const knownOnlySensitivity = sitePrice(knownUnits, round2(knownRisk), rates);
-    if (units <= 0) flags.push(`${name}: zero identified serviceable units; PM price cannot be quoted automatically`);
-    if (risk <= 0) flags.push(`${name}: no eligible/provisionally eligible component value; extension cannot be quoted automatically`);
+    if (units <= 0) flags.push(quoteFlag("no_pm_scope", `${name}: zero identified serviceable units; PM price cannot be quoted automatically`));
+    if (risk <= 0) flags.push(quoteFlag("no_warranty_scope", `${name}: no eligible/provisionally eligible component value; extension cannot be quoted automatically`));
     result.sites.push({ name, address, goodsNet: siteGoods, lineItems: lines, prices, knownOnlySensitivity, flags });
     result.flags.push(...flags);
   });
@@ -247,11 +248,15 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
     result.goodsNetDiscrepancy = delta;
     if (Math.abs(delta) > 0.1) {
       result.flags.push(
-        `GOODS NET RECONCILIATION: quoted £${recorded}; transcribed lines £${totalGoods}; discrepancy £${Math.abs(delta)}. Check quote pages before final approval.`,
+        quoteFlag(
+          "goods_net_discrepancy",
+          `Goods net reconciliation: quoted £${recorded}; product lines £${totalGoods}; difference £${Math.abs(delta)}.`,
+          delta,
+        ),
       );
     }
   } else {
-    result.flags.push("Goods Net not provided: cannot independently reconcile full quote completeness");
+    result.flags.push(quoteFlag("goods_net_missing", "Goods net was not provided, so the product lines could not be checked against it."));
     result.goodsNetDiscrepancy = null;
   }
 
@@ -265,7 +270,7 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
     };
   }
   if (result.sites.length >= 2) {
-    result.flags.push("Bundle and portfolio discount needs management approval.");
+    result.flags.push(quoteFlag("multi_site_approval", "Bundle and portfolio discount needs management approval."));
   }
   return result;
 }

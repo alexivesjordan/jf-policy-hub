@@ -5,6 +5,7 @@ import { classifyLine, type ClassificationRule } from "@/lib/service-quote/class
 import { calculateServiceQuote, type ServiceQuoteResult } from "@/lib/service-quote/engine";
 import { buildServiceProposal } from "@/lib/service-quote/proposal";
 import { DEFAULT_SERVICE_RATES, type ServiceRates } from "@/lib/service-quote/rates";
+import type { QuoteFlag } from "@/lib/quotes/flags";
 import { ingestCin7Quote, ingestPdfBytes, quoteCacheKey, type IngestedQuote } from "@/lib/quotes/ingest";
 import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { getCin7Client } from "@/lib/cin7/client";
@@ -19,7 +20,8 @@ export type ServiceQuoteView = {
   prices: ServiceQuoteResult["sites"];
   portfolioPm: ServiceQuoteResult["portfolioPm"];
   warnings: string[];
-  flags: string[];
+  /** Select these by `code`. Everyone who can open the quote sees them. */
+  flags: QuoteFlag[];
   audit: Pick<ServiceQuoteResult, "goodsNetFromLines" | "goodsNetDiscrepancy" | "assumptions">;
 };
 
@@ -157,6 +159,7 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
     }],
   }, rates);
 
+  result.flags = [...(ingested.flags ?? []), ...result.flags];
   let id: string | null = null;
   if (rateId) {
     const saved = await supabase.rpc("service_save_quote", {

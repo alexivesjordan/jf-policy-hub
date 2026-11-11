@@ -3,53 +3,19 @@
 import { useActionState } from "react";
 import { generateServiceProposal, type ServiceQuoteView } from "@/features/sales/service-actions";
 import { Banner, Button } from "@/components/pulse/ui";
+import type { QuoteFlag } from "@/lib/quotes/flags";
 
 function money(value: number | null | undefined) {
   if (value == null) return "—";
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
 
-function plainFlag(flag: string) {
-  const text = flag.replace(/\bFIXTURE\s*[—–-]\s*/gi, "");
-  if (/no eligible\/provisionally eligible component value/i.test(text)) {
-    return "No kit on this order qualifies for the parts warranty, so it can't be priced automatically.";
+function flagLine(flag: QuoteFlag) {
+  const message = flag.message.replace(/\s+/g, " ").trim();
+  if (flag.code === "cin7_totals_mismatch" && flag.difference != null) {
+    return `${message} Difference ${money(flag.difference)}.`;
   }
-  if (/zero identified serviceable units/i.test(text)) {
-    return "No machines on this order can be put on a maintenance visit, so that price can't be set automatically.";
-  }
-  if (/Goods Net not provided/i.test(text)) {
-    return "The order total was not on the quote, so we could not check that every line was included.";
-  }
-  if (/GOODS NET RECONCILIATION/i.test(text)) {
-    return text
-      .replace(/GOODS NET RECONCILIATION:\s*/i, "")
-      .replace(/quoted £([0-9,.]+)/i, "The order total was £$1")
-      .replace(/transcribed lines £([0-9,.]+)/i, "the lines add up to £$1")
-      .replace(/discrepancy £([0-9,.]+)/i, "which is £$1 different")
-      .replace(/Check quote pages before final approval\./i, "Check the quote before this price is sent.");
-  }
-  if (/Identity and actual number of machines|does not name a model|Provisional DHZ/i.test(text)) {
-    return "The model is not named. This is a provisional allowance only, and parts cover is not promised.";
-  }
-  if (/Cardio OEM|cardio model is not confirmed|cardio model needs confirming/i.test(text)) {
-    return "The cardio model needs confirming before a warranty is offered.";
-  }
-  if (/Third-party|unclear cardio/i.test(text)) {
-    return "This looks like another brand of cardio. Maintenance is priced. The five-year warranty waits for written approval.";
-  }
-  if (/Rack\/functional trainer|Rack and trainer/i.test(text)) {
-    return "Rack and trainer parts cover is provisional until the model is confirmed.";
-  }
-  if (/Product identity cannot be established/i.test(text)) {
-    return "This product cannot be identified from the quote, so it is left out of the automatic price.";
-  }
-  if (/manual rate\/category override/i.test(text)) {
-    return "A manual category needs a written note before it can be used.";
-  }
-  if (/Bundle and portfolio discount needs management approval/i.test(text)) {
-    return "This quote covers more than one site. The bundle and portfolio discount needs management approval.";
-  }
-  return text.replace(/^[^:]+:\s*/, "").replace(/\s+/g, " ").trim();
+  return message;
 }
 
 function plainAssumption(note: string) {
@@ -67,11 +33,8 @@ export function ServiceQuoteResult({
   installPrice?: number | null;
 }) {
   const sites = service.prices ?? [];
-  const missingLinePrices = service.warnings.some((warning) => /line net/i.test(warning));
-  const flags = [...new Set([
-    ...(missingLinePrices ? ["Some lines did not include a price, so they were counted at £0. Upload the quote PDF to price them."] : []),
-    ...service.flags.map(plainFlag),
-  ].filter((flag) => flag && !/\b1\.30\b|risk formula/i.test(flag)))];
+  const flags = [...new Map(service.flags.map((flag) => [`${flag.code}:${flag.message}`, flagLine(flag)])).values()]
+    .filter((line) => line && !/\b1\.30\b|risk formula/i.test(line));
   const auditNotes = (service.audit?.assumptions ?? []).map(plainAssumption).filter(Boolean);
   return (
     <section className="space-y-4">
