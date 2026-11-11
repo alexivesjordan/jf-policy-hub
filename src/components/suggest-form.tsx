@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { suggestAmendment } from "@/features/amendments/actions";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { DateField } from "@/components/date-field";
 import { Banner, Button, Field, Input, Select, TextArea } from "@/components/pulse/ui";
 
 export function SuggestForm({ policyId, content }: { policyId: string; content: string }) {
@@ -27,7 +28,7 @@ export function SuggestForm({ policyId, content }: { policyId: string; content: 
           <Input name="jurisdiction" placeholder="England and Wales" />
         </Field>
         <Field label="Effective date" hint="Optional.">
-          <Input name="effectiveDate" type="date" />
+          <DateField name="effectiveDate" />
         </Field>
       </div>
       <Field label="What the law or guidance changed" hint="Optional, but helpful for the approver.">

@@ -202,15 +202,19 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
-  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep";
+  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead";
   if (fn === "workspace_can") {
     const moduleName = String(args?.p_module ?? "");
-    if (process.env.PULSE_FIXTURE_ROLE !== "rep") return true;
-    return moduleName === "sales";
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return moduleName === "sales";
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return moduleName === "operations" || moduleName === "sales";
+    return true;
   }
   if (fn === "workspace_my_access") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
+    }
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "edit", sales: "view", finance: "none" };
     }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
   }
@@ -295,6 +299,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "service_set_proposal_path" || fn === "save_person_name" || fn === "service_save_rates" || fn === "service_upsert_rule") return true;
   if (fn === "orbit_office_context") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return { has_module: true, ops_role: "install_lead", is_owner: false, operations: "edit", sales: "view" };
     return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
   }
   if (fn === "orbit_list_jobs") return jobs;

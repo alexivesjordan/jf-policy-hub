@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { Upload } from "lucide-react";
+import { DateField } from "@/components/date-field";
 import { LockedFields } from "@/components/locked-fields";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
@@ -164,7 +165,7 @@ export function ServiceRateEditor({ rates, canEdit }: { rates: ServiceRates; can
         <PercentRate name="portfolioFactor" label="Portfolio discount" stored={rates.portfolioFactor} kind="discount" disabled={!canEdit} />
         <label className="text-sm font-semibold">
           <span className="mb-1 block text-muted-foreground">Effective on</span>
-          <Input name="effectiveOn" type="date" required disabled={!canEdit} />
+          <DateField name="effectiveOn" required disabled={!canEdit} />
         </label>
         <label className="text-sm font-semibold sm:col-span-2">
           <span className="mb-1 block text-muted-foreground">Reason</span>

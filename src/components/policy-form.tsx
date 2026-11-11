@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { savePolicyForm } from "@/features/policies/actions";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { DateField } from "@/components/date-field";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import type { Category, Person, PolicyRecord } from "@/lib/types";
 
@@ -46,7 +47,7 @@ export function PolicyForm({
           </Select>
         </Field>
         <Field label="Review date" hint="Optional. We will remind you when it is due.">
-          <Input name="reviewDate" type="date" defaultValue={policy?.review_date ?? ""} />
+          <DateField name="reviewDate" defaultValue={policy?.review_date ?? ""} />
         </Field>
         <Field label="Owner">
           <Select name="ownerId" searchable defaultValue={policy?.owner_id ?? ""}>

@@ -42,6 +42,7 @@ export default async function SalesQuotePage() {
     isOwner: context?.is_owner,
     opsRole: context?.ops_role,
     workspaceRole: profile.workspace_role,
+    operations: context?.operations ?? profile.levels?.operations,
   });
   const rates = pricing ?? SEEDED_PRICING;
 

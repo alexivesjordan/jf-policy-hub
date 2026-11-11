@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useActionState } from "react";
 import { Banner } from "@/components/pulse/ui";
 import { Button } from "@/components/ui/button";
+import { enGB } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { loadBookingWindow, pencilJobDay } from "@/features/operations/price-actions";
@@ -102,6 +103,7 @@ export function MonthBookingCalendar({ jobId }: { jobId: string }) {
       ) : null}
       <Calendar
         mode="range"
+        locale={enGB}
         weekStartsOn={1}
         month={cursor}
         onMonthChange={setCursor}

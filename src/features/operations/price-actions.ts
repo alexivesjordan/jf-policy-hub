@@ -339,6 +339,7 @@ async function priceDraft(draft: QuoteDraft) {
     isOwner: context.is_owner,
     opsRole: context.ops_role,
     workspaceRole: profile?.workspace_role,
+    operations: context.operations ?? profile?.levels?.operations,
   });
   const pricing = await pricingConfig();
   const lines = await withLiveCategories(draft.lines);
