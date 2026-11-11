@@ -59,21 +59,37 @@ async function cachedIngest(ingested: IngestedQuote) {
   return { ingestId: typeof saved.data === "string" ? saved.data : null, ingested, fromCache: false };
 }
 
+async function savedCin7Read(cacheKey: string) {
+  const supabase = await createClient();
+  const existing = await supabase.rpc("service_get_ingest", { p_key: cacheKey });
+  if (existing.error || !existing.data) return null;
+  return existing.data as IngestedQuote;
+}
+
 export async function loadServiceFromOrder(_state: ActionState, formData: FormData): Promise<ActionState & { ingested?: IngestedQuote }> {
   await requireSalesUser();
   const number = String(formData.get("quoteNumber") ?? "").trim();
   if (!number) return { ok: false, message: "Enter a sales order number." };
+  const cacheKey = quoteCacheKey("cin7", number.toLowerCase());
   try {
-    const supabase = await createClient();
-    const existing = await supabase.rpc("service_get_ingest", { p_key: quoteCacheKey("cin7", number.toLowerCase()) });
-    if (!existing.error && existing.data) {
-      return { ok: true, message: "Quote loaded from the saved read.", ingested: existing.data as IngestedQuote };
-    }
     const quote = await getCin7Client().getQuote(number);
     if (!quote) return { ok: false, message: "No Cin7 sale has that order number." };
-    const loaded = await cachedIngest(ingestCin7Quote(quote));
-    return { ok: true, message: "Quote loaded.", ingested: loaded.ingested };
+    const ingested = ingestCin7Quote(quote);
+    const supabase = await createClient();
+    const saved = await supabase.rpc("service_put_ingest", {
+      p_source: ingested.source,
+      p_key: ingested.cacheKey,
+      p_quote_number: ingested.quoteNumber,
+      p_payload: ingested,
+    });
+    const note = saved.error ? " The saved copy could not be updated." : "";
+    return { ok: true, message: `Quote loaded from Cin7.${note}`, ingested };
   } catch (error) {
+    const saved = await savedCin7Read(cacheKey);
+    if (saved) {
+      const when = saved.fetchedAt ? ` from ${saved.fetchedAt}` : "";
+      return { ok: true, message: `Cin7 could not be read. Showing the last saved copy${when}.`, ingested: saved };
+    }
     return { ok: false, message: error instanceof Error ? error.message : "Could not load that order." };
   }
 }
@@ -157,6 +173,7 @@ export async function priceIngestedService(ingested: IngestedQuote): Promise<Ser
         quoteNumber: result.quoteNumber,
         sites: result.sites.map((site) => ({ name: site.name, address: site.address, prices: site.prices })),
         portfolioPm: result.portfolioPm,
+        fetchedAt: ingested.fetchedAt,
       },
       p_audit: result,
     });

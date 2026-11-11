@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Button, Field, Input } from "@/components/pulse/ui";
 import { updateOwnName } from "@/features/account/name-actions";
 import { getCurrentProfile } from "@/lib/auth";
@@ -6,7 +7,15 @@ import { redirect } from "next/navigation";
 
 export const metadata = { title: "Your name" };
 
-export default async function AccountNamePage() {
+export default function AccountNamePage() {
+  return (
+    <Suspense fallback={<main className="px-6 py-16 text-grey">Loading...</main>}>
+      <AccountNameForm />
+    </Suspense>
+  );
+}
+
+async function AccountNameForm() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login?next=/account/name");
   const stored = splitPersonName(profile.full_name);

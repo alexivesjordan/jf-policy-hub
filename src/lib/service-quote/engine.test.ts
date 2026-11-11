@@ -73,6 +73,7 @@ describe("service quote engine", () => {
     assert.equal(site.knownOnlySensitivity.twiceYearlyPm, 3095);
     assert.equal(site.knownOnlySensitivity.extendedWarrantyOneOff, 2195);
     assert.ok(result.flags.some((flag) => flag.includes("Identity")));
+    assert.equal(result.flags.some((flag) => flag.includes("management approval")), false);
     const customer = customerProposalText(result);
     assert.equal(customer.includes("99 + 59"), false);
     assert.equal(customer.includes("1.30"), false);
@@ -117,5 +118,6 @@ describe("service quote engine", () => {
     });
     assert.equal(result.portfolioPm?.annualPmAllSites, 3135);
     assert.equal(result.portfolioPm?.twiceYearlyPmAllSites, 5790);
+    assert.ok(result.flags.some((flag) => flag === "Bundle and portfolio discount needs management approval."));
   });
 });

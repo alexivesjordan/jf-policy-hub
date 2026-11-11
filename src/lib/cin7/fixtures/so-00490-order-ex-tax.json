@@ -1,0 +1,28 @@
+{
+  "SaleOrderNumber": "SO-00490",
+  "Lines": [
+    {
+      "SKU": "JF-C2SE-2",
+      "Name": "Concept2 SkiErg",
+      "Quantity": 1,
+      "Price": 679.17,
+      "Discount": 0,
+      "Tax": 135.83,
+      "Total": 679.17,
+      "TaxRule": "Tax on Sales"
+    },
+    {
+      "SKU": "JF-C2SE-FS-2",
+      "Name": "Concept2 SkiErg Floor Stand",
+      "Quantity": 1,
+      "Price": 195.83,
+      "Discount": 0,
+      "Tax": 39.17,
+      "Total": 195.83,
+      "TaxRule": "Tax on Sales"
+    }
+  ],
+  "TotalBeforeTax": 875,
+  "Tax": 175,
+  "Total": 1050
+}

@@ -30,6 +30,8 @@ export type IngestedQuote = {
   lines: IngestedLine[];
   deliveryInstallLines: IngestedCharge[];
   warnings: string[];
+  /** When a Cin7 order was fetched. Null for a PDF or a draft. */
+  fetchedAt: string | null;
 };
 
 export function quoteCacheKey(source: string, material: string) {
@@ -58,6 +60,7 @@ export function ingestExtractedQuote(extracted: ExtractedQuote, source: Ingested
     })),
     deliveryInstallLines: delivery,
     warnings: extracted.warnings,
+    fetchedAt: null,
   };
 }
 
@@ -88,6 +91,7 @@ export function ingestDraft(draft: {
     })),
     deliveryInstallLines: [],
     warnings: draft.warnings,
+    fetchedAt: null,
   };
 }
 
@@ -108,7 +112,8 @@ export function ingestCin7Quote(quote: Cin7Quote): IngestedQuote {
   }));
   const goodsNet = lines.reduce((sum, line) => sum + line.lineNet, 0);
   const warnings: string[] = [];
-  if (quote.lines.some((line) => line.lineNet == null)) {
+  if (quote.moneyWarning) warnings.push(quote.moneyWarning);
+  else if (quote.lines.some((line) => line.lineNet == null)) {
     warnings.push("Cin7 did not send a line net for every row. Those lines are priced at £0 until the PDF is used.");
   }
   return {
@@ -123,5 +128,6 @@ export function ingestCin7Quote(quote: Cin7Quote): IngestedQuote {
     lines,
     deliveryInstallLines: [],
     warnings,
+    fetchedAt: new Date().toISOString(),
   };
 }

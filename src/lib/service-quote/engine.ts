@@ -264,6 +264,9 @@ export function calculateServiceQuote(input: ServiceQuoteInput, rates: ServiceRa
       conditions: "10% PM discount only when all listed sites select the same agreed programme. No automatic extended-warranty or further bundle discount.",
     };
   }
+  if (result.sites.length >= 2) {
+    result.flags.push("Bundle and portfolio discount needs management approval.");
+  }
   return result;
 }
 
