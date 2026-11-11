@@ -163,6 +163,16 @@ export function PriceQuoteForm({
           <input type="hidden" name="saleId" value={draft.saleId} />
           <input type="hidden" name="internalNote" value={draft.internalNote} />
           <input type="hidden" name="goodsNet" value={draft.goodsNet ?? ""} />
+          <input
+            type="hidden"
+            name="serviceReconcile"
+            value={JSON.stringify({
+              goodsNet: draft.goodsNet,
+              orderNet: draft.orderNet,
+              deliveryInstallLines: draft.deliveryInstall,
+              flags: draft.moneyFlags,
+            })}
+          />
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Customer">
               <Input name="customerName" value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} required />

@@ -26,7 +26,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { messageFromError } from "@/lib/errors";
 import type { ActionState } from "@/lib/action-state";
-import { ingestDraft } from "@/lib/quotes/ingest";
+import { ingestDraft, parseServiceReconcile, serviceReconcileFromCin7, serviceReconcileFromExtract, type ServiceReconcile } from "@/lib/quotes/ingest";
 import { priceIngestedService, type ServiceQuoteView } from "@/features/sales/service-actions";
 
 const SEGMENTS = ["independent", "franchisee", "trade", "big_corporate"] as const;
@@ -54,6 +54,9 @@ export type QuoteDraft = {
   customerReference: string;
   lines: ReviewLine[];
   goodsNet: number | null;
+  orderNet: number | null;
+  deliveryInstall: ServiceReconcile["deliveryInstallLines"];
+  moneyFlags: ServiceReconcile["flags"];
   warnings: string[];
   source: "fixture" | "pdf" | "cin7";
   customerId: string;
@@ -179,6 +182,30 @@ async function pricingConfig(): Promise<PricingConfig> {
   };
 }
 
+function serviceFields(reconcile: ServiceReconcile): Pick<QuoteDraft, "goodsNet" | "orderNet" | "deliveryInstall" | "moneyFlags"> {
+  return {
+    goodsNet: reconcile.goodsNet,
+    orderNet: reconcile.orderNet,
+    deliveryInstall: reconcile.deliveryInstallLines,
+    moneyFlags: reconcile.flags,
+  };
+}
+
+function serviceIngest(draft: QuoteDraft) {
+  return ingestDraft({
+    source: draft.source,
+    quoteNumber: draft.quoteNumber,
+    customerName: draft.customerName,
+    postcode: draft.postcode,
+    goodsNet: draft.goodsNet,
+    orderNet: draft.orderNet,
+    lines: draft.lines,
+    warnings: draft.warnings,
+    deliveryInstallLines: draft.deliveryInstall,
+    flags: draft.moneyFlags,
+  });
+}
+
 function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"]): QuoteDraft {
   const sum = Math.round(extracted.lines.reduce((total, line) => total + line.lineTotal, 0) * 100) / 100;
   const warnings = [...extracted.warnings];
@@ -200,7 +227,7 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
       unitWeightKg: null,
       productId: "",
     })),
-    goodsNet: extracted.goodsNet,
+    ...serviceFields(serviceReconcileFromExtract(extracted)),
     warnings,
     source,
     customerId: "",
@@ -250,8 +277,9 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
   if (lines.some((line) => !line.description || !Number.isFinite(line.qty) || line.qty <= 0)) {
     return { draft: emptyDraft(), error: "Each line needs a description and a quantity." };
   }
+  const reconcile = parseServiceReconcile(String(formData.get("serviceReconcile") ?? ""));
   const goodsText = String(formData.get("goodsNet") ?? "").trim();
-  const goodsNet = goodsText ? Number(goodsText) : null;
+  const goodsNet = goodsText ? Number(goodsText) : reconcile.goodsNet;
   const warnings: string[] = [];
   if (goodsNet != null && Number.isFinite(goodsNet)) {
     const comparable = lines.filter((line) => line.lineTotal != null);
@@ -269,6 +297,9 @@ function readDraft(formData: FormData): { draft: QuoteDraft; error?: string } {
       customerReference: String(formData.get("customerReference") ?? "").trim(),
       lines,
       goodsNet: goodsNet != null && Number.isFinite(goodsNet) ? goodsNet : null,
+      orderNet: reconcile.orderNet,
+      deliveryInstall: reconcile.deliveryInstallLines,
+      moneyFlags: reconcile.flags,
       warnings,
       source: formData.get("source") === "pdf" ? "pdf" : formData.get("source") === "cin7" ? "cin7" : "fixture",
       customerId: String(formData.get("customerId") ?? "").trim(),
@@ -294,6 +325,9 @@ function emptyDraft(): QuoteDraft {
     customerReference: "",
     lines: [],
     goodsNet: null,
+    orderNet: null,
+    deliveryInstall: [],
+    moneyFlags: [],
     warnings: [],
     source: "fixture",
     customerId: "",
@@ -467,7 +501,7 @@ function draftFromSale(quote: Cin7Quote, source: QuoteDraft["source"], remembere
       dimensionUnit: line.dimensionUnit ?? null,
       tilesPerPack: line.tilesPerPack ?? null,
     })),
-    goodsNet: null,
+    ...serviceFields(serviceReconcileFromCin7(quote)),
     warnings,
     source,
     customerId: quote.customerId ?? "",
@@ -560,7 +594,7 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
         });
       }
     }
-    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(ingestDraft(draft)) : null;
+    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Best-case price ready. Create the job when you want it booked."),
@@ -596,7 +630,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
         });
       }
     }
-    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(ingestDraft(draft)) : null;
+    const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Cin7Quote } from "@/lib/cin7/types";
-import type { QuoteFlag } from "@/lib/quotes/flags";
+import { QUOTE_FLAG_CODES, type QuoteFlag } from "@/lib/quotes/flags";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import type { ExtractedQuote } from "@/lib/quotes/types";
@@ -72,14 +72,80 @@ export function ingestExtractedQuote(extracted: ExtractedQuote, source: Ingested
   };
 }
 
+export type ServiceReconcile = {
+  goodsNet: number | null;
+  orderNet: number | null;
+  deliveryInstallLines: IngestedCharge[];
+  flags: QuoteFlag[];
+};
+
+/** The goods net, order total, charges, and money flags the service page prices from. */
+export function serviceReconcileFromCin7(quote: Cin7Quote): ServiceReconcile {
+  const ingested = ingestCin7Quote(quote);
+  return {
+    goodsNet: ingested.goodsNet,
+    orderNet: ingested.orderNet,
+    deliveryInstallLines: ingested.deliveryInstallLines,
+    flags: ingested.flags,
+  };
+}
+
+export function serviceReconcileFromExtract(extracted: ExtractedQuote): ServiceReconcile {
+  const ingested = ingestExtractedQuote(extracted, "pdf", "extract");
+  return {
+    goodsNet: ingested.goodsNet,
+    orderNet: ingested.orderNet,
+    deliveryInstallLines: ingested.deliveryInstallLines,
+    flags: ingested.flags,
+  };
+}
+
+export function serialiseServiceReconcile(value: ServiceReconcile) {
+  return JSON.stringify(value);
+}
+
+export function parseServiceReconcile(raw: string): ServiceReconcile {
+  const empty: ServiceReconcile = { goodsNet: null, orderNet: null, deliveryInstallLines: [], flags: [] };
+  if (!raw.trim()) return empty;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ServiceReconcile>;
+    const money = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+    const charges = Array.isArray(parsed.deliveryInstallLines)
+      ? parsed.deliveryInstallLines.flatMap((line) => {
+          if (!line || typeof line.description !== "string" || typeof line.amountNet !== "number" || !Number.isFinite(line.amountNet)) return [];
+          return [{ description: line.description, amountNet: line.amountNet }];
+        })
+      : [];
+    const flags = Array.isArray(parsed.flags)
+      ? parsed.flags.flatMap((flag) => {
+          if (!flag || typeof flag.code !== "string" || typeof flag.message !== "string") return [];
+          if (!(QUOTE_FLAG_CODES as readonly string[]).includes(flag.code)) return [];
+          const difference = flag.difference == null ? null : money(flag.difference);
+          return [{ code: flag.code as QuoteFlag["code"], difference, message: flag.message }];
+        })
+      : [];
+    return {
+      goodsNet: money(parsed.goodsNet),
+      orderNet: money(parsed.orderNet),
+      deliveryInstallLines: charges,
+      flags,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export function ingestDraft(draft: {
   source: IngestedQuote["source"];
   quoteNumber: string;
   customerName: string;
   postcode: string;
   goodsNet: number | null;
+  orderNet?: number | null;
   lines: { sku: string; description: string; qty: number; lineTotal: number | null; category: string }[];
   warnings: string[];
+  deliveryInstallLines?: IngestedCharge[];
+  flags?: QuoteFlag[];
 }): IngestedQuote {
   return {
     source: draft.source,
@@ -89,7 +155,7 @@ export function ingestDraft(draft: {
     siteName: null,
     postcode: draft.postcode || null,
     goodsNet: draft.goodsNet,
-    orderNet: draft.goodsNet,
+    orderNet: draft.orderNet ?? draft.goodsNet,
     lines: draft.lines.map((line) => ({
       sku: line.sku,
       description: line.description,
@@ -97,9 +163,9 @@ export function ingestDraft(draft: {
       lineNet: line.lineTotal ?? 0,
       cin7Category: line.category || null,
     })),
-    deliveryInstallLines: [],
+    deliveryInstallLines: draft.deliveryInstallLines ?? [],
     warnings: draft.warnings,
-    flags: [],
+    flags: draft.flags ?? [],
     fetchedAt: null,
   };
 }
