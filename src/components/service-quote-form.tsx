@@ -34,7 +34,7 @@ export function ServiceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) 
     <div className="space-y-6">
       <form action={price} className="grid gap-4 md:grid-cols-[1fr_auto]">
         <Field label="Order number" hint="For example SO-00490.">
-          <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"} />
+          <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "EXAMPLE-00490"} />
         </Field>
         <div className="md:pt-7">
           <Button type="submit" disabled={pricing && !reading} onClick={() => setPdfIntent(false)}>{pricing && !reading ? "Calculating…" : "Load quote"}</Button>
@@ -99,30 +99,68 @@ function DropPdf({ onReady }: { onReady: () => void }) {
   );
 }
 
+function roundPercent(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function MoneyRate({ name, label, pounds, disabled }: { name: string; label: string; pounds: number; disabled: boolean }) {
+  return (
+    <label className="text-sm font-semibold">
+      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2">
+        <span className="text-muted-foreground">£</span>
+        <Input name={name} type="number" min="0" step="1" defaultValue={pounds} disabled={disabled} />
+      </span>
+      <span className="mt-1 block text-xs font-normal text-grey">Saved as £{pounds.toFixed(2)}</span>
+    </label>
+  );
+}
+
+function PercentRate({
+  name,
+  label,
+  stored,
+  kind,
+  disabled,
+}: {
+  name: string;
+  label: string;
+  stored: number;
+  kind: "extra" | "discount" | "share";
+  disabled: boolean;
+}) {
+  const initial = kind === "extra" ? (stored - 1) * 100 : kind === "discount" ? (1 - stored) * 100 : stored * 100;
+  const [percent, setPercent] = useState(roundPercent(initial));
+  const saved = kind === "extra" ? 1 + percent / 100 : kind === "discount" ? 1 - percent / 100 : percent / 100;
+  return (
+    <label className="text-sm font-semibold">
+      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2">
+        <Input type="number" min="0" step="0.1" value={percent} disabled={disabled} onChange={(event) => setPercent(Number(event.target.value))} />
+        <span className="text-muted-foreground">%</span>
+      </span>
+      <input type="hidden" name={name} value={Number.isFinite(saved) ? saved : stored} />
+      <span className="mt-1 block text-xs font-normal text-grey">Saved as {Number.isFinite(saved) ? saved.toFixed(2) : stored.toFixed(2)}</span>
+    </label>
+  );
+}
+
 export function ServiceRateEditor({ rates, canEdit }: { rates: ServiceRates; canEdit: boolean }) {
   const [state, action, pending] = useActionState(saveServiceRates, null);
-  const fields = [
-    ["callout", "Call-out", rates.callout],
-    ["perMachine", "Per machine", rates.perMachine],
-    ["uplift", "Uplift", rates.uplift],
-    ["twiceYearlyFactor", "Twice-yearly factor", rates.twiceYearlyFactor],
-    ["cardioRate", "Cardio rate", rates.cardioRate],
-    ["strengthRate", "Strength rate", rates.strengthRate],
-    ["rackRate", "Rack rate", rates.rackRate],
-    ["extensionFactor", "Extension factor", rates.extensionFactor],
-    ["perSite", "Per site", rates.perSite],
-    ["bundleIncentive", "Bundle incentive", rates.bundleIncentive],
-    ["portfolioFactor", "Portfolio factor", rates.portfolioFactor],
-  ] as const;
   return (
     <form action={action} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {fields.map(([name, label, value]) => (
-          <label key={name} className="text-sm font-semibold">
-            <span className="mb-1 block text-muted-foreground">{label}</span>
-            <Input name={name} type="number" step="0.01" defaultValue={value} disabled={!canEdit} />
-          </label>
-        ))}
+        <MoneyRate name="callout" label="Call-out" pounds={rates.callout} disabled={!canEdit} />
+        <MoneyRate name="perMachine" label="Per machine" pounds={rates.perMachine} disabled={!canEdit} />
+        <PercentRate name="uplift" label="Uplift" stored={rates.uplift} kind="extra" disabled={!canEdit} />
+        <PercentRate name="twiceYearlyFactor" label="Twice-yearly discount" stored={rates.twiceYearlyFactor} kind="discount" disabled={!canEdit} />
+        <PercentRate name="cardioRate" label="Cardio" stored={rates.cardioRate} kind="share" disabled={!canEdit} />
+        <PercentRate name="strengthRate" label="Strength" stored={rates.strengthRate} kind="share" disabled={!canEdit} />
+        <PercentRate name="rackRate" label="Rack" stored={rates.rackRate} kind="share" disabled={!canEdit} />
+        <PercentRate name="extensionFactor" label="Warranty uplift" stored={rates.extensionFactor} kind="extra" disabled={!canEdit} />
+        <MoneyRate name="perSite" label="Per site" pounds={rates.perSite} disabled={!canEdit} />
+        <MoneyRate name="bundleIncentive" label="Bundle incentive" pounds={rates.bundleIncentive} disabled={!canEdit} />
+        <PercentRate name="portfolioFactor" label="Portfolio discount" stored={rates.portfolioFactor} kind="discount" disabled={!canEdit} />
         <label className="text-sm font-semibold">
           <span className="mb-1 block text-muted-foreground">Effective on</span>
           <Input name="effectiveOn" type="date" required disabled={!canEdit} />

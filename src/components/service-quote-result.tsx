@@ -9,6 +9,52 @@ function money(value: number | null | undefined) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
 }
 
+function plainFlag(flag: string) {
+  const text = flag.replace(/\bFIXTURE\s*[—–-]\s*/gi, "");
+  if (/no eligible\/provisionally eligible component value/i.test(text)) {
+    return "No kit on this order qualifies for the parts warranty, so it can't be priced automatically.";
+  }
+  if (/zero identified serviceable units/i.test(text)) {
+    return "No machines on this order can be put on a maintenance visit, so that price can't be set automatically.";
+  }
+  if (/Goods Net not provided/i.test(text)) {
+    return "The order total was not on the quote, so we could not check that every line was included.";
+  }
+  if (/GOODS NET RECONCILIATION/i.test(text)) {
+    return text
+      .replace(/GOODS NET RECONCILIATION:\s*/i, "")
+      .replace(/quoted £([0-9,.]+)/i, "The order total was £$1")
+      .replace(/transcribed lines £([0-9,.]+)/i, "the lines add up to £$1")
+      .replace(/discrepancy £([0-9,.]+)/i, "which is £$1 different")
+      .replace(/Check quote pages before final approval\./i, "Check the quote before this price is sent.");
+  }
+  if (/Identity and actual number of machines|does not name a model|Provisional DHZ/i.test(text)) {
+    return "The model is not named. This is a provisional allowance only, and parts cover is not promised.";
+  }
+  if (/Cardio OEM|cardio model is not confirmed|cardio model needs confirming/i.test(text)) {
+    return "The cardio model needs confirming before a warranty is offered.";
+  }
+  if (/Third-party|unclear cardio/i.test(text)) {
+    return "This looks like another brand of cardio. Maintenance is priced. The five-year warranty waits for written approval.";
+  }
+  if (/Rack\/functional trainer|Rack and trainer/i.test(text)) {
+    return "Rack and trainer parts cover is provisional until the model is confirmed.";
+  }
+  if (/Product identity cannot be established/i.test(text)) {
+    return "This product cannot be identified from the quote, so it is left out of the automatic price.";
+  }
+  if (/manual rate\/category override/i.test(text)) {
+    return "A manual category needs a written note before it can be used.";
+  }
+  return text.replace(/^[^:]+:\s*/, "").replace(/\s+/g, " ").trim();
+}
+
+function plainAssumption(note: string) {
+  return note
+    .replace("are not in the warranty eligible value", "are not included in the warranty value")
+    .replace("eligible parts only", "qualifying parts only");
+}
+
 export function ServiceQuoteResult({
   service,
   installPrice,
@@ -17,52 +63,61 @@ export function ServiceQuoteResult({
   installPrice?: number | null;
 }) {
   const sites = service.prices ?? [];
+  const detail = service.flags !== null;
+  const missingLinePrices = service.warnings.some((warning) => /line net/i.test(warning));
+  const ownerFlags = [...new Set([
+    ...(missingLinePrices ? ["Some lines did not include a price, so they were counted at £0. Upload the quote PDF to price them."] : []),
+    ...(service.flags ?? []).map(plainFlag),
+  ])];
   return (
     <section className="space-y-4">
       {sites.map((site) => {
         const prices = site.prices;
-        const rows = [
-          ...(installPrice !== undefined ? [["Install price", installPrice] as const] : []),
-          ["Annual maintenance", prices.annualPm] as const,
-          ["Twice-yearly maintenance", prices.twiceYearlyPm] as const,
-          ["5-year parts warranty, one-off", prices.extendedWarrantyOneOff] as const,
-          ["Year 1 bundle · annual maintenance", prices.annualBundleYear1] as const,
-          ["Year 1 bundle · twice-yearly maintenance", prices.twiceBundleYear1] as const,
-        ];
+        const warrantyReady = prices.extendedWarrantyOneOff > 0;
+        const rows: { label: string; value: string }[] = [];
+        if (installPrice !== undefined) rows.push({ label: "Install price", value: money(installPrice) });
+        rows.push({ label: "Annual maintenance", value: money(prices.annualPm) });
+        rows.push({ label: "Twice-yearly maintenance", value: money(prices.twiceYearlyPm) });
+        if (warrantyReady) {
+          rows.push({ label: "5-year parts warranty, one-off", value: money(prices.extendedWarrantyOneOff) });
+          rows.push({ label: "Year 1 bundle · annual maintenance", value: money(prices.annualBundleYear1) });
+          rows.push({ label: "Year 1 bundle · twice-yearly maintenance", value: money(prices.twiceBundleYear1) });
+        }
         return (
           <div key={site.name} className="rounded-3xl border border-line bg-card px-6 py-6">
             <h2 className="font-display text-2xl">{sites.length > 1 ? site.name : "Maintenance and warranty"}</h2>
-            <p className="mt-1 text-sm text-grey">{service.customerName} · {service.quoteNumber} · rate {service.rateVersion}</p>
+            <p className="mt-1 text-sm text-grey">{service.customerName.replace(/^FIXTURE\s*[—–-]\s*/i, "")} · {service.quoteNumber} · rate {service.rateVersion}</p>
             <dl className="mt-4 divide-y divide-border">
-              {rows.map(([label, value]) => (
-                <div key={label} className="flex items-baseline justify-between gap-4 py-3">
-                  <dt className="text-sm text-ink">{label}</dt>
-                  <dd className="font-display text-2xl">{money(value)}</dd>
+              {rows.map((row) => (
+                <div key={row.label} className="flex items-baseline justify-between gap-4 py-3">
+                  <dt className="text-sm text-ink">{row.label}</dt>
+                  <dd className="font-display text-2xl">{row.value}</dd>
                 </div>
               ))}
             </dl>
+            {!warrantyReady ? (
+              <p className="mt-4 text-sm text-grey">Not available for this order. Our team will confirm the warranty price.</p>
+            ) : null}
           </div>
         );
       })}
-      {service.warnings.length > 0 ? (
-        <ul className="space-y-2">
-          {service.warnings.map((warning) => <li key={warning}><Banner tone="warning">{warning}</Banner></li>)}
-        </ul>
+      {!detail && missingLinePrices ? (
+        <p className="text-sm text-grey">Some lines need checking. Upload the quote PDF for a full price.</p>
       ) : null}
-      {service.flags ? (
+      {detail ? (
         <div className="rounded-3xl border border-line bg-card px-6 py-5">
           <h3 className="font-display text-xl">Flags</h3>
-          {service.flags.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{service.flags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
+          {ownerFlags.length === 0 ? <p className="mt-2 text-sm text-grey">No flags on this quote.</p> : (
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{ownerFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
           )}
           {service.audit ? (
             <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4"><dt>Goods net from lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Goods net difference</dt><dd>{service.audit.goodsNetDiscrepancy == null ? "—" : money(service.audit.goodsNetDiscrepancy)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Total of the lines</dt><dd>{money(service.audit.goodsNetFromLines)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Difference from the order total</dt><dd>{service.audit.goodsNetDiscrepancy == null ? "The order total was not on the quote" : money(service.audit.goodsNetDiscrepancy)}</dd></div>
               {service.audit.assumptions.length > 0 ? (
                 <div>
                   <dt className="font-semibold">Audit notes</dt>
-                  <dd className="mt-1 text-grey">{service.audit.assumptions.join(" ")}</dd>
+                  <dd className="mt-1 text-grey">{service.audit.assumptions.map(plainAssumption).join(" ")}</dd>
                 </div>
               ) : null}
             </dl>
