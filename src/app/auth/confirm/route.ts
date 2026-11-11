@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { confirmGetPlan, continueToPulsePage } from "@/lib/auth-confirm";
 import { confirmDestination } from "@/lib/auth-link";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,44 +41,29 @@ function loginRedirect(origin: string) {
   return NextResponse.redirect(new URL("/login?error=link", origin));
 }
 
+function html(body: string) {
+  return new NextResponse(body, {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
 export async function GET(request: Request) {
   await connection();
   const url = new URL(request.url);
-  const tokenHash = url.searchParams.get("token_hash");
-  const type = url.searchParams.get("type");
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next");
-  const errored = url.searchParams.get("error") || url.searchParams.get("error_description");
-
-  if (errored) return loginRedirect(url.origin);
-
-  if (!tokenHash && !code) {
-    return new NextResponse(IMPLICIT_PAGE, {
-      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-    });
-  }
-
-  const supabase = await createClient();
-  const otpType = type;
-
-  if (tokenHash && type && OTP_TYPES.has(type)) {
-    const { error } = await supabase.auth.verifyOtp({
-      type: type as EmailOtpType,
-      token_hash: tokenHash,
-    });
-    if (error) return loginRedirect(url.origin);
-  } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) return loginRedirect(url.origin);
-  } else {
-    return loginRedirect(url.origin);
-  }
-
-  return NextResponse.redirect(new URL(confirmDestination(otpType, next), url.origin));
+  const plan = confirmGetPlan(url.searchParams);
+  if (plan === "error") return loginRedirect(url.origin);
+  if (plan === "implicit") return html(IMPLICIT_PAGE);
+  return html(continueToPulsePage(plan));
 }
 
 export async function POST(request: Request) {
   await connection();
+  const url = new URL(request.url);
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+    return verifyPostedLink(await request.formData(), url.origin);
+  }
+
   let body: { access_token?: unknown; refresh_token?: unknown; type?: unknown; next?: unknown };
   try {
     body = await request.json();
@@ -101,4 +87,29 @@ export async function POST(request: Request) {
   if (error) return Response.json({ redirect: "/login?error=link" }, { status: 400 });
 
   return Response.json({ redirect: confirmDestination(otpType, next) });
+}
+
+async function verifyPostedLink(form: FormData, origin: string) {
+  const tokenHash = String(form.get("token_hash") ?? "");
+  const type = String(form.get("type") ?? "");
+  const code = String(form.get("code") ?? "");
+  const next = String(form.get("next") ?? "") || null;
+  const supabase = await createClient();
+
+  if (tokenHash && OTP_TYPES.has(type)) {
+    const { error } = await supabase.auth.verifyOtp({
+      type: type as EmailOtpType,
+      token_hash: tokenHash,
+    });
+    if (error) return loginRedirect(origin);
+    return NextResponse.redirect(new URL(confirmDestination(type, next), origin), 303);
+  }
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) return loginRedirect(origin);
+    return NextResponse.redirect(new URL(confirmDestination(type || null, next), origin), 303);
+  }
+
+  return loginRedirect(origin);
 }
