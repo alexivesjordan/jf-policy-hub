@@ -61,7 +61,9 @@ export function BookInstallDialog({
   const [message, setMessage] = useState("");
   const [booked, setBooked] = useState<{ id: string; startOn: string; endOn: string } | null>(null);
 
-  async function load(from = new Date().toISOString().slice(0, 10), to = addDays(new Date().toISOString().slice(0, 10), 42)) {
+  async function load() {
+    const from = new Date().toISOString().slice(0, 10);
+    const to = addDays(from, 42);
     setLoading(true);
     const result = await listInstallStartDates(quoteId, from, to);
     setDates(result.dates ?? []);

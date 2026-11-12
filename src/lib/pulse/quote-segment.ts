@@ -6,29 +6,20 @@ export function isSalesSegment(value: string): value is SalesSegment {
   return (SEGMENTS as readonly string[]).includes(value);
 }
 
-/**
- * The rep's choice wins. Otherwise the quote, then the segment remembered for
- * that customer. An empty result means the page must ask.
- */
-export function resolveQuoteSegment(input: { quoteSegment: string; remembered: string; chosen: string }) {
-  const chosen = input.chosen.trim();
-  const quoteSegment = input.quoteSegment.trim();
-  const remembered = input.remembered.trim();
-  if (isSalesSegment(chosen)) {
-    return { segment: chosen, needsChoice: false, remember: chosen !== remembered };
-  }
-  if (isSalesSegment(quoteSegment)) {
-    return { segment: quoteSegment, needsChoice: false, remember: false };
-  }
-  if (isSalesSegment(remembered)) {
-    return { segment: remembered, needsChoice: false, remember: false };
-  }
-  return { segment: "" as const, needsChoice: true, remember: false };
+/** The rep's choice is the segment. It replaces whatever was stored for that customer. */
+export function resolveQuoteSegment(chosen: string) {
+  const segment = chosen.trim();
+  if (!isSalesSegment(segment)) return { segment: "" as const, needsChoice: true, remember: false };
+  return { segment, needsChoice: false, remember: true };
+}
+
+export function canLoadQuote(orderNumber: string, segment: string) {
+  return orderNumber.trim().length > 0 && isSalesSegment(segment);
 }
 
 /** Real failures only. Asking for a segment is a control, not an error. */
-export function quoteFailureText(result: { ok: boolean; needsSegment?: boolean; message?: string } | null) {
-  if (!result || result.ok || result.needsSegment) return null;
+export function quoteFailureText(result: { ok: boolean; message?: string } | null) {
+  if (!result || result.ok) return null;
   const message = result.message?.trim();
   return message || "Could not price that order.";
 }

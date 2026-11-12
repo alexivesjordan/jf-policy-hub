@@ -680,14 +680,12 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       });
     }
     const draft = loaded.draft;
-    const chosen = String(formData.get("segment") ?? "");
-    const remembered = draft.segment ? "" : await rememberedSegment(draft.customerId);
-    const decision = resolveQuoteSegment({ quoteSegment: draft.segment, remembered, chosen });
+    const decision = resolveQuoteSegment(String(formData.get("segment") ?? ""));
     if (decision.needsChoice) {
       return salesOrderActionResult({
         ok: false,
-        needsSegment: true,
-        message: "",
+        needsSegment: false,
+        message: "Choose a segment.",
         quoteNumber: draft.quoteNumber,
         customerName: draft.customerName,
         postcode: draft.postcode,
@@ -696,7 +694,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     draft.segment = decision.segment;
     const { result, view } = await priceDraft(draft);
-    if (!result.blockedReason && draft.customerId && draft.segment) {
+    if (decision.remember && draft.customerId) {
       const admin = createAdminClient();
       if (admin) {
         await admin.rpc("orbit_remember_segment", {

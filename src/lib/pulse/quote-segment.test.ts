@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { quoteFailureText, resolveQuoteSegment, salesInstallResult, salesOrderActionResult } from "./quote-segment";
+import { canLoadQuote, quoteFailureText, resolveQuoteSegment, salesInstallResult, salesOrderActionResult } from "./quote-segment";
 
 describe("install quote segment", () => {
   it("shows a failed load and an unknown order", () => {
@@ -9,20 +9,23 @@ describe("install quote segment", () => {
     assert.equal(quoteFailureText({ ok: false, message: "" }), "Could not price that order.");
   });
 
-  it("asks for a segment, then prices and remembers it, then skips the choice", () => {
-    const memory = new Map<string, string>();
-    const first = resolveQuoteSegment({ quoteSegment: "", remembered: memory.get("life") ?? "", chosen: "" });
-    assert.equal(first.needsChoice, true);
-    assert.equal(quoteFailureText({ ok: false, needsSegment: true, message: "" }), null);
+  it("stays disabled until the order number and segment are both filled", () => {
+    assert.equal(canLoadQuote("", "trade"), false);
+    assert.equal(canLoadQuote("SO-00564", ""), false);
+    assert.equal(canLoadQuote("  ", "trade"), false);
+    assert.equal(canLoadQuote("SO-00564", "trade"), true);
+  });
 
-    const chosen = resolveQuoteSegment({ quoteSegment: "", remembered: "", chosen: "trade" });
+  it("uses the latest choice and overwrites the stored segment", () => {
+    assert.equal(resolveQuoteSegment("").needsChoice, true);
+    const stored = "independent";
+    const chosen = resolveQuoteSegment("trade");
     assert.equal(chosen.needsChoice, false);
     assert.equal(chosen.segment, "trade");
     assert.equal(chosen.remember, true);
-    if (chosen.remember) memory.set("life", chosen.segment);
-
-    const again = resolveQuoteSegment({ quoteSegment: "", remembered: memory.get("life") ?? "", chosen: "" });
-    assert.deepEqual(again, { segment: "trade", needsChoice: false, remember: false });
+    assert.notEqual(chosen.segment, stored);
+    const again = resolveQuoteSegment("big_corporate");
+    assert.deepEqual(again, { segment: "big_corporate", needsChoice: false, remember: true });
   });
 
   it("gives an owner the same price result as a rep", () => {
