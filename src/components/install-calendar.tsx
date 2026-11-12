@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { PageHeader } from "@/components/pulse/page-header";
@@ -23,6 +24,7 @@ export async function InstallCalendarPage({
   title: string;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await connection();
   const params = await searchParams;
   const view = one(params.view) === "week" ? "week" : "month";
   const mine = one(params.mine) === "1";

@@ -11,6 +11,7 @@ import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
 import { jobSpanDays } from "@/lib/pulse/install-booking";
+import { resolveQuoteSegment, salesInstallResult } from "@/lib/pulse/quote-segment";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
@@ -661,20 +662,19 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
   }
 }
 
-export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft }> {
+export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft; needsSegment?: boolean }> {
   await requireSalesUser();
   await fixturePause();
   try {
     const file = formData.get("quotePdf");
     const loaded = file instanceof File && file.size > 0 ? await parseUploadedQuote(null, formData) : await loadFixtureQuote(null, formData);
-    if (!loaded.draft) return loaded;
+    if (!loaded.draft) return { ok: false, needsSegment: false, message: loaded.message || "Could not load that order." };
     const draft = loaded.draft;
     const chosen = String(formData.get("segment") ?? "");
-    if (SEGMENTS.includes(chosen as Segment)) draft.segment = chosen;
-    else if (!draft.segment) draft.segment = await rememberedSegment(draft.customerId);
-    if (!SEGMENTS.includes(draft.segment as Segment)) {
-      return { ok: false, message: "Choose a customer segment. Nothing is saved for this customer yet.", draft };
-    }
+    const remembered = draft.segment ? "" : await rememberedSegment(draft.customerId);
+    const decision = resolveQuoteSegment({ quoteSegment: draft.segment, remembered, chosen });
+    if (decision.needsChoice) return { ok: false, needsSegment: true, message: "", draft };
+    draft.segment = decision.segment;
     const { result, view } = await priceDraft(draft);
     if (!result.blockedReason && draft.customerId && draft.segment) {
       const admin = createAdminClient();
@@ -688,10 +688,25 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const priced = salesInstallResult(view);
     return {
       ok: !result.blockedReason,
+      needsSegment: false,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
-      quote: { ...view, service, savedQuoteId: savedQuoteId ?? undefined },
+      quote: {
+        ...view,
+        ...priced,
+        requirements: null,
+        warnings: [],
+        repSummary: null,
+        breakdown: undefined,
+        priceNotes: undefined,
+        flags: undefined,
+        cost: undefined,
+        markup: undefined,
+        service,
+        savedQuoteId: savedQuoteId ?? undefined,
+      },
       draft,
     };
   } catch (error) {

@@ -27,6 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function ServiceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
   const [priced, price, pricing] = useActionState(priceServiceQuote, null);
+  const [orderNumber, setOrderNumber] = useState("");
   const [pdfIntent, setPdfIntent] = useState(false);
   const pdfForm = useRef<HTMLFormElement>(null);
   const reading = pdfIntent && pricing;
@@ -35,8 +36,8 @@ export function ServiceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) 
   return (
     <div className="space-y-6">
       <form action={price} className="grid gap-4 md:grid-cols-[1fr_auto]">
-        <Field label="Order number" hint="For example SO-00490.">
-          <Input name="quoteNumber" placeholder={cin7Connected ? "SO-00490" : "EXAMPLE-00490"} />
+        <Field label="Order number">
+          <Input name="quoteNumber" value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder={cin7Connected ? "SO-00490" : "EXAMPLE-00490"} />
         </Field>
         <div className="md:pt-7">
           <Button type="submit" disabled={pricing && !reading} onClick={() => setPdfIntent(false)}>{pricing && !reading ? "Calculating…" : "Load quote"}</Button>

@@ -5,10 +5,12 @@ import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { DEFAULT_SERVICE_RATES } from "@/lib/service-quote/rates";
 import { createClient } from "@/lib/supabase/server";
+import { connection } from "next/server";
 
 export const metadata = { title: "Warranties and Servicing" };
 
 export default async function ServiceQuotePage() {
+  await connection();
   await requireSalesUser();
   const canEdit = await canEditQuoteSettings();
   const supabase = await createClient();
