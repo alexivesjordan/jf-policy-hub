@@ -5,10 +5,12 @@ import { ErrorState } from "@/components/pulse/states";
 import { getOfficeContext, listJobs, listPulseNotifications, listPulseTasks } from "@/features/operations/queries";
 import { greetingName } from "@/lib/format";
 import { requireOperationsUser } from "@/lib/auth";
+import { connection } from "next/server";
 
 export const metadata = { title: "Install office" };
 
 export default async function OperationsHomePage() {
+  await connection();
   const profile = await requireOperationsUser();
   let contextError: string | null = null;
   let role = "not set";

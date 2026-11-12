@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/pulse/page-header";
 import { requireWorkspaceAdmin } from "@/lib/auth";
+import { connection } from "next/server";
 
 export const metadata = { title: "Workspace" };
 
 export default async function WorkspaceHomePage() {
+  await connection();
   await requireWorkspaceAdmin();
   return (
     <div className="space-y-6">

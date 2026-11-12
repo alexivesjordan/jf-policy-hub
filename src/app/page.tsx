@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { Launcher } from "@/components/launcher";
 import { homeRedirect } from "@/lib/access";
@@ -18,6 +19,7 @@ export default function HomePage() {
 }
 
 async function HomeGate() {
+  await connection();
   if (!isSupabaseConfigured() && !isFixtureMode()) return <Launcher profile={null} />;
   const profile = await getCurrentProfile();
   const destination = homeRedirect(profile);

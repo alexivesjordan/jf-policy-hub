@@ -3,11 +3,11 @@ import { PricingForm } from "@/components/operations-forms";
 import { PriceQuoteForm } from "@/components/price-quote-form";
 import { QuoteSettingsButton } from "@/components/quote-settings-button";
 import { PageHeader } from "@/components/pulse/page-header";
-import { getOfficeContext, listCin7CategoryDefaults, readOwnerSettings } from "@/features/operations/queries";
+import { listCin7CategoryDefaults, readOwnerSettings } from "@/features/operations/queries";
 import type { PricingSettings } from "@/features/operations/types";
 import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { cin7IsConnected } from "@/lib/cin7/client";
-import { seesInstallBreakdown } from "@/lib/pulse/quote-access";
+import { connection } from "next/server";
 
 export const metadata = { title: "Install quoting" };
 
@@ -31,19 +31,13 @@ const SEEDED_PRICING: PricingSettings = {
 };
 
 export default async function SalesQuotePage() {
-  const profile = await requireSalesUser();
-  const [context, canEdit, pricing, categories] = await Promise.all([
-    getOfficeContext().catch(() => null),
+  await connection();
+  await requireSalesUser();
+  const [canEdit, pricing, categories] = await Promise.all([
     canEditQuoteSettings(),
     readOwnerSettings().catch(() => null),
     listCin7CategoryDefaults().catch(() => []),
   ]);
-  const fullBreakdown = seesInstallBreakdown({
-    isOwner: context?.is_owner,
-    opsRole: context?.ops_role,
-    workspaceRole: profile.workspace_role,
-    operations: context?.operations ?? profile.levels?.operations,
-  });
   const rates = pricing ?? SEEDED_PRICING;
 
   return (
@@ -87,7 +81,7 @@ export default async function SalesQuotePage() {
           </QuoteSettingsButton>
         }
       />
-      <PriceQuoteForm cin7Connected={cin7IsConnected()} fullBreakdown={fullBreakdown} />
+      <PriceQuoteForm cin7Connected={cin7IsConnected()} />
     </div>
   );
 }

@@ -161,4 +161,14 @@ describe("sales quote results hide line lists", () => {
     assert.equal(html.includes("HIDDEN-PRODUCT"), false);
     assert.equal(html.includes("secret-sale"), false);
   });
+
+  it("uses one sales quote form for every role", () => {
+    const page = readFileSync(new URL("../app/(sales)/sales/quote/page.tsx", import.meta.url), "utf8");
+    const form = readFileSync(new URL("./price-quote-form.tsx", import.meta.url), "utf8");
+    assert.equal(page.includes("fullBreakdown"), false);
+    assert.equal(form.includes("fullBreakdown"), false);
+    assert.equal(form.includes("QuoteLineFields"), false);
+    assert.equal(form.includes('label="Segment"'), true);
+    assert.equal(form.includes("quoteFailureText"), true);
+  });
 });
