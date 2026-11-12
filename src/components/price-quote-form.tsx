@@ -3,12 +3,17 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
-import { BookInstallDialog } from "@/components/book-install-dialog";
+import dynamic from "next/dynamic";
+
+const BookInstallDialog = dynamic(
+  () => import("@/components/book-install-dialog").then((mod) => mod.BookInstallDialog),
+  { ssr: false },
+);
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
-import { priceSalesOrder, type PricedQuote } from "@/features/operations/price-actions";
-import { quoteFailureText } from "@/lib/pulse/quote-segment";
+import { priceSalesOrder } from "@/features/operations/price-actions";
+import { canLoadQuote, isSalesSegment, quoteFailureText } from "@/lib/pulse/quote-segment";
 
 const SEGMENTS = [
   ["independent", "Independent"],
@@ -21,17 +26,11 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
   const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
   const [orderNumber, setOrderNumber] = useState("");
   const [segment, setSegment] = useState("");
-  const [askSegment, setAskSegment] = useState(false);
   const [includeService, setIncludeService] = useState(false);
   const [pdfIntent, setPdfIntent] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfForm = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (!sold || selling) return;
-    if (sold.needsSegment) setAskSegment(true);
-    else if (sold.ok) setAskSegment(false);
-  }, [sold, selling]);
+  const ready = canLoadQuote(orderNumber, segment);
 
   useEffect(() => {
     const input = pdfForm.current?.querySelector<HTMLInputElement>('input[type="file"]');
@@ -48,52 +47,57 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
     toast.success(sold.message);
   }, [sold]);
 
-  const quote = sold?.quote as PricedQuote | undefined;
+  const quote = sold?.quote;
   const readingPdf = pdfIntent && selling;
   const failure = selling ? null : quoteFailureText(sold);
-  const segmentFields = askSegment ? (
-    <>
-      <Field label="Segment">
-        <Select name="segment" required value={segment} onChange={(event) => setSegment(event.target.value)}>
-          <option value="">Choose</option>
-          {SEGMENTS.map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </Select>
-      </Field>
-      {pdfFile ? <input type="hidden" name="segment" value={segment} form="quote-pdf" /> : null}
-    </>
-  ) : null;
+
+  function submitPdf(file: File | null, chosen: string) {
+    if (!file || orderNumber.trim() || !isSalesSegment(chosen)) return;
+    setPdfIntent(true);
+    queueMicrotask(() => pdfForm.current?.requestSubmit());
+  }
 
   return (
     <div className="space-y-6">
-      <form action={sellOrder} className="grid gap-4">
-        <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-          <Field label="Order number">
-            <Input
-              name="quoteNumber"
-              value={orderNumber}
-              onChange={(event) => setOrderNumber(event.target.value)}
-              placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"}
-            />
-          </Field>
-          <div className="md:pt-7">
-            <Button type="submit" form={askSegment && pdfFile && !orderNumber.trim() ? "quote-pdf" : undefined} disabled={selling || (askSegment && !segment)}>
-              {selling && !readingPdf ? "Calculating…" : "Load quote"}
-            </Button>
-          </div>
-        </div>
+      <form action={sellOrder} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_auto] md:items-end">
+        <Field label="Order number">
+          <Input
+            name="quoteNumber"
+            value={orderNumber}
+            onChange={(event) => setOrderNumber(event.target.value)}
+            placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"}
+          />
+        </Field>
+        <Field label="Segment">
+          <Select
+            name="segment"
+            required
+            value={segment}
+            onChange={(event) => {
+              const next = event.target.value;
+              setSegment(next);
+              submitPdf(pdfFile, next);
+            }}
+          >
+            <option value="" disabled />
+            {SEGMENTS.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </Select>
+        </Field>
+        <Button type="submit" disabled={selling || !ready}>
+          {selling && !readingPdf ? "Calculating…" : "Load quote"}
+        </Button>
         <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
-        {segmentFields}
       </form>
       <form id="quote-pdf" ref={pdfForm} action={sellOrder}>
         <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
-        <Field label="Or upload the quote PDF" hint="We read the quote. The file is not kept.">
+        <input type="hidden" name="segment" value={segment} />
+        <Field label="Or upload the quote PDF">
           <QuoteFileDrop
             onReady={(file) => {
               setPdfFile(file);
-              setPdfIntent(true);
-              pdfForm.current?.requestSubmit();
+              submitPdf(file, segment);
             }}
           />
         </Field>

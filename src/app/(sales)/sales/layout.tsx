@@ -6,6 +6,7 @@ import { listMyNotifications } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { connection } from "next/server";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
@@ -27,6 +28,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
 }
 
 async function SalesShell({ children }: { children: React.ReactNode }) {
+  await connection();
   const profile = await requireSalesUser();
   let isOwner = false;
   let notifications: BellItem[] = [];

@@ -1,23 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 
 const storageKey = "pulse-theme";
 
-export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+function themeSnapshot() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
 
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  }, []);
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+  return () => observer.disconnect();
+}
+
+export function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribeTheme, themeSnapshot, () => "light" as const);
 
   function apply(next: "light" | "dark") {
     document.documentElement.dataset.theme = next;
     document.documentElement.classList.toggle("dark", next === "dark");
     localStorage.setItem(storageKey, next);
     document.cookie = `${storageKey}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    setTheme(next);
   }
 
   const next = theme === "dark" ? "light" : "dark";

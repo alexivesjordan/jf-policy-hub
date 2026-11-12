@@ -11,7 +11,7 @@ import { isFixtureMode } from "@/lib/env";
 import { planDay, type PoolResource } from "@/lib/pulse/availability";
 import { addIsoDays, planRange, weekendBookingError, workingDaysFrom } from "@/lib/pulse/booking-range";
 import { jobSpanDays } from "@/lib/pulse/install-booking";
-import { resolveQuoteSegment, salesInstallResult } from "@/lib/pulse/quote-segment";
+import { resolveQuoteSegment, salesOrderActionResult } from "@/lib/pulse/quote-segment";
 import type { JobRequirements, VanSize } from "@/lib/pulse/requirements";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
 import { loadBundledEffortTable } from "@/lib/pricer/effort-table";
@@ -662,21 +662,39 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
   }
 }
 
-export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ActionState & { quote?: PricedQuote; draft?: QuoteDraft; needsSegment?: boolean }> {
+export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ReturnType<typeof salesOrderActionResult>> {
   await requireSalesUser();
   await fixturePause();
   try {
     const file = formData.get("quotePdf");
     const loaded = file instanceof File && file.size > 0 ? await parseUploadedQuote(null, formData) : await loadFixtureQuote(null, formData);
-    if (!loaded.draft) return { ok: false, needsSegment: false, message: loaded.message || "Could not load that order." };
+    if (!loaded.draft) {
+      return salesOrderActionResult({
+        ok: false,
+        needsSegment: false,
+        message: loaded.message || "Could not load that order.",
+        quoteNumber: "",
+        customerName: "",
+        postcode: "",
+        customerPrice: null,
+      });
+    }
     const draft = loaded.draft;
-    const chosen = String(formData.get("segment") ?? "");
-    const remembered = draft.segment ? "" : await rememberedSegment(draft.customerId);
-    const decision = resolveQuoteSegment({ quoteSegment: draft.segment, remembered, chosen });
-    if (decision.needsChoice) return { ok: false, needsSegment: true, message: "", draft };
+    const decision = resolveQuoteSegment(String(formData.get("segment") ?? ""));
+    if (decision.needsChoice) {
+      return salesOrderActionResult({
+        ok: false,
+        needsSegment: false,
+        message: "Choose a segment.",
+        quoteNumber: draft.quoteNumber,
+        customerName: draft.customerName,
+        postcode: draft.postcode,
+        customerPrice: null,
+      });
+    }
     draft.segment = decision.segment;
     const { result, view } = await priceDraft(draft);
-    if (!result.blockedReason && draft.customerId && draft.segment) {
+    if (decision.remember && draft.customerId) {
       const admin = createAdminClient();
       if (admin) {
         await admin.rpc("orbit_remember_segment", {
@@ -688,29 +706,27 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
-    const priced = salesInstallResult(view);
-    return {
+    return salesOrderActionResult({
       ok: !result.blockedReason,
       needsSegment: false,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
-      quote: {
-        ...view,
-        ...priced,
-        requirements: null,
-        warnings: [],
-        repSummary: null,
-        breakdown: undefined,
-        priceNotes: undefined,
-        flags: undefined,
-        cost: undefined,
-        markup: undefined,
-        service,
-        savedQuoteId: savedQuoteId ?? undefined,
-      },
-      draft,
-    };
+      quoteNumber: view.quoteNumber,
+      customerName: view.customerName,
+      postcode: view.postcode,
+      customerPrice: view.customerPrice,
+      savedQuoteId: savedQuoteId ?? undefined,
+      service,
+    });
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : "Could not price that order." };
+    return salesOrderActionResult({
+      ok: false,
+      needsSegment: false,
+      message: error instanceof Error ? error.message : "Could not price that order.",
+      quoteNumber: "",
+      customerName: "",
+      postcode: "",
+      customerPrice: null,
+    });
   }
 }
 

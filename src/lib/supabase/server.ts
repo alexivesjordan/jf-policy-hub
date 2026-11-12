@@ -2,11 +2,13 @@ import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { isFixtureMode } from "@/lib/env";
 import { createFixtureClient } from "@/lib/supabase/fixture";
 
 export async function createClient() {
   if (isFixtureMode()) return createFixtureClient();
+  await connection();
   const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
