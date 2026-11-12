@@ -7,7 +7,7 @@ import { BookInstallDialog } from "@/components/book-install-dialog";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
-import { priceSalesOrder, type PricedQuote } from "@/features/operations/price-actions";
+import { priceSalesOrder } from "@/features/operations/price-actions";
 import { quoteFailureText } from "@/lib/pulse/quote-segment";
 
 const SEGMENTS = [
@@ -21,17 +21,15 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
   const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
   const [orderNumber, setOrderNumber] = useState("");
   const [segment, setSegment] = useState("");
-  const [askSegment, setAskSegment] = useState(false);
+  const [segmentFor, setSegmentFor] = useState("");
   const [includeService, setIncludeService] = useState(false);
   const [pdfIntent, setPdfIntent] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfForm = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    if (!sold || selling) return;
-    if (sold.needsSegment) setAskSegment(true);
-    else if (sold.ok) setAskSegment(false);
-  }, [sold, selling]);
+  const promptedOrder = sold?.quoteNumber?.trim() ?? "";
+  const askSegment = Boolean(sold?.needsSegment) && !selling && orderNumber.trim() === promptedOrder && promptedOrder !== "";
+  const segmentValue = segmentFor === orderNumber.trim() ? segment : "";
 
   useEffect(() => {
     const input = pdfForm.current?.querySelector<HTMLInputElement>('input[type="file"]');
@@ -48,20 +46,20 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
     toast.success(sold.message);
   }, [sold]);
 
-  const quote = sold?.quote as PricedQuote | undefined;
+  const quote = sold?.quote;
   const readingPdf = pdfIntent && selling;
   const failure = selling ? null : quoteFailureText(sold);
   const segmentFields = askSegment ? (
     <>
       <Field label="Segment">
-        <Select name="segment" required value={segment} onChange={(event) => setSegment(event.target.value)}>
+        <Select name="segment" required value={segmentValue} onChange={(event) => { setSegment(event.target.value); setSegmentFor(orderNumber.trim()); }}>
           <option value="">Choose</option>
           {SEGMENTS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </Select>
       </Field>
-      {pdfFile ? <input type="hidden" name="segment" value={segment} form="quote-pdf" /> : null}
+      {pdfFile ? <input type="hidden" name="segment" value={segmentValue} form="quote-pdf" /> : null}
     </>
   ) : null;
 
@@ -78,7 +76,7 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
             />
           </Field>
           <div className="md:pt-7">
-            <Button type="submit" form={askSegment && pdfFile && !orderNumber.trim() ? "quote-pdf" : undefined} disabled={selling || (askSegment && !segment)}>
+            <Button type="submit" form={askSegment && pdfFile && !orderNumber.trim() ? "quote-pdf" : undefined} disabled={selling || (askSegment && !segmentValue)}>
               {selling && !readingPdf ? "Calculating…" : "Load quote"}
             </Button>
           </div>

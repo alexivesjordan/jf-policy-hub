@@ -48,3 +48,66 @@ export function salesInstallResult(view: {
     showCost: false as const,
   };
 }
+
+type ServicePrice = {
+  annualPm: number;
+  twiceYearlyPm: number;
+  extendedWarrantyOneOff: number;
+  annualBundleYear1: number | null;
+  twiceBundleYear1: number | null;
+};
+
+/** Fields the install quote page actually draws. Anything else on the input is dropped. */
+export function salesOrderActionResult(input: {
+  ok: boolean;
+  message: string;
+  needsSegment: boolean;
+  quoteNumber: string;
+  customerName: string;
+  postcode: string;
+  customerPrice: number | null;
+  savedQuoteId?: string;
+  service?: {
+    id: string | null;
+    quoteNumber: string;
+    customerName: string;
+    rateVersion: string;
+    prices?: { name: string; prices?: Partial<ServicePrice> | null }[] | null;
+  } | null;
+}) {
+  const service = input.service
+    ? {
+        id: input.service.id,
+        quoteNumber: input.service.quoteNumber,
+        customerName: input.service.customerName,
+        rateVersion: input.service.rateVersion,
+        prices: (input.service.prices ?? []).map((site) => ({
+          name: site.name,
+          prices: {
+            annualPm: site.prices?.annualPm ?? 0,
+            twiceYearlyPm: site.prices?.twiceYearlyPm ?? 0,
+            extendedWarrantyOneOff: site.prices?.extendedWarrantyOneOff ?? 0,
+            annualBundleYear1: site.prices?.annualBundleYear1 ?? null,
+            twiceBundleYear1: site.prices?.twiceBundleYear1 ?? null,
+          },
+        })),
+      }
+    : null;
+  return {
+    ok: input.ok,
+    message: input.message,
+    needsSegment: input.needsSegment,
+    quoteNumber: input.quoteNumber,
+    customerName: input.customerName,
+    quote: input.needsSegment
+      ? undefined
+      : {
+          customerPrice: input.customerPrice,
+          quoteNumber: input.quoteNumber,
+          customerName: input.customerName,
+          postcode: input.postcode,
+          savedQuoteId: input.savedQuoteId,
+          service,
+        },
+  };
+}

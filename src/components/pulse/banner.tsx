@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const recent = new Map<string, number>();
+let lastAnnounced = "";
 
 function plainText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
@@ -17,9 +17,8 @@ function plainText(node: ReactNode): string {
 
 function announce(tone: "success" | "error" | "warning", message: string) {
   const key = `${tone}:${message}`;
-  const now = Date.now();
-  if (now - (recent.get(key) ?? 0) < 1000) return;
-  recent.set(key, now);
+  if (lastAnnounced === key) return;
+  lastAnnounced = key;
   if (tone === "success") toast.success(message);
   else if (tone === "error") toast.error(message);
   else toast.warning(message);

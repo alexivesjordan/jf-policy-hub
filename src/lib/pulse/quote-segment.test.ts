@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { quoteFailureText, resolveQuoteSegment, salesInstallResult } from "./quote-segment";
+import { quoteFailureText, resolveQuoteSegment, salesInstallResult, salesOrderActionResult } from "./quote-segment";
 
 describe("install quote segment", () => {
   it("shows a failed load and an unknown order", () => {
@@ -44,5 +44,45 @@ describe("install quote segment", () => {
     assert.equal("breakdown" in owner, false);
     assert.equal("lines" in owner, false);
     assert.equal(owner.customerPrice, 4743.62);
+  });
+
+  it("serializes the action result without lines, SKUs, flags, or cost", () => {
+    const result = salesOrderActionResult({
+      ok: true,
+      message: "Install price ready.",
+      needsSegment: false,
+      quoteNumber: "SO-00564",
+      customerName: "Life Fitness UK",
+      postcode: "NR1 1AA",
+      customerPrice: 4743.62,
+      savedQuoteId: "quote-1",
+      service: {
+        id: "svc-1",
+        quoteNumber: "SO-00564",
+        customerName: "Life Fitness UK",
+        rateVersion: "v1",
+        prices: [{
+          name: "Site",
+          prices: { annualPm: 1895, twiceYearlyPm: 3495, extendedWarrantyOneOff: 0, annualBundleYear1: null, twiceBundleYear1: null },
+        }],
+      },
+      draft: {
+        lines: [{ sku: "HIDDEN-SKU", qty: 2, description: "HIDDEN-PRODUCT" }],
+        flags: ["SECRET-FLAG"],
+        cost: 1200,
+        breakdown: { hq: { personHours: 8 } },
+      },
+      flags: ["SECRET-FLAG"],
+      cost: 1200,
+      lineItems: [{ sku: "HIDDEN-SKU", quantity: 2 }],
+    } as Parameters<typeof salesOrderActionResult>[0]);
+    const json = JSON.stringify(result);
+    for (const secret of ["HIDDEN-SKU", "HIDDEN-PRODUCT", "SECRET-FLAG", "draft", "lineItems", "breakdown", "qty", "sku", "flags", "cost"]) {
+      assert.equal(json.includes(secret), false, secret);
+    }
+    assert.equal(json.includes("Life Fitness UK"), true);
+    assert.equal(json.includes("4743.62"), true);
+    assert.equal(json.includes("quote-1"), true);
+    assert.equal(result.needsSegment, false);
   });
 });
