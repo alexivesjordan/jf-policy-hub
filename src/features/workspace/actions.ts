@@ -9,6 +9,7 @@ import { messageFromError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { PULSE_MODULE_IDS } from "@/lib/types";
+import { personName } from "@/lib/names";
 
 function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -49,16 +50,28 @@ export async function saveWorkspaceUser(formData: FormData) {
     p_active: formData.get("isActive") === "yes",
   });
   if (error) throw new Error(messageFromError(error, "Could not save that user."));
+  const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
+  if (names) {
+    const named = await supabase.rpc("save_person_name", {
+      p_profile: clean(formData.get("userId")),
+      p_first_name: names.firstName,
+      p_last_name: names.lastName,
+    });
+    if (named.error) throw new Error(messageFromError(named.error, "Could not save that name."));
+  }
   revalidatePath("/workspace/users");
 }
 
 export async function inviteWorkspaceUser(formData: FormData) {
   await requireWorkspaceAdmin();
   const email = clean(formData.get("email"));
+  const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
+  if (!names) throw new Error("Enter a first and last name.");
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("workspace_prepare_invite", {
     p_email: email,
-    p_full_name: clean(formData.get("fullName")),
+    p_first_name: names.firstName,
+    p_last_name: names.lastName,
     p_workspace_role: clean(formData.get("workspaceRole")),
   });
   if (error) throw new Error(messageFromError(error, "We could not save that invite."));
@@ -68,7 +81,7 @@ export async function inviteWorkspaceUser(formData: FormData) {
     const service = createAdminClient();
     if (!service) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
     const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: clean(formData.get("fullName")) },
+      data: { first_name: names.firstName, last_name: names.lastName, full_name: `${names.firstName} ${names.lastName}` },
       redirectTo: authConfirmRedirect(passwordSetupPath()),
     });
     if (inviteError && !inviteError.message.toLowerCase().includes("already")) {

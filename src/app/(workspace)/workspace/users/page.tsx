@@ -23,7 +23,11 @@ export default async function WorkspaceUsersPage() {
     supabase.rpc("workspace_directory"),
     supabase.rpc("workspace_teams"),
   ]);
-  const people = (Array.isArray(peopleData) ? peopleData : []) as WorkspaceDirectoryUser[];
+  const people = ((Array.isArray(peopleData) ? peopleData : []) as WorkspaceDirectoryUser[]).slice().sort((a, b) => {
+    const last = (person: WorkspaceDirectoryUser) => (person.last_name || person.full_name?.split(" ").slice(-1)[0] || person.email).toLocaleLowerCase();
+    const first = (person: WorkspaceDirectoryUser) => (person.first_name || person.full_name?.split(" ")[0] || "").toLocaleLowerCase();
+    return last(a).localeCompare(last(b)) || first(a).localeCompare(first(b)) || a.email.localeCompare(b.email);
+  });
   const teams = (Array.isArray(teamData) ? teamData : []) as { id: string; name: string }[];
 
   return (
@@ -31,7 +35,6 @@ export default async function WorkspaceUsersPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Users"
-        description="Invite colleagues and choose what they can open."
       />
       <form action={inviteWorkspaceUser} className="grid gap-3 rounded-3xl border border-line bg-card p-5 md:grid-cols-4">
         <label className="text-sm md:col-span-2">
@@ -39,8 +42,12 @@ export default async function WorkspaceUsersPage() {
           <Input name="email" type="email" required placeholder="name@jordanfitness.com" />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-grey">Name</span>
-          <Input name="fullName" required />
+          <span className="mb-1 block text-grey">First name</span>
+          <Input name="firstName" required autoComplete="given-name" />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-grey">Last name</span>
+          <Input name="lastName" required autoComplete="family-name" />
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-grey">Role</span>

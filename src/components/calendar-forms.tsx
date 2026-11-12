@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
+import { DateField } from "@/components/date-field";
+import { Banner, Button, Field, Select } from "@/components/pulse/ui";
 import { bookFixture, recordUnavailability } from "@/features/operations/calendar-actions";
 
 export function UnavailabilityForm({ resources }: { resources: { id: string; name: string }[] }) {
@@ -25,8 +26,8 @@ export function UnavailabilityForm({ resources }: { resources: { id: string; nam
           <option value="other">Other</option>
         </Select>
       </Field>
-      <Field label="From"><Input name="starts" type="date" required /></Field>
-      <Field label="To"><Input name="ends" type="date" required /></Field>
+      <Field label="From"><DateField name="starts" required /></Field>
+      <Field label="To"><DateField name="ends" required /></Field>
       <Button type="submit" disabled={pending}>{pending ? "Saving..." : "Mark unavailable"}</Button>
       {state ? <div className="md:col-span-2"><Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner></div> : null}
     </form>
@@ -57,7 +58,7 @@ export function BookFixtureForm({
           ))}
         </Select>
       </Field>
-      <Field label="Day"><Input name="day" type="date" required /></Field>
+      <Field label="Day"><DateField name="day" required /></Field>
       <Field label="Hold">
         <Select name="kind" defaultValue="pencil">
           <option value="pencil">Hold</option>

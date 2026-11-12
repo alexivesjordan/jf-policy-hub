@@ -40,7 +40,6 @@ export default async function OperationsHomePage() {
       <PageHeader
         eyebrow="Pulse Operations"
         title={`Hello ${greetingName(profile)}`}
-        description="Today’s installs, tasks, and notes."
       />
 
       {contextError ? (

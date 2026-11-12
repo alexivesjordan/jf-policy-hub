@@ -17,7 +17,6 @@ export default async function TeamsPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Teams"
-        description="Groups of people who share the same access."
       />
       <form action={saveWorkspaceTeam} className="flex flex-wrap items-end gap-3">
         <label className="text-sm">

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
+let fixtureServiceQuote: { id: string; prices: unknown } | null = null;
 const JOB_BOOKED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
 const JOB_PRICED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
 const JOB_SITE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
@@ -8,6 +9,8 @@ const JOB_SITE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
 const profile = {
   id: USER_ID,
   email: "alex.ives@jordanfitness.com",
+  first_name: "Alex",
+  last_name: "Ives",
   full_name: "Alex Ives",
   role: "admin",
   is_active: true,
@@ -199,7 +202,20 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
+  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead";
+  if (fn === "workspace_can") {
+    const moduleName = String(args?.p_module ?? "");
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return moduleName === "sales";
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return moduleName === "operations" || moduleName === "sales";
+    return true;
+  }
   if (fn === "workspace_my_access") {
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
+    }
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "edit", sales: "view", finance: "none" };
+    }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
   }
   if (fn === "workspace_directory") {
@@ -207,6 +223,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: USER_ID,
         email: profile.email,
+        first_name: "Alex",
+        last_name: "Ives",
         full_name: profile.full_name,
         workspace_role: "owner",
         access_mode: "follow",
@@ -217,6 +235,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: "00000000-0000-4000-8000-000000000002",
         email: "sam.cole@jordanfitness.com",
+        first_name: "Sam",
+        last_name: "Cole",
         full_name: "Sam Cole",
         workspace_role: "member",
         access_mode: "follow",
@@ -227,6 +247,8 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       {
         id: "00000000-0000-4000-8000-000000000003",
         email: "riley.hart@jordanfitness.com",
+        first_name: "Riley",
+        last_name: "Hart",
         full_name: "Riley Hart",
         workspace_role: "member",
         access_mode: "custom",
@@ -246,7 +268,40 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       { id: "team-management", name: "Management", members: 2 },
     ];
   }
-  if (fn === "orbit_office_context") return { has_module: true, ops_role: "admin_owner", is_owner: true };
+  if (fn === "service_get_ingest") return null;
+  if (fn === "service_put_ingest") return "ingest-1";
+  if (fn === "service_current_rates") {
+    return {
+      id: "rate-1",
+      label: "2026-11-11-standalone-v1",
+      callout_gbp: 99,
+      per_machine_gbp: 59,
+      uplift: 1.08,
+      twice_yearly_factor: 0.92,
+      cardio_rate: 0.05,
+      strength_rate: 0.03,
+      rack_rate: 0.02,
+      extension_factor: 1.3,
+      per_site_gbp: 150,
+      bundle_incentive_gbp: 195,
+      portfolio_factor: 0.9,
+    };
+  }
+  if (fn === "service_list_rules") {
+    return [{ match_kind: "description_contains", match_value: "bench", category: "adjustable_bench", priority: 10, note: "Benches" }];
+  }
+  if (fn === "service_can_see_flags") return process.env.PULSE_FIXTURE_ROLE !== "rep";
+  if (fn === "service_save_quote") {
+    fixtureServiceQuote = { id: "svc-quote-1", prices: args?.p_prices ?? null };
+    return fixtureServiceQuote.id;
+  }
+  if (fn === "service_read_quote") return fixtureServiceQuote;
+  if (fn === "service_set_proposal_path" || fn === "save_person_name" || fn === "service_save_rates" || fn === "service_upsert_rule") return true;
+  if (fn === "orbit_office_context") {
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return { has_module: true, ops_role: "install_lead", is_owner: false, operations: "edit", sales: "view" };
+    return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
+  }
   if (fn === "orbit_list_jobs") return jobs;
   if (fn === "orbit_get_job") return jobs.find((row) => row.id === args?.p_job_id) ?? null;
   if (fn === "orbit_list_notifications") return [];
@@ -257,10 +312,10 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       settings: null,
       pricing_settings: {
         version: 3,
-        markup_independent: 1.35,
-        markup_franchisee: 1.25,
-        markup_trade: 1.2,
-        markup_big_corporate: 1.15,
+        markup_independent: 0.4,
+        markup_franchisee: 0.4,
+        markup_trade: 0.5,
+        markup_big_corporate: 0.8,
         min_job_charge: 450,
         margin_floor_pct: 0.18,
         custom_deposit_fraction: 0.5,
@@ -331,7 +386,87 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "orbit_sku_effort_for_pricing") return [];
   if (fn === "orbit_record_fixture_quote" || fn === "orbit_record_cin7_sale") return { job_id: JOB_PRICED };
   if (fn === "orbit_save_job_requirements" || fn === "orbit_remember_segment") return true;
+  if (fn === "install_save_quote") return "11111111-1111-4111-8111-111111111111";
+  if (fn === "install_available_starts") {
+    const from = String(args?.p_from ?? "2026-11-16").slice(0, 10);
+    const to = String(args?.p_to ?? isoPlus(from, 42)).slice(0, 10);
+    const dates: string[] = [];
+    let cursor = from;
+    let guard = 0;
+    while (cursor <= to && guard < 130) {
+      const day = new Date(`${cursor}T12:00:00Z`).getUTCDay();
+      if (day !== 0 && day !== 6) dates.push(cursor);
+      cursor = isoPlus(cursor, 1);
+      guard += 1;
+    }
+    return dates;
+  }
+  if (fn === "install_book") {
+    const start = String(args?.p_start ?? "2026-11-16").slice(0, 10);
+    return fixtureInstall(start, String(args?.p_warranty ?? "none"), true);
+  }
+  if (fn === "install_calendar") {
+    const rows = [fixtureInstall("2026-11-16", "annual", true), fixtureInstall("2026-11-23", "none", false)];
+    return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
+  }
+  if (fn === "install_read") {
+    const id = String(args?.p_id ?? "");
+    const row = id.endsWith("b2") ? fixtureInstall("2026-11-23", "none", false) : fixtureInstall("2026-11-16", "annual", true);
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") {
+      const source = row as Record<string, unknown>;
+      const sales: Record<string, unknown> = {};
+      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
+        sales[key] = source[key];
+      }
+      return sales;
+    }
+    return row;
+  }
+  if (fn === "install_move") {
+    const start = String(args?.p_start ?? "2026-11-18").slice(0, 10);
+    return fixtureInstall(start, "annual", true);
+  }
+  if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
   return null;
+}
+
+function isoPlus(iso: string, days: number) {
+  const date = new Date(`${iso}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked") {
+  const end = isoPlus(start, 2);
+  return {
+    id: mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
+    orderNumber: mine ? "EXAMPLE-00490" : "SO-1002",
+    goodsNet: 49066.53,
+    installPrice: 4743.62,
+    warrantyOption: warranty === "none" ? null : warranty,
+    warrantyPrice: warranty === "annual" ? 1895 : null,
+    startOn: start,
+    endOn: end,
+    customerName: mine ? "Example Sports Centre" : "Northside Fitness",
+    contactName: "Alex Example",
+    contactEmail: "alex.example@example.com",
+    contactPhone: "01603 000000",
+    siteAddress: "Example Road, Exampletown IP1 9ZZ",
+    status,
+    bookingRepId: mine ? USER_ID : "00000000-0000-4000-8000-000000000003",
+    bookingRepName: mine ? "Alex Ives" : "Riley Hart",
+    proposalPath: mine ? "ops/proposal.docx" : null,
+    serviceQuoteId: mine ? "svc-quote-1" : null,
+    flags: { install: ["Needs review: HIDDEN-RACK"], service: [] },
+    hqBuild: { personHours: 6, lines: [{ productName: "HIDDEN-PRODUCT", qty: 2, minutes: 40, crew: 2 }] },
+    siteInstall: { days: 2, nights: 0, onSiteHours: 8 },
+    crew: 2,
+    vans: { size: "small", count: 1 },
+    resources: [{ id: "res-lee", name: "Lee" }],
+    lines: [{ sku: "HIDDEN-SKU", description: "HIDDEN-PRODUCT", qty: 2, category: "cardio", lineNet: 1000 }],
+    cin7SaleId: "sale-1",
+    cin7CustomerId: "customer-1",
+  };
 }
 
 type Filter = { kind: "eq" | "neq" | "lte" | "null" | "notnull"; column: string; value?: unknown };
@@ -437,6 +572,18 @@ export function createFixtureClient() {
     },
     async rpc(fn: string, args?: Record<string, unknown>) {
       return { data: rpcData(fn, args), error: null };
+    },
+    storage: {
+      from() {
+        return {
+          async upload() {
+            return { data: { path: "proposal.docx" }, error: null };
+          },
+          async createSignedUrl(path: string) {
+            return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
+          },
+        };
+      },
     },
   };
   return client as unknown as SupabaseClient;

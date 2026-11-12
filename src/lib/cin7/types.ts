@@ -1,3 +1,5 @@
+import type { QuoteFlag } from "@/lib/quotes/flags";
+
 export type Cin7CustomerType = "credit" | "proforma" | "leasing" | null;
 export type Cin7Segment = "independent" | "franchisee" | "trade" | "big_corporate" | null;
 
@@ -11,6 +13,8 @@ export type Cin7QuoteLine = {
   /** Cin7 ProductID from the sale line. */
   productId?: string | null;
   qty: number;
+  /** Line net ex VAT after checking Total against the order totals. Null when that check fails. */
+  lineNet?: number | null;
   /** Product.Weight when Cin7 reports kilograms. */
   unitWeightKg?: number | null;
   length?: number | null;
@@ -37,6 +41,12 @@ export type Cin7Quote = {
   usedQuoteLines?: boolean;
   /** A positive weight was ignored because it was not in kilograms. */
   weightIgnored?: boolean;
+  /** Additional charges from the same Order or Quote section as the lines. Ex VAT. */
+  additionalCharges?: { description: string; amountNet: number }[];
+  /** Line Total matched the tax-inclusive order total, so Tax was removed. */
+  taxStripped?: boolean;
+  /** Money checks. Select these by code; do not match the message text. */
+  moneyFlags?: QuoteFlag[];
 };
 
 /**

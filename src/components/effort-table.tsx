@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { LockedFields } from "@/components/locked-fields";
 import { Banner, Button, Input, Select } from "@/components/pulse/ui";
 import { EmptyState } from "@/components/pulse/states";
 import { EffortDataTable } from "@/components/effort-data-table";
@@ -21,9 +22,10 @@ export function SyncProductsButton() {
   );
 }
 
-export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] }) {
+export function CategoryDefaultEditor({ rows, locked = false }: { rows: Cin7CategoryDefault[]; locked?: boolean }) {
   const [state, action, pending] = useActionState(saveCin7CategoryDefaults, null);
   return (
+    <LockedFields locked={locked}>
     <form action={action} className="space-y-4">
       <CategoryTable
         rows={rows.map((row) => ({
@@ -43,9 +45,10 @@ export function CategoryDefaultEditor({ rows }: { rows: Cin7CategoryDefault[] })
           assemblyOptions: "known",
         }))}
       />
-      <Button type="submit" disabled={pending}>{pending ? "Saving..." : "Save category defaults"}</Button>
+      <Button type="submit" disabled={locked || pending}>{pending ? "Saving..." : "Save category defaults"}</Button>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
     </form>
+    </LockedFields>
   );
 }
 

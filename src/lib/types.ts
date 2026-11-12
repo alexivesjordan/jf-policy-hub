@@ -16,6 +16,8 @@ export type Severity = "low" | "medium" | "high";
 export type Profile = {
   id: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   full_name: string | null;
   role: Role;
   is_active: boolean;

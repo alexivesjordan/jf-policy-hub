@@ -90,7 +90,9 @@ export function actorName(person: { full_name: string | null; email: string } | 
   return displayName(person);
 }
 
-export function greetingName(person: { full_name: string | null; email: string }) {
+export function greetingName(person: { first_name?: string | null; full_name: string | null; email: string }) {
+  const first = person.first_name?.trim();
+  if (first) return first;
   const name = person.full_name?.trim();
   if (name) return name.split(/\s+/)[0] ?? name;
   return person.email.split("@")[0] ?? "there";

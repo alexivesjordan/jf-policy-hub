@@ -1,6 +1,7 @@
 import { deriveJobRequirements, type JobRequirements } from "@/lib/pulse/requirements";
 import { compareStays, driverCheck, evaluateCrewPlans, type QuoteBreakdown } from "@/lib/pricer/breakdown";
-import type { EffortRow } from "@/lib/pricer/effort-table";
+import { loadBundledEffortTable, type EffortRow } from "@/lib/pricer/effort-table";
+import { matchesPinLoadedRule } from "@/lib/pricer/strength-rule";
 import {
   BEST_CASE_NOTICE,
   EFFORT_TABLE_VERSION,
@@ -255,6 +256,26 @@ function sledRates(pricing?: PricingConfig | null): SledTrackRates {
     baseLengthM: pricing?.sledBaseLengthM ?? DEFAULT_SLED_RATES.baseLengthM,
     extraMinutesPerMetre: pricing?.sledExtraMinutesPerMetre ?? DEFAULT_SLED_RATES.extraMinutesPerMetre,
   };
+}
+
+const INSTALL_MACHINE_DEFAULTS: CategoryEffortDefault[] = ["cardio", "rack-rig", "bench", "strength-selectorised"].map((category) => ({
+  category,
+  buildCrew: 2,
+  buildMinutes: 120,
+  note: "Each machine: 2-man, 2-hour build.",
+}));
+
+/** The install pricer's category for one product. Cin7 category names are not effort-table categories. */
+export function classifyInstallLine(input: { sku?: string | null; productName: string }) {
+  if (matchesPinLoadedRule(input.productName, input.sku ?? "")) {
+    return { category: "strength-selectorised", match: "exact" as const, provisional: false };
+  }
+  const resolved = matchLine(
+    { sku: input.sku ?? null, productName: input.productName, qty: 1 },
+    loadBundledEffortTable(),
+    INSTALL_MACHINE_DEFAULTS,
+  );
+  return { category: resolved.category, match: resolved.match, provisional: resolved.provisional };
 }
 
 function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryEffortDefault[] = []): ResolvedLine {

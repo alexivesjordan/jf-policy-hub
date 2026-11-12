@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isCompanyEmail, normaliseEmail } from "@/lib/access";
+import { personName } from "@/lib/names";
 import { requirePeopleEditor, requireRole } from "@/lib/auth";
 import { authConfirmRedirect } from "@/lib/site-url";
 import { passwordSetupPath } from "@/lib/auth-link";
@@ -30,14 +31,16 @@ function revalidateUsers() {
 export async function inviteUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireRole(["admin"]);
   const email = normaliseEmail(clean(formData.get("email")));
-  const fullName = clean(formData.get("fullName"));
+  const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
   const role = asRole(clean(formData.get("role")));
   const peopleEnabled = formData.get("peopleEnabled") === "yes";
 
   if (!isCompanyEmail(email)) {
     return { ok: false, message: "Use a @jordanfitness.com email address." };
   }
+  if (!names) return { ok: false, message: "Enter a first and last name." };
   if (!role) return { ok: false, message: "Choose a role." };
+  const fullName = `${names.firstName} ${names.lastName}`;
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_prepare_invite", {
@@ -77,7 +80,7 @@ export async function inviteUser(_prev: ActionState, formData: FormData): Promis
   }
 
   const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName },
+    data: { first_name: names.firstName, last_name: names.lastName, full_name: fullName },
     redirectTo: authConfirmRedirect(passwordSetupPath()),
   });
 

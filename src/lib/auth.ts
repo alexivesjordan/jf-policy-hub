@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
 
 const profileColumns =
-  "id, email, full_name, role, is_active, access_granted, can_review, last_sign_in_at, created_at, updated_at";
+  "id, email, first_name, last_name, full_name, role, is_active, access_granted, can_review, last_sign_in_at, created_at, updated_at";
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
@@ -76,6 +76,13 @@ export async function requireWorkspaceAdmin() {
   if (!profile.is_active) redirect("/account-inactive");
   if (!canManageWorkspace(profile)) redirect("/");
   return profile;
+}
+
+/** Owners and admins. A sales rep passes workspace_can('sales','edit'), so that does not gate these fields. */
+export async function canEditQuoteSettings() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("workspace_is_admin");
+  return !error && data === true;
 }
 
 export async function requireSalesUser() {

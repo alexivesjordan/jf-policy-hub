@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { LockedFields } from "@/components/locked-fields";
 import { Banner, Button, Field, Input, Select, TextArea } from "@/components/pulse/ui";
 import {
   createGateOverride,
@@ -18,27 +19,31 @@ function percentInput(value: number) {
 
 export function CategoryEffortForm({
   rows,
+  locked = false,
 }: {
   rows: { category: string; build_crew: number; build_minutes: number; note: string }[];
+  locked?: boolean;
 }) {
   const [state, action, pending] = useActionState(saveCategoryEffort, null);
   return (
+    <LockedFields locked={locked}>
     <form action={action} className="space-y-3">
       {rows.map((row) => (
         <div key={row.category} className="grid gap-2 md:grid-cols-[1fr_6rem_8rem]">
           <input type="hidden" name="category" value={row.category} />
           <input type="hidden" name="note" value={row.note} />
           <p className="self-center text-sm font-semibold text-ink">{row.category}</p>
-          <Input name="buildCrew" type="number" min={1} max={6} defaultValue={row.build_crew} aria-label={`${row.category} crew`} />
-          <Input name="buildMinutes" type="number" min={0} max={480} defaultValue={row.build_minutes} aria-label={`${row.category} minutes`} />
+          <Input name="buildCrew" type="number" min={1} max={6} defaultValue={row.build_crew} aria-label={`${row.category} crew`} disabled={locked} />
+          <Input name="buildMinutes" type="number" min={0} max={480} defaultValue={row.build_minutes} aria-label={`${row.category} minutes`} disabled={locked} />
         </div>
       ))}
       <Field label="Reason">
-        <Input name="reason" required placeholder="Why this build assumption changed" />
+        <Input name="reason" required placeholder="Why this build assumption changed" disabled={locked} />
       </Field>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
-      <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Saving..." : "Save effort defaults"}</Button>
+      <Button type="submit" variant="secondary" disabled={locked || pending}>{pending ? "Saving..." : "Save effort defaults"}</Button>
     </form>
+    </LockedFields>
   );
 }
 
@@ -54,6 +59,7 @@ export function PricingForm({
   sledBaseMinutes,
   sledBaseLengthM,
   sledExtraMinutesPerMetre,
+  locked = false,
 }: {
   markups: { independent: number; franchisee: number; trade: number; corporate: number };
   minJobCharge: number | null;
@@ -66,27 +72,29 @@ export function PricingForm({
   sledBaseMinutes: number;
   sledBaseLengthM: number;
   sledExtraMinutesPerMetre: number;
+  locked?: boolean;
 }) {
   const [state, action, pending] = useActionState(savePricing, null);
   return (
+    <LockedFields locked={locked}>
     <form action={action} className="grid gap-4 md:grid-cols-2">
       <p className="text-sm text-grey md:col-span-2">
         Current version {version}. Saving adds the next version and leaves this one in place.
       </p>
       <Field label="Independent gym markup %" hint="Seeded at 40%">
-        <Input name="markupIndependent" inputMode="decimal" required defaultValue={percentInput(markups.independent)} />
+        <Input name="markupIndependent" inputMode="decimal" required defaultValue={percentInput(markups.independent)} disabled={locked} />
       </Field>
       <Field label="AF franchisee markup %" hint="Seeded at 40%">
-        <Input name="markupFranchisee" inputMode="decimal" required defaultValue={percentInput(markups.franchisee)} />
+        <Input name="markupFranchisee" inputMode="decimal" required defaultValue={percentInput(markups.franchisee)} disabled={locked} />
       </Field>
       <Field label="Trade markup %" hint="Seeded at 50%">
-        <Input name="markupTrade" inputMode="decimal" required defaultValue={percentInput(markups.trade)} />
+        <Input name="markupTrade" inputMode="decimal" required defaultValue={percentInput(markups.trade)} disabled={locked} />
       </Field>
       <Field label="Big corporate markup %" hint="Seeded at 80%">
-        <Input name="markupCorporate" inputMode="decimal" required defaultValue={percentInput(markups.corporate)} />
+        <Input name="markupCorporate" inputMode="decimal" required defaultValue={percentInput(markups.corporate)} disabled={locked} />
       </Field>
       <Field label="Minimum job charge £" hint={minJobCharge == null ? "Not configured" : undefined}>
-        <Input name="minJobCharge" inputMode="decimal" placeholder="Not configured" defaultValue={minJobCharge ?? ""} />
+        <Input name="minJobCharge" inputMode="decimal" placeholder="Not configured" defaultValue={minJobCharge ?? ""} disabled={locked} />
       </Field>
       <Field label="Margin floor %" hint={marginFloor == null ? "Not configured" : undefined}>
         <Input
@@ -94,34 +102,35 @@ export function PricingForm({
           inputMode="decimal"
           placeholder="Not configured"
           defaultValue={marginFloor == null ? "" : percentInput(marginFloor)}
+          disabled={locked}
         />
       </Field>
       <Field label="Custom-item deposit %" hint="Seeded at one third">
-        <Input name="depositPercent" inputMode="decimal" required defaultValue={percentInput(depositFraction)} />
+        <Input name="depositPercent" inputMode="decimal" required defaultValue={percentInput(depositFraction)} disabled={locked} />
       </Field>
       <Field label="Large-order threshold £" hint="Seeded at 50000">
-        <Input name="largeOrder" inputMode="decimal" required defaultValue={String(largeOrderThreshold)} />
+        <Input name="largeOrder" inputMode="decimal" required defaultValue={String(largeOrderThreshold)} disabled={locked} />
       </Field>
       <Field label="Variation rounding (hours)" hint="Seeded at 0.5">
-        <Input name="roundingHours" inputMode="decimal" required defaultValue={String(roundingHours)} />
+        <Input name="roundingHours" inputMode="decimal" required defaultValue={String(roundingHours)} disabled={locked} />
       </Field>
       <Field label="Sled track width (m)" hint={sledTrackWidthM == null ? "Not set. A filled Cin7 product width is used first. Until this is set, square metres are priced as metres of track." : "A filled Cin7 product width is used first."}>
-        <Input name="sledTrackWidth" inputMode="decimal" placeholder="Not set" defaultValue={sledTrackWidthM ?? ""} />
+        <Input name="sledTrackWidth" inputMode="decimal" placeholder="Not set" defaultValue={sledTrackWidthM ?? ""} disabled={locked} />
       </Field>
       <Field label="Sled track base minutes" hint="The first stretch of track. Seeded at 180, which is 3 hours for 2 people.">
-        <Input name="sledBaseMinutes" inputMode="decimal" required defaultValue={String(sledBaseMinutes)} />
+        <Input name="sledBaseMinutes" inputMode="decimal" required defaultValue={String(sledBaseMinutes)} disabled={locked} />
       </Field>
       <Field label="Sled track base length (m)" hint="Seeded at 10. A track this long takes the base minutes.">
-        <Input name="sledBaseLength" inputMode="decimal" required defaultValue={String(sledBaseLengthM)} />
+        <Input name="sledBaseLength" inputMode="decimal" required defaultValue={String(sledBaseLengthM)} disabled={locked} />
       </Field>
       <Field label="Extra minutes per metre" hint="Seeded at 6. A 20 m track is 240 minutes.">
-        <Input name="sledExtraMinutes" inputMode="decimal" required defaultValue={String(sledExtraMinutesPerMetre)} />
+        <Input name="sledExtraMinutes" inputMode="decimal" required defaultValue={String(sledExtraMinutesPerMetre)} disabled={locked} />
       </Field>
       <Field label="Reason for this version">
-        <Input name="reason" required maxLength={500} placeholder="Why this version" />
+        <Input name="reason" required maxLength={500} placeholder="Why this version" disabled={locked} />
       </Field>
       <div className="md:col-span-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={locked || pending}>
           {pending ? "Saving..." : "Save new pricing version"}
         </Button>
       </div>
@@ -131,6 +140,7 @@ export function PricingForm({
         </div>
       ) : null}
     </form>
+    </LockedFields>
   );
 }
 
