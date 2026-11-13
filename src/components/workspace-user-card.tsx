@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { saveWorkspaceUser } from "@/features/workspace/actions";
+import { fieldEngineerBlankLabel } from "@/lib/installs/field-engineer-label";
 import { PULSE_MODULE_IDS } from "@/lib/types";
 
 const ROLES = [
@@ -65,7 +66,9 @@ export function WorkspaceUserCard({
   const [state, action, pending] = useActionState(saveWorkspaceUser, null);
   const owner = role === "owner";
   const linkedResource = resources?.find((resource) => resource.profileId === person.id)?.id ?? "";
-  const fieldChoice = officeIds.includes(person.id) ? "office" : linkedResource;
+  const office = officeIds.includes(person.id);
+  const fieldChoice = office ? "office" : linkedResource;
+  const blankLabel = fieldEngineerBlankLabel(person.teams.includes("Installs"), Boolean(linkedResource), office);
   const locked = owner || mode === "follow";
   const orderedTeams = [...teams].sort((a, b) => {
     const aIndex = TEAM_ORDER.indexOf(a.name);
@@ -105,7 +108,7 @@ export function WorkspaceUserCard({
           <label className="block text-sm">
             <span className="mb-1 block text-grey">Field engineer resource</span>
             <Select name="fieldResource" defaultValue={fieldChoice} aria-label="Field engineer resource" className="w-full sm:w-80">
-              <option value="">Not a field engineer</option>
+              <option value="">{blankLabel}</option>
               <option value="office">Office user (not a field engineer)</option>
               {resources.map((resource) => (
                 <option key={resource.id} value={resource.id}>
