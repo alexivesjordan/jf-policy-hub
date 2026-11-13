@@ -13,5 +13,8 @@ describe("fixture insurance gate", () => {
     const data = opened.data as { installId: string; threads: { id: string }[] };
     expect(data.installId).toMatch(/^[0-9a-f-]{36}$/);
     expect(data.threads).toHaveLength(1);
+    expect(() => fixtureSubcontractorRpc("subcontractor_open", { p_dates: ["2026-11-16"], p_sends: [send] })).toThrow(/already emailed/);
+    const again = fixtureSubcontractorRpc("subcontractor_followup", { p_install: data.installId });
+    expect(again.data).toMatchObject({ orderNumber: "FIXTURE-Q-1001", postcode: "LS1 4DY" });
   });
 });

@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
-import { awardSubcontractor, confirmSubcontractorPrice, resendFailedQuote, resendJobSheet } from "@/features/subcontractors/quote-actions";
+import { SubcontractorQuote } from "@/components/subcontractor-quote";
+import { awardSubcontractor, confirmSubcontractorPrice, resendFailedQuote, resendJobSheet, type AskAnotherOffer } from "@/features/subcontractors/quote-actions";
 import { isWeekday } from "@/lib/subcontractors/draft";
 
 type Message = { id: string; direction: string; from: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null; bodyUnavailable?: boolean };
 type Thread = { id: string; subcontractorId: string; name: string; status: string; suggestedPrice: number | null; confirmedPrice: number | null; messages: Message[] };
 
-export function SubcontractorInstall({ installId, stage, subcontractorName, threads, canAward }: { installId: string; stage: string; subcontractorName: string | null; threads: Thread[]; canAward: boolean }) {
+export function SubcontractorInstall({ installId, stage, subcontractorName, threads, canAward, followup = null }: { installId: string; stage: string; subcontractorName: string | null; threads: Thread[]; canAward: boolean; followup?: AskAnotherOffer | null }) {
   if (threads.length === 0 && stage !== "quoting" && !subcontractorName) return null;
   return (
     <section className="space-y-4 rounded-3xl border border-line bg-card px-5 py-5">
@@ -17,6 +18,12 @@ export function SubcontractorInstall({ installId, stage, subcontractorName, thre
       {subcontractorName ? <p className="text-sm">Chosen: {subcontractorName}</p> : null}
       {stage === "quoting" ? <p className="text-sm text-grey">Quoting. Assembly and QC still go on the Jordan calendar when you award the job.</p> : null}
       {threads.map((thread) => <ThreadCard key={thread.id} installId={installId} thread={thread} canAward={canAward && stage === "quoting"} />)}
+      {followup ? (
+        <details className="rounded-2xl border border-line px-3 py-3">
+          <summary className="cursor-pointer text-sm font-semibold">Ask another subcontractor</summary>
+          <SubcontractorQuote offer={followup} embedded />
+        </details>
+      ) : null}
       {subcontractorName ? <JobSheetButton installId={installId} /> : null}
     </section>
   );

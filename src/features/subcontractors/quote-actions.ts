@@ -8,9 +8,9 @@ import { getCurrentProfile, requireSalesUser } from "@/lib/auth";
 import { deliverPulseEmail } from "@/lib/email/deliver";
 import { messageFromError } from "@/lib/errors";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
-import { draftHtml, isWeekday } from "@/lib/subcontractors/draft";
+import { buildSubcontractorDraft, draftHtml, isWeekday } from "@/lib/subcontractors/draft";
 import { inboundDomain, newReplyToken, replyAddress } from "@/lib/subcontractors/inbound";
-import { deliverableEmails, selectionGate } from "@/lib/subcontractors/capability";
+import { deliverableEmails, jobTypesForKit, markAlreadyEmailed, rankSubcontractors, selectionGate, type QuoteChoice } from "@/lib/subcontractors/capability";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
@@ -53,6 +53,70 @@ export async function sendSubcontractorQuote(_state: ActionState, formData: Form
   revalidatePath("/sales/installs");
   revalidatePath("/operations/installs");
   redirect(`/sales/installs/${result.installId}`);
+}
+
+export type AskAnotherOffer = {
+  savedQuoteId: string;
+  quoteNumber: string;
+  customerName: string;
+  postcode: string;
+  jobTypes: string[];
+  subject: string;
+  draft: string;
+  initialDates: string[];
+  choices: QuoteChoice[];
+};
+
+export async function loadAskAnother(installId: string, emailedIds: string[]): Promise<AskAnotherOffer | null> {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_active || !profile.access_granted) return null;
+  if (!moduleAllows(profile, "sales", "edit") && !moduleAllows(profile, "operations", "edit")) return null;
+  if (!ID.test(installId)) return null;
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("subcontractor_followup", { p_install: installId });
+  if (loaded.error || !loaded.data) return null;
+  const row = loaded.data as {
+    quoteId?: string;
+    orderNumber?: string;
+    customerName?: string;
+    postcode?: string;
+    crew?: number | null;
+    suggestedDates?: string[];
+    lines?: { qty?: string | number; description?: string; category?: string | null }[];
+  };
+  if (!row.quoteId) return null;
+  const lines = (row.lines ?? []).map((line) => ({
+    qty: Number(line.qty ?? 0),
+    description: String(line.description ?? ""),
+    category: line.category ?? null,
+  }));
+  const dates = (row.suggestedDates ?? []).map((day) => String(day).slice(0, 10)).filter(isWeekday);
+  const jobTypes = jobTypesForKit(lines);
+  const postcode = String(row.postcode ?? "");
+  const email = buildSubcontractorDraft({
+    orderNumber: String(row.orderNumber ?? ""),
+    customerName: String(row.customerName ?? ""),
+    postcode,
+    lines,
+    dates,
+  });
+  const directory = await listSubcontractorRecords();
+  return {
+    savedQuoteId: row.quoteId,
+    quoteNumber: String(row.orderNumber ?? ""),
+    customerName: String(row.customerName ?? ""),
+    postcode,
+    jobTypes,
+    subject: email.subject,
+    draft: email.text,
+    initialDates: dates,
+    choices: markAlreadyEmailed(rankSubcontractors(directory, {
+      postcode,
+      jobTypes,
+      crew: row.crew ?? null,
+      today: new Date().toISOString().slice(0, 10),
+    }), emailedIds),
+  };
 }
 
 export async function resendFailedQuote(threadId: string): Promise<ActionState> {

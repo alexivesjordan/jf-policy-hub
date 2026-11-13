@@ -99,6 +99,14 @@ export function selectionGate(row: Pick<SubcontractorRecord, "status" | "emails"
   return { ok: true as const, reason: null };
 }
 
+/** Someone already on this quoting install cannot be picked again. */
+export function markAlreadyEmailed(choices: readonly QuoteChoice[], emailedIds: readonly string[]): QuoteChoice[] {
+  const taken = new Set(emailedIds);
+  return choices.map((choice) => taken.has(choice.id)
+    ? { ...choice, selectable: false, preselected: false, reason: "Already emailed" }
+    : choice);
+}
+
 export function rankSubcontractors(rows: readonly SubcontractorRecord[], need: QuoteNeed): QuoteChoice[] {
   return rows.map((row) => {
     const gate = selectionGate(row, need.today);

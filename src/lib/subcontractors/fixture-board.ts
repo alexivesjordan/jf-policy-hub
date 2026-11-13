@@ -41,6 +41,7 @@ export function fixtureSubcontractorRpc(fn: string, args: Record<string, unknown
   if (fn === "subcontractor_attach_insurance") return done(attach(args));
   if (fn === "subcontractor_drop_insurance") return done(dropDoc(String(args.p_id ?? "")));
   if (fn === "subcontractor_open") return done(openQuote(args));
+  if (fn === "subcontractor_followup") return done(followup(String(args.p_install ?? "")));
   if (fn === "subcontractor_log_message") return done(logMessage(args));
   if (fn === "subcontractor_record_reply") return done(recordReply(args));
   if (fn === "subcontractor_confirm_price") return done(confirm(args));
@@ -145,6 +146,9 @@ function openQuote(args: Record<string, unknown>) {
   const created = sends.map((send) => {
     const row = rows.find((item) => item.id === send.subcontractorId);
     if (!row) throw new Error("app: That subcontractor cannot be emailed.");
+    if (threads.some((thread) => thread.installId === String(quoting?.id) && thread.subcontractorId === row.id && thread.status !== "failed")) {
+      throw new Error("app: That subcontractor was already emailed for this order.");
+    }
     const gate = selectionGate(row, today);
     if (!gate.ok) throw new Error(`app: ${gate.reason ?? "That subcontractor cannot be emailed."}`);
     const thread: Thread = { id: randomUUID(), installId: String(quoting?.id), subcontractorId: row.id, replyToken: send.replyToken, subject: send.subject ?? "Install quote", status: "queued", suggestedPrice: null, confirmedPrice: null, messages: [] };
@@ -153,6 +157,19 @@ function openQuote(args: Record<string, unknown>) {
     return { id: thread.id, subcontractorId: row.id, replyToken: thread.replyToken, emails };
   });
   return { installId: quoting?.id, threads: created };
+}
+
+function followup(installId: string) {
+  if (!quoting || quoting.id !== installId || quoting.status !== "quoting") return null;
+  return {
+    quoteId: "11111111-1111-4111-8111-111111111111",
+    orderNumber: quoting.orderNumber,
+    customerName: quoting.customerName,
+    postcode: "LS1 4DY",
+    crew: quoting.crew,
+    suggestedDates: ["2026-11-16"],
+    lines: quoting.lines,
+  };
 }
 
 function logMessage(args: Record<string, unknown>) {

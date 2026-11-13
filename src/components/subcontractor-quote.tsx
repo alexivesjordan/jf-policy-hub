@@ -8,6 +8,7 @@ import { formatUkDate, isWeekday, replaceDateBlock } from "@/lib/subcontractors/
 
 export function SubcontractorQuote({
   offer,
+  embedded = false,
 }: {
   offer: {
     savedQuoteId: string;
@@ -18,10 +19,12 @@ export function SubcontractorQuote({
     subject: string;
     draft: string;
     choices: QuoteChoice[];
+    initialDates?: string[];
   };
+  embedded?: boolean;
 }) {
   const [state, action, pending] = useActionState(sendSubcontractorQuote, null);
-  const [dates, setDates] = useState<string[]>([]);
+  const [dates, setDates] = useState<string[]>(offer.initialDates ?? []);
   const [date, setDate] = useState("");
   const [dateNote, setDateNote] = useState("");
   const [body, setBody] = useState(offer.draft);
@@ -42,13 +45,15 @@ export function SubcontractorQuote({
   }
 
   return (
-    <form action={action} className="space-y-5 rounded-3xl border border-line bg-card px-5 py-5">
+    <form action={action} className={embedded ? "space-y-5 pt-4" : "space-y-5 rounded-3xl border border-line bg-card px-5 py-5"}>
       <input type="hidden" name="savedQuoteId" value={offer.savedQuoteId} />
       <input type="hidden" name="dates" value={dates.join(",")} />
-      <div>
-        <h2 className="font-display text-2xl">Subcontractor quote</h2>
-        <p className="mt-1 text-sm text-grey">{offer.customerName} · {offer.postcode || "No postcode"} · {offer.jobTypes.join(", ")}</p>
-      </div>
+      {embedded ? null : (
+        <div>
+          <h2 className="font-display text-2xl">Subcontractor quote</h2>
+          <p className="mt-1 text-sm text-grey">{offer.customerName} · {offer.postcode || "No postcode"} · {offer.jobTypes.join(", ")}</p>
+        </div>
+      )}
       <Field label="Suggested dates" hint="Weekdays only.">
         <div className="flex flex-wrap items-center gap-2">
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
@@ -67,7 +72,7 @@ export function SubcontractorQuote({
       <Field label="Email"><TextArea name="body" value={body} onChange={(event) => setBody(event.target.value)} required className="min-h-64" /></Field>
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">Subcontractors</legend>
-        <p className="text-sm text-grey">Capable ones are ticked. A subcontractor with no in-date insurance cannot be selected or emailed.</p>
+        {embedded ? null : <p className="text-sm text-grey">Capable ones are ticked. A subcontractor with no in-date insurance cannot be selected or emailed.</p>}
         <ul className="space-y-2">
           {offer.choices.map((choice) => (
             <li key={choice.id} className="rounded-2xl border border-line px-3 py-3">

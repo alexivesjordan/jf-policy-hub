@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
+import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, markAlreadyEmailed, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
 import { buildSubcontractorDraft, isWeekday, replaceDateBlock } from "@/lib/subcontractors/draft";
 import { CHECK_EMAILS, SEEDED_SUBCONTRACTORS } from "@/lib/subcontractors/seed-data";
 import { INSURANCE_MAX_BYTES, insuranceBytesMatch, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
@@ -120,5 +121,23 @@ describe("seed and draft", () => {
     expect(next.startsWith("Hello Chris,")).toBe(true);
     expect(next).toContain("18/11/2026");
     expect(next).not.toContain("16/11/2026");
+  });
+});
+
+describe("ask another subcontractor", () => {
+  it("keeps the insurance, area, and job-type filters and refuses anyone already emailed", () => {
+    const need = { postcode: "LS1 4DY", jobTypes: ["install"], crew: 2, today };
+    const local = row({ id: "local", name: "Local Fit" });
+    const emailed = row({ id: "sent", name: "Already Sent" });
+    const uninsured = row({ id: "bare", name: "Bare", insurance: [] });
+    const ireland = row({ id: "eire", name: "Eire Only", regions: ["Ireland"] });
+    const choices = markAlreadyEmailed(rankSubcontractors([local, emailed, uninsured, ireland], need), ["sent"]);
+    expect(choices.find((choice) => choice.id === "local")).toMatchObject({ selectable: true, preselected: true });
+    expect(choices.find((choice) => choice.id === "sent")).toMatchObject({ selectable: false, preselected: false, reason: "Already emailed" });
+    expect(choices.find((choice) => choice.id === "bare")?.reason).toBe("No in-date insurance");
+    expect(choices.find((choice) => choice.id === "eire")?.reason).toBe("Outside the area");
+    const page = readFileSync(path.join(process.cwd(), "src/components/subcontractor-install.tsx"), "utf8");
+    expect(page).toContain("Ask another subcontractor");
+    expect(page).toContain("<SubcontractorQuote");
   });
 });

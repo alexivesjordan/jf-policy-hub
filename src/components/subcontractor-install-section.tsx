@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { SubcontractorInstall } from "@/components/subcontractor-install";
-import { readSubcontractorBoard } from "@/features/subcontractors/quote-actions";
+import { loadAskAnother, readSubcontractorBoard } from "@/features/subcontractors/quote-actions";
 import { moduleAllows } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 
@@ -11,6 +11,9 @@ export async function SubcontractorInstallSection({ profile, install }: { profil
   const threads = await readSubcontractorBoard(id);
   const stage = String(install.stage ?? "");
   const name = typeof install.subcontractorName === "string" ? install.subcontractorName : null;
+  const canEdit = moduleAllows(profile, "sales", "edit") || moduleAllows(profile, "operations", "edit");
   if (threads.length === 0 && stage !== "quoting" && !name) return null;
-  return <SubcontractorInstall installId={id} stage={stage} subcontractorName={name} threads={threads} canAward={moduleAllows(profile, "sales", "edit") || moduleAllows(profile, "operations", "edit")} />;
+  const emailed = threads.filter((thread) => thread.status !== "failed").map((thread) => thread.subcontractorId);
+  const followup = canEdit && stage === "quoting" ? await loadAskAnother(id, emailed) : null;
+  return <SubcontractorInstall installId={id} stage={stage} subcontractorName={name} threads={threads} canAward={canEdit} followup={followup} />;
 }
