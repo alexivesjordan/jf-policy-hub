@@ -185,9 +185,15 @@ function weekMonday() {
   return monday.toISOString().slice(0, 10);
 }
 
+function sessionProfile() {
+  const marker = process.env.PULSE_FIXTURE_ROLE;
+  if (marker === "rep" || marker === "lead" || marker === "engineer") return { ...profile, role: "staff" };
+  return profile;
+}
+
 function tables(): Record<string, Record<string, unknown>[]> {
   return {
-    profiles: [profile],
+    profiles: [sessionProfile()],
     categories,
     policies,
     policy_versions: [],
@@ -205,10 +211,11 @@ function tables(): Record<string, Record<string, unknown>[]> {
 function rpcData(fn: string, args?: Record<string, unknown>) {
   const subcontractor = fixtureSubcontractorRpc(fn, args);
   if (subcontractor.handled) return subcontractor.data;
-  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead";
+  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead" && process.env.PULSE_FIXTURE_ROLE !== "engineer";
   if (fn === "workspace_can") {
     const moduleName = String(args?.p_module ?? "");
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return moduleName === "sales";
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return moduleName === "operations";
     if (process.env.PULSE_FIXTURE_ROLE === "lead") return moduleName === "operations" || moduleName === "sales";
     return true;
   }
@@ -216,10 +223,23 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
     }
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "view", sales: "none", finance: "none" };
+    }
     if (process.env.PULSE_FIXTURE_ROLE === "lead") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "edit", sales: "view", finance: "none" };
     }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
+  }
+  if (fn === "install_field_role") {
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return "engineer";
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return "ops";
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return "none";
+    return "admin";
+  }
+  if (fn === "install_field_home") {
+    const role = process.env.PULSE_FIXTURE_ROLE === "engineer" ? "engineer" : process.env.PULSE_FIXTURE_ROLE === "lead" ? "ops" : "admin";
+    return { role, jobs: [], needsLink: false };
   }
   if (fn === "workspace_directory") {
     return [
@@ -302,6 +322,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "service_set_proposal_path" || fn === "save_person_name" || fn === "service_save_rates" || fn === "service_upsert_rule") return true;
   if (fn === "orbit_office_context") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return { has_module: true, ops_role: "engineer", is_owner: false, operations: "view", sales: "none" };
     if (process.env.PULSE_FIXTURE_ROLE === "lead") return { has_module: true, ops_role: "install_lead", is_owner: false, operations: "edit", sales: "view" };
     return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
   }

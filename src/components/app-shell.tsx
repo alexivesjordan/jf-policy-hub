@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ChevronsUpDown, Menu } from "lucide-react";
 import { NotificationBell, type BellItem } from "@/components/notification-bell";
 import { ModuleGlyph } from "@/components/module-icon";
@@ -10,7 +10,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { canManageWorkspace, moduleAllows } from "@/lib/access";
+import { canManageWorkspace } from "@/lib/access";
+import { visibleNav } from "@/lib/shell-nav";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -41,11 +42,7 @@ export function AppShell({
   const current = moduleFromPath(path);
   const heading = inWorkspace ? "Workspace" : current ? pulseLabel(current) : "Jordan Pulse";
   const counts = { pending, unread };
-  const items = (nav ?? current?.nav ?? []).filter((item) => {
-    if (item.adminOnly && !moduleAllows(profile, "people", "edit")) return false;
-    if (item.ownerOnly && !isOwner) return false;
-    return true;
-  });
+  const items = visibleNav(nav ?? current?.nav ?? [], profile, isOwner);
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
@@ -153,7 +150,7 @@ function PulseSwitcher({
   );
 }
 
-function MobileNav({
+export function MobileNav({
   items,
   counts,
   title,
@@ -167,16 +164,30 @@ function MobileNav({
   currentId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) requestAnimationFrame(() => triggerRef.current?.focus());
+      }}
+    >
       <SheetTrigger
-        className="inline-flex size-11 items-center justify-center rounded-full border border-line text-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
-        aria-label="Open menu"
+        ref={triggerRef}
+        className="inline-flex size-11 items-center justify-center rounded-full border border-line bg-paper text-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+        aria-label="Menu"
       >
         <Menu className="size-5" aria-hidden="true" />
       </SheetTrigger>
-      <SheetContent side="left" className="bg-pine text-ink">
+      <SheetContent
+        side="left"
+        className="bg-pine text-ink"
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("a")) setOpen(false);
+        }}
+      >
         <SheetHeader>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <SheetDescription className="sr-only">{title}</SheetDescription>

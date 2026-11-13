@@ -10,6 +10,7 @@ import { fieldRole } from "@/features/field/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ENGINEER_NAV } from "@/lib/shell-nav";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
@@ -87,12 +88,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   const officeNav = (pulseModules.find((module) => module.id === "operations")?.nav ?? []).filter(
     (item) => !item.ownerOnly || isOwner,
   );
-  const nav = role === "engineer"
-    ? [
-        { href: "/field", label: "My jobs" },
-        { href: "/operations/documents", label: "Visit documents" },
-      ]
-    : officeNav;
+  const nav = role === "engineer" ? ENGINEER_NAV : officeNav;
 
   return (
     <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>

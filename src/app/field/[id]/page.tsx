@@ -5,7 +5,7 @@ import { FieldFrame } from "@/components/field/frame";
 import { VisitFlow, type VisitScreen } from "@/components/field/visit-flow";
 import { mySignature, visitContext } from "@/features/field/queries";
 import { getCurrentProfile } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
 export const instant = false;
 export const metadata = { title: "Job" };
@@ -21,7 +21,7 @@ export default function FieldJobPage({ params }: { params: Promise<{ id: string 
 async function Job({ params }: { params: Promise<{ id: string }> }) {
   await connection();
   const { id } = await params;
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return <FieldFrame title="Job" back={{ href: "/field", label: "Jobs" }}><p>Add the Supabase keys, then open the job again.</p></FieldFrame>;
   }
   const profile = await getCurrentProfile();
