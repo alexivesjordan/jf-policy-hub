@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { projectInstall, type InstallRecord } from "@/lib/pulse/install-booking";
 
 const WARRANTY: Record<string, string> = {
@@ -36,9 +37,11 @@ export function salesInstall(record: InstallRecord) {
 export function InstallSalesView({
   install,
   proposalUrl,
+  cancel,
 }: {
   install: InstallRecord;
   proposalUrl?: string | null;
+  cancel?: ReactNode;
 }) {
   const row = salesInstall(install);
   const warranty = row.warrantyOption ? WARRANTY[String(row.warrantyOption)] ?? String(row.warrantyOption) : "None";
@@ -60,6 +63,7 @@ export function InstallSalesView({
           <Row label="Contact" value={[row.contactName, row.contactEmail, row.contactPhone].filter(Boolean).join(" · ") || "—"} />
           <Row label="Site" value={String(row.siteAddress ?? "—")} />
         </dl>
+        {cancel ? <div className="mt-4">{cancel}</div> : null}
         {proposalUrl ? (
           <p className="mt-4 text-sm">
             <a className="font-semibold underline decoration-primary" href={proposalUrl}>Download the proposal</a>

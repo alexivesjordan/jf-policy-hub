@@ -472,6 +472,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return fixtureInstall(start, "annual", true);
   }
   if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
+  if (fn === "install_cancel") return fixtureInstall("2026-11-16", "annual", true, "cancelled");
   return null;
 }
 

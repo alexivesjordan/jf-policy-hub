@@ -4,7 +4,7 @@ import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
-import { canManageInstall } from "@/lib/installs/access-auth";
+import { canCancelInstall, canManageInstall } from "@/lib/installs/access-auth";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
 import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
@@ -209,6 +209,31 @@ export async function installProposalUrl(path: unknown) {
   if (!admin) return null;
   const signed = await admin.storage.from("service-proposals").createSignedUrl(path, 60 * 10);
   return signed.data?.signedUrl ?? null;
+}
+
+export async function cancelInstall(installId: string, reason: string): Promise<InstallActionResult> {
+  const profile = await requireSalesUser();
+  if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
+  const trimmed = reason.trim();
+  if (trimmed.length < 3 || trimmed.length > 500) return { ok: false, message: "Add a reason of 3 to 500 characters." };
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("install_read", { p_id: installId });
+  if (loaded.error || !loaded.data) return { ok: false, message: messageFromError(loaded.error, "That install was not found.") };
+  const row = loaded.data as { bookingRepId?: string | null; status?: string; stage?: string };
+  const office = await supabase.rpc("orbit_office_context");
+  const engineer = (office.data as { ops_role?: string } | null)?.ops_role === "installer";
+  if (!canCancelInstall({
+    profile,
+    bookingRepId: row.bookingRepId,
+    status: String(row.status ?? ""),
+    stage: String(row.stage ?? ""),
+    fieldEngineer: engineer,
+  })) {
+    return { ok: false, message: "You cannot cancel that install." };
+  }
+  const cancelled = await supabase.rpc("install_cancel", { p_id: installId, p_reason: trimmed });
+  if (cancelled.error) return { ok: false, message: messageFromError(cancelled.error, "Could not cancel that install.") };
+  return { ok: true, message: "Install cancelled.", install: (cancelled.data ?? null) as Record<string, unknown> | null };
 }
 
 export async function setInstallStatus(installId: string, status: string): Promise<InstallActionResult> {
