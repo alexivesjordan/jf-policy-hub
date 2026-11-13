@@ -110,11 +110,12 @@ export function asVisitContext(value: unknown): VisitContext | null {
 }
 
 export async function fieldHome() {
-  const data = await userRpc<{ role?: string; jobs?: unknown }>("install_field_home");
+  const data = await userRpc<{ role?: string; jobs?: unknown; needsLink?: boolean }>("install_field_home");
   const role = data?.role;
   return {
     role: role === "admin" || role === "ops" || role === "engineer" ? role : "none",
     jobs: asJobs(data?.jobs),
+    needsLink: data?.needsLink === true,
   };
 }
 

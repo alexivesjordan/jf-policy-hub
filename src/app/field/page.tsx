@@ -57,7 +57,8 @@ async function FieldHome() {
           </Link>
         </div>
       </div>
-      {home.jobs.length === 0 ? <p className="text-base">No jobs assigned.</p> : null}
+      {home.needsLink ? <p className="text-base">Ask an admin to link your login.</p> : null}
+      {!home.needsLink && home.jobs.length === 0 ? <p className="text-base">No jobs assigned.</p> : null}
       <div className="space-y-6">
         {groups.map((group) =>
           group.jobs.length === 0 ? null : (

@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
-import { prepareSignaturePng } from "@/lib/installs/signature-image";
+import { prepareSignaturePng, prepareVisitPhoto } from "@/lib/installs/signature-image";
 import { FORM_NOTICES, type SheetDraft } from "@/lib/installs/visit-form";
 
 const A4 = [595.28, 841.89] as const;
@@ -207,6 +207,12 @@ export async function buildVisitPdf(input: VisitPdfInput) {
   if (input.riskLines.length === 0) pdf.text("Not recorded.");
   for (const row of input.riskLines) pdf.pair(row.label, row.answer);
   if (input.riskNotes.trim()) pdf.text(`Notes: ${input.riskNotes.trim()}`);
-  for (const photo of input.photos ?? []) await pdf.image(photo.bytes, photo.label);
+  for (const photo of input.photos ?? []) {
+    try {
+      await pdf.image(await prepareVisitPhoto(photo.bytes), photo.label);
+    } catch {
+      pdf.text(`${photo.label}: the photo could not be printed.`);
+    }
+  }
   return pdf.bytes();
 }

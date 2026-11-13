@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,15 +50,22 @@ export function WorkspaceUserCard({
   person,
   teams,
   resources,
+  officeIds = [],
+  installsTeamId = "",
 }: {
   person: WorkspaceDirectoryUser;
   teams: { id: string; name: string }[];
   resources?: FieldResourceOption[];
+  officeIds?: string[];
+  installsTeamId?: string;
 }) {
   const [role, setRole] = useState(person.workspace_role);
   const [mode, setMode] = useState<WorkspaceDirectoryUser["access_mode"]>(person.access_mode);
   const [levels, setLevels] = useState(() => Object.fromEntries(PULSE_MODULE_IDS.map((moduleId) => [moduleId, levelFor(moduleId, person.effective)])));
+  const [state, action, pending] = useActionState(saveWorkspaceUser, null);
   const owner = role === "owner";
+  const linkedResource = resources?.find((resource) => resource.profileId === person.id)?.id ?? "";
+  const fieldChoice = officeIds.includes(person.id) ? "office" : linkedResource;
   const locked = owner || mode === "follow";
   const orderedTeams = [...teams].sort((a, b) => {
     const aIndex = TEAM_ORDER.indexOf(a.name);
@@ -68,8 +75,9 @@ export function WorkspaceUserCard({
 
   return (
     <li className="rounded-3xl border border-line bg-card p-5">
-      <form action={saveWorkspaceUser} className="space-y-4">
+      <form action={action} className="space-y-4">
         <input type="hidden" name="userId" value={person.id} />
+        <input type="hidden" name="installsTeamId" value={installsTeamId} />
         <div>
           <p className="font-semibold text-ink">{person.full_name || `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || person.email}</p>
           <p className="text-sm text-grey">{person.email}</p>
@@ -81,7 +89,7 @@ export function WorkspaceUserCard({
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-grey">Last name</span>
-            <Input name="lastName" required defaultValue={person.last_name ?? ""} autoComplete="family-name" />
+            <Input name="lastName" defaultValue={person.last_name ?? ""} autoComplete="family-name" />
           </label>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -96,8 +104,9 @@ export function WorkspaceUserCard({
         {resources ? (
           <label className="block text-sm">
             <span className="mb-1 block text-grey">Field engineer resource</span>
-            <Select name="fieldResource" defaultValue={resources.find((resource) => resource.profileId === person.id)?.id ?? ""} aria-label="Field engineer resource" className="w-full sm:w-80">
+            <Select name="fieldResource" defaultValue={fieldChoice} aria-label="Field engineer resource" className="w-full sm:w-80">
               <option value="">Not a field engineer</option>
+              <option value="office">Office user (not a field engineer)</option>
               {resources.map((resource) => (
                 <option key={resource.id} value={resource.id}>
                   {resource.name.replace(/^FIXTURE — /, "")}
@@ -150,7 +159,8 @@ export function WorkspaceUserCard({
             </div>
           </div>
         </details>
-        <Button type="submit" variant="secondary">Save</Button>
+        {state?.message ? <p className="text-sm font-semibold text-red">{state.message}</p> : null}
+        <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Saving" : "Save"}</Button>
       </form>
     </li>
   );
