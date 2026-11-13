@@ -1,5 +1,22 @@
--- Final install reads after the engineer review. Field engineers keep Orion's
--- assignment check and price stripping. Quoting rows with no dates stay on the kanban.
+-- Last definitions after the engineer review. Field engineers keep Orion's
+-- assignment check and price stripping. Quoting rows with no dates stay on the
+-- kanban, and a Jordan book cannot take over a quote that is still out.
+-- Replaces the helper too, so a database that already applied 240000 refuses
+-- a linked field engineer without the old "only if the function exists" check.
+
+create or replace function ops.reject_field_engineer()
+returns void
+language plpgsql
+stable
+as $$
+begin
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
+end;
+$$;
+
+revoke all on function ops.reject_field_engineer() from public, anon, authenticated;
 
 create or replace function public.subcontractor_list()
 returns jsonb
@@ -157,5 +174,112 @@ begin
   v_resources := ops.hold_install_resources(v_row.id, v_ids, v_days);
   update ops.installs set start_on = p_start, end_on = v_end, resources = v_resources, updated_at = now() where id = v_row.id;
   return public.install_read(v_row.id);
+end;
+$$;
+
+-- 20261113230000 replaced install_book after the quoting guard. This is the last one:
+-- his field-engineer refusal, plus the block while a subcontractor quote is open.
+
+create or replace function public.install_book(p_quote_id uuid, p_start date, p_warranty text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ops, public
+as $$
+declare
+  v_quote ops.install_quotes%rowtype;
+  v_payload jsonb;
+  v_weekends boolean := false;
+  v_total integer;
+  v_days date[];
+  v_ids uuid[];
+  v_install uuid;
+  v_end date;
+  v_option text := nullif(p_warranty, 'none');
+  v_price numeric;
+  v_resources jsonb;
+  v_requirements jsonb;
+  v_existing ops.installs%rowtype;
+begin
+  if ops.is_field_engineer() then
+    raise exception 'app: You cannot book an install.';
+  end if;
+  if not (public.workspace_can('sales', 'edit') or public.workspace_can('operations', 'edit')) then
+    raise exception 'app: You cannot book an install.';
+  end if;
+  select * into v_quote from ops.install_quotes where id = p_quote_id for update;
+  if v_quote.id is null then
+    raise exception 'app: Price the order before booking.';
+  end if;
+  if v_quote.install_id is not null then
+    select * into v_existing from ops.installs where id = v_quote.install_id;
+    if v_existing.status = 'quoting' then
+      raise exception 'app: That order is out for a subcontractor quote.';
+    end if;
+    raise exception 'app: That order is already booked.';
+  end if;
+  if v_quote.created_by is distinct from auth.uid() and not public.workspace_is_admin() and not public.workspace_can('operations', 'edit') then
+    raise exception 'app: You cannot book that quote.';
+  end if;
+  v_payload := v_quote.payload;
+  v_total := greatest(coalesce((v_payload->>'totalDays')::integer, 1), 1);
+  select coalesce(array_agg(day order by day), '{}') into v_days
+  from ops.install_working_days(p_start, v_total, v_weekends) as day;
+  if coalesce(array_length(v_days, 1), 0) < v_total or v_days[1] is distinct from p_start then
+    raise exception 'app: Choose a weekday start date.';
+  end if;
+  v_requirements := coalesce(v_payload->'requirements', '{}'::jsonb);
+  v_ids := ops.pick_install_resources(
+    v_days,
+    greatest(coalesce((v_requirements->>'installers')::integer, 1), 1),
+    greatest(coalesce((v_requirements->>'licensedDrivers')::integer, 0), 0),
+    coalesce(v_requirements->>'vanSize', 'small'),
+    greatest(coalesce((v_requirements->>'vanCount')::integer, 1), 1),
+    coalesce((v_requirements->>'stairClimber')::boolean, false)
+  );
+  if v_ids is null then
+    raise exception 'app: Those engineers or vans are no longer free. Choose another start date.';
+  end if;
+  if v_option is not null and v_option not in ('annual', 'twice_yearly', 'extension', 'annual_bundle', 'twice_yearly_bundle') then
+    raise exception 'app: Choose a warranty option from the priced quote.';
+  end if;
+  v_price := case v_option
+    when 'annual' then (v_payload #>> '{warranty,annual}')::numeric
+    when 'twice_yearly' then (v_payload #>> '{warranty,twice}')::numeric
+    when 'extension' then (v_payload #>> '{warranty,extension}')::numeric
+    when 'annual_bundle' then (v_payload #>> '{warranty,annualBundle}')::numeric
+    when 'twice_yearly_bundle' then (v_payload #>> '{warranty,twiceBundle}')::numeric
+    else null
+  end;
+  if v_option is not null and v_price is null then
+    raise exception 'app: That warranty option was not priced.';
+  end if;
+  v_end := v_days[array_length(v_days, 1)];
+  insert into ops.installs (
+    quote_id, order_number, goods_net, install_price, warranty_option, warranty_price,
+    start_on, end_on, customer_name, contact_name, contact_email, contact_phone, site_address,
+    status, booking_rep_id, service_quote_id, proposal_path,
+    flags, hq_build, site_install, crew, van_size, van_count, lines, cin7_sale_id, cin7_customer_id
+  ) values (
+    v_quote.id, v_quote.order_number,
+    (v_payload->>'goodsNet')::numeric, (v_payload->>'installPrice')::numeric,
+    v_option, v_price, p_start, v_end,
+    coalesce(v_payload->>'customerName', ''),
+    v_payload->>'contactName', v_payload->>'contactEmail', v_payload->>'contactPhone', v_payload->>'siteAddress',
+    'booked', auth.uid(),
+    nullif(v_payload->>'serviceQuoteId', '')::uuid, v_payload->>'proposalPath',
+    coalesce(v_payload->'flags', '[]'::jsonb),
+    coalesce(v_payload->'hqBuild', '{}'::jsonb),
+    coalesce(v_payload->'siteInstall', '{}'::jsonb),
+    greatest(coalesce((v_requirements->>'installers')::integer, 1), 1),
+    coalesce(v_requirements->>'vanSize', 'small'),
+    greatest(coalesce((v_requirements->>'vanCount')::integer, 1), 1),
+    coalesce(v_payload->'lines', '[]'::jsonb),
+    v_payload->>'cin7SaleId', v_payload->>'cin7CustomerId'
+  ) returning id into v_install;
+  v_resources := ops.hold_install_resources(v_install, v_ids, v_days);
+  update ops.installs set resources = v_resources where id = v_install;
+  update ops.install_quotes set install_id = v_install where id = v_quote.id;
+  return public.install_read(v_install);
 end;
 $$;

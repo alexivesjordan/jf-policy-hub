@@ -34,14 +34,8 @@ returns void
 language plpgsql
 stable
 as $$
-declare
-  v_engineer boolean := false;
 begin
-  if to_regprocedure('ops.is_field_engineer()') is null then
-    return;
-  end if;
-  execute 'select ops.is_field_engineer()' into v_engineer;
-  if v_engineer then
+  if ops.is_field_engineer() then
     raise exception 'app: Field engineers cannot do that.';
   end if;
 end;
