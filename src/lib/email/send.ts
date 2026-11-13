@@ -5,6 +5,8 @@ export type PulseEmail = {
   text: string;
   html: string;
   installId?: string | null;
+  tokenLinkId?: string | null;
+  accessPath?: string | null;
   attachments?: { filename: string; contentBase64: string }[];
 };
 
@@ -13,6 +15,8 @@ export type EmailLogRow = {
   subject: string;
   template: string;
   installId: string | null;
+  tokenLinkId: string | null;
+  accessPath: string | null;
   providerId: string | null;
   status: "logged" | "sent" | "failed" | "redirected";
   detail: string | null;
@@ -26,6 +30,10 @@ export type EmailIo = {
 
 const FROM = "Jordan Pulse <pulse@jordanfitness.com>";
 
+function outsideProduction(env: Record<string, string | undefined>) {
+  return env.VERCEL_ENV !== "production";
+}
+
 /** Sends through Resend, or only writes the log when the key or a preview override says so. */
 export async function sendPulseEmail(input: PulseEmail, io: EmailIo) {
   const key = io.env.RESEND_API_KEY?.trim() ?? "";
@@ -35,10 +43,22 @@ export async function sendPulseEmail(input: PulseEmail, io: EmailIo) {
     subject: input.subject,
     template: input.template,
     installId: input.installId ?? null,
+    tokenLinkId: input.tokenLinkId ?? null,
+    accessPath: input.accessPath ?? null,
   };
 
   if (!key) {
     await io.record({ ...base, providerId: null, status: "logged", detail: "RESEND_API_KEY is not set" });
+    return { status: "logged" as const, providerId: null };
+  }
+
+  if (outsideProduction(io.env) && !redirect) {
+    await io.record({
+      ...base,
+      providerId: null,
+      status: "logged",
+      detail: "EMAIL_REDIRECT_TO is required outside production",
+    });
     return { status: "logged" as const, providerId: null };
   }
 

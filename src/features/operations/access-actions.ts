@@ -5,7 +5,9 @@ import { headers } from "next/headers";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
+import { accessMediaPathOk, planAccessMediaUpload } from "@/lib/pulse/access-upload";
 import { storePulseFile } from "@/lib/pulse/files";
+import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { hashPulseToken } from "@/lib/pulse/token-hash";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -52,18 +54,10 @@ export async function submitAccessForm(_state: ActionState, formData: FormData):
       ...formData.getAll("photos"),
       ...formData.getAll("videos"),
     ].filter((item): item is File => item instanceof File && item.size > 0);
-    const media: string[] = [];
+    const media = mediaIdsFrom(formData);
     for (const file of files.slice(0, 8)) {
-      const stored = await storePulseFile({
-        bucket: "access-media",
-        mimeType: file.type || "image/jpeg",
-        bytes: Buffer.from(await file.arrayBuffer()),
-        uploadedBy: null,
-        entitySchema: "ops",
-        entityTable: "installs",
-        entityId: install.install_id,
-        kind: file.type.startsWith("video/") ? "video" : "photo",
-      });
+      const stored = await storeAccessFile(file, "installs", install.install_id);
+      if (!stored.ok) return stored;
       media.push(stored.fileId);
     }
     if (install.submitted && media.length === 0 && !name) {
@@ -91,19 +85,11 @@ export async function submitAccessForm(_state: ActionState, formData: FormData):
   const termsId = (preview.data as { terms: { id: string } | null }).terms?.id ?? null;
   const answers = answersFrom(formData);
 
-  const media: string[] = [];
+  const media = mediaIdsFrom(formData);
   const files = formData.getAll("photos").filter((item): item is File => item instanceof File && item.size > 0);
   for (const file of files.slice(0, 8)) {
-    const stored = await storePulseFile({
-      bucket: "access-media",
-      mimeType: file.type || "image/jpeg",
-      bytes: Buffer.from(await file.arrayBuffer()),
-      uploadedBy: null,
-      entitySchema: "ops",
-      entityTable: "install_jobs",
-      entityId: jobId,
-      kind: "photo",
-    });
+    const stored = await storeAccessFile(file, "install_jobs", jobId);
+    if (!stored.ok) return stored;
     media.push(stored.fileId);
   }
 
@@ -119,6 +105,85 @@ export async function submitAccessForm(_state: ActionState, formData: FormData):
   if (saved.error) return { ok: false, message: messageFromError(saved.error, "Could not save the form.") };
   revalidatePath(`/operations/jobs/${jobId}/access`);
   return { ok: true, message: "Access details received. Jordan will confirm any extra charges before the install is booked." };
+}
+
+const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function mediaIdsFrom(formData: FormData) {
+  return formData.getAll("mediaIds").map((value) => String(value)).filter((value) => FILE_ID.test(value));
+}
+
+async function storeAccessFile(file: File, entityTable: string, entityId: string) {
+  try {
+    const stored = await storePulseFile({
+      bucket: "access-media",
+      mimeType: file.type || "image/jpeg",
+      bytes: Buffer.from(await file.arrayBuffer()),
+      uploadedBy: null,
+      entitySchema: "ops",
+      entityTable,
+      entityId,
+      kind: file.type.startsWith("video/") ? "video" : "photo",
+    });
+    return { ok: true as const, fileId: stored.fileId };
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : "Could not store that file." };
+  }
+}
+
+export async function prepareAccessMediaUpload(token: string, mimeType: string, byteSize: number) {
+  const hash = hashPulseToken(token);
+  if (!hash) return { ok: false as const, message: "That link is not valid." };
+  const plan = planAccessMediaUpload(mimeType, byteSize);
+  if (!plan.ok) return plan;
+  const admin = createAdminClient();
+  if (!admin) return { ok: false as const, message: "Supabase is not configured." };
+  const preview = await admin.rpc("install_access_preview", { p_token_hash: hash });
+  const installId = (preview.data as { install_id?: string } | null)?.install_id;
+  if (!installId) return { ok: false as const, message: "That link is not valid." };
+  const path = pulseStoragePath("ops", installId, plan.extension);
+  const signed = await admin.storage.from("access-media").createSignedUploadUrl(path);
+  if (signed.error || !signed.data) return { ok: false as const, message: "Could not start that upload." };
+  return {
+    ok: true as const,
+    bucket: "access-media" as const,
+    path: signed.data.path,
+    token: signed.data.token,
+    signedUrl: signed.data.signedUrl,
+    kind: plan.kind,
+  };
+}
+
+export async function finishAccessMediaUpload(token: string, path: string, mimeType: string, byteSize: number) {
+  const hash = hashPulseToken(token);
+  if (!hash) return { ok: false as const, message: "That link is not valid." };
+  const plan = planAccessMediaUpload(mimeType, byteSize);
+  if (!plan.ok) return plan;
+  const admin = createAdminClient();
+  if (!admin) return { ok: false as const, message: "Supabase is not configured." };
+  const preview = await admin.rpc("install_access_preview", { p_token_hash: hash });
+  const installId = (preview.data as { install_id?: string } | null)?.install_id;
+  if (!installId || !accessMediaPathOk(installId, path)) return { ok: false as const, message: "That file path is not allowed." };
+  const folder = path.split("/").slice(0, -1).join("/");
+  const name = path.split("/").pop() ?? "";
+  const listed = await admin.storage.from("access-media").list(folder, { search: name, limit: 10 });
+  if (!listed.data?.some((item) => item.name === name)) {
+    return { ok: false as const, message: "Upload the file before saving it." };
+  }
+  const registered = await admin.rpc("orbit_register_file", {
+    p_bucket: "access-media",
+    p_storage_path: path,
+    p_mime_type: mimeType,
+    p_byte_size: byteSize,
+    p_checksum: null,
+    p_uploaded_by: null,
+    p_entity_schema: "ops",
+    p_entity_table: "installs",
+    p_entity_id: installId,
+    p_kind: plan.kind,
+  });
+  if (registered.error || !registered.data) return { ok: false as const, message: "Could not register that file." };
+  return { ok: true as const, fileId: registered.data as string };
 }
 
 function answersFrom(formData: FormData) {

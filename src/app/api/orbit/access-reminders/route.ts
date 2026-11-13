@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Could not read reminder candidates." }, { status: 502 });
   }
   const payload = queued.data as {
-    settings?: { weekly?: boolean; finalDaysBeforeStart?: number };
+    settings?: { weekly?: boolean; finalDaysBeforeStart?: number; backfillMissingLinks?: boolean };
     installs?: {
       id: string;
       email: string;
@@ -29,12 +29,23 @@ export async function GET(request: Request) {
       mediaCount: number;
       lastReminderOn: string | null;
     }[];
+    backfill?: { id: string; email: string; endOn: string }[];
   };
   const cadence: AccessReminderCadence = {
     weekly: payload.settings?.weekly !== false,
     finalDaysBeforeStart: Number(payload.settings?.finalDaysBeforeStart ?? 7),
   };
   const today = new Date().toISOString().slice(0, 10);
+  let issued = 0;
+  if (payload.settings?.backfillMissingLinks !== false) {
+    for (const install of payload.backfill ?? []) {
+      await issueInstallAccess(
+        { id: install.id, contactEmail: install.email, endOn: String(install.endOn).slice(0, 10) },
+        { rotate: false },
+      );
+      issued += 1;
+    }
+  }
   let sent = 0;
   for (const install of payload.installs ?? []) {
     const due = accessReminderDue(
@@ -49,13 +60,13 @@ export async function GET(request: Request) {
       cadence,
     );
     if (!due) continue;
-    await issueInstallAccess({
-      id: install.id,
-      contactEmail: install.email,
-      endOn: String(install.endOn).slice(0, 10),
-    });
+    const result = await issueInstallAccess(
+      { id: install.id, contactEmail: install.email, endOn: String(install.endOn).slice(0, 10) },
+      { rotate: false },
+    );
+    if (result.status === "failed") continue;
     await admin.rpc("install_mark_reminder_sent", { p_install: install.id, p_day: today });
     sent += 1;
   }
-  return Response.json({ sent });
+  return Response.json({ sent, issued });
 }

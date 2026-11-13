@@ -18,6 +18,8 @@ export async function deliverPulseEmail(input: PulseEmail) {
         p_provider_id: row.providerId,
         p_status: row.status,
         p_detail: row.detail,
+        p_token_link: row.tokenLinkId,
+        p_access_path: row.accessPath,
       });
     },
   });

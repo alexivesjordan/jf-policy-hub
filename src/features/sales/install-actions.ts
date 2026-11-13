@@ -4,6 +4,7 @@ import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
+import { canManageInstall } from "@/lib/installs/access-auth";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
 import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +18,7 @@ export type InstallActionResult = {
   dates?: string[];
   install?: Record<string, unknown> | null;
   installs?: Record<string, unknown>[];
+  path?: string;
 };
 
 async function requireInstallReader() {
@@ -90,14 +92,15 @@ export async function bookInstall(quoteId: string, startDate: string, warrantyOp
   if (install?.id) {
     try {
       const access = await issueInstallAccess({ id: install.id, contactEmail: install.contactEmail, endOn: String(install.endOn ?? "").slice(0, 10) || null });
-      needsEmail = access.needsEmail;
+      needsEmail = !access.sent;
     } catch (error) {
       console.error("Access link was not sent", error);
+      needsEmail = true;
     }
   }
   return {
     ok: true,
-    message: needsEmail ? "Install booked. Add the customer's email to send the access form." : "Install booked.",
+    message: needsEmail ? "Install booked. The access form was not emailed. Copy the link from the install." : "Install booked.",
     install: (booked.data ?? null) as Record<string, unknown> | null,
   };
 }
@@ -111,27 +114,63 @@ export async function setInstallContactEmail(installId: string, email: string): 
   const loaded = await supabase.rpc("install_read", { p_id: installId });
   const row = loaded.data as { endOn?: string; contactEmail?: string } | null;
   try {
-    await issueInstallAccess({ id: installId, contactEmail: email, endOn: String(row?.endOn ?? "").slice(0, 10) || null });
+    const access = await issueInstallAccess({ id: installId, contactEmail: email, endOn: String(row?.endOn ?? "").slice(0, 10) || null });
+    if (!access.sent) return { ok: true, message: "Email saved. The access form was not emailed. Copy the link from the install.", path: access.path ?? undefined };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "The email was saved, but the access form was not sent." };
   }
   return { ok: true, message: "Access form sent." };
 }
 
-export async function resendInstallAccess(installId: string): Promise<InstallActionResult> {
-  await requireSalesUser();
-  if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
+async function managedInstall(installId: string) {
+  const profile = await requireSalesUser();
+  if (!ID.test(installId)) return { ok: false as const, message: "That install was not found." };
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });
-  if (loaded.error || !loaded.data) return { ok: false, message: messageFromError(loaded.error, "That install was not found.") };
-  const row = loaded.data as { contactEmail?: string | null; endOn?: string };
-  if (!row.contactEmail) return { ok: false, message: "Add the customer's email first." };
+  if (loaded.error || !loaded.data) return { ok: false as const, message: messageFromError(loaded.error, "That install was not found.") };
+  const row = loaded.data as { bookingRepId?: string | null; contactEmail?: string | null; endOn?: string };
+  if (!canManageInstall(profile, row.bookingRepId)) {
+    return { ok: false as const, message: "You cannot change that install." };
+  }
+  return { ok: true as const, row };
+}
+
+export async function resendInstallAccess(installId: string): Promise<InstallActionResult> {
+  const managed = await managedInstall(installId);
+  if (!managed.ok) return managed;
+  if (!managed.row.contactEmail) return { ok: false, message: "Add the customer's email first." };
   try {
-    await issueInstallAccess({ id: installId, contactEmail: row.contactEmail, endOn: String(row.endOn ?? "").slice(0, 10) || null });
+    const access = await issueInstallAccess({
+      id: installId,
+      contactEmail: managed.row.contactEmail,
+      endOn: String(managed.row.endOn ?? "").slice(0, 10) || null,
+    });
+    if (!access.sent) {
+      return { ok: true, message: "A new link was created, but the email was not sent. Copy it from the install.", path: access.path ?? undefined };
+    }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not send a new access link." };
   }
   return { ok: true, message: "A new access link was sent. The previous link no longer works." };
+}
+
+export async function copyInstallAccessLink(installId: string): Promise<InstallActionResult> {
+  const managed = await managedInstall(installId);
+  if (!managed.ok) return managed;
+  try {
+    const access = await issueInstallAccess(
+      {
+        id: installId,
+        contactEmail: managed.row.contactEmail,
+        endOn: String(managed.row.endOn ?? "").slice(0, 10) || null,
+      },
+      { rotate: true },
+    );
+    if (!access.path) return { ok: false, message: "Could not create an access link." };
+    return { ok: true, message: "Link ready. It is shown once.", path: access.path };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not create an access link." };
+  }
 }
 
 export async function listInstalls(from: string, to: string, mine = false): Promise<InstallActionResult> {
@@ -141,7 +180,7 @@ export async function listInstalls(from: string, to: string, mine = false): Prom
   const listed = await supabase.rpc("install_calendar", { p_from: from, p_to: to, p_mine: mine });
   if (listed.error) return { ok: false, message: messageFromError(listed.error, "Could not read installs."), installs: [] };
   const rows = Array.isArray(listed.data) ? (listed.data as Record<string, unknown>[]) : [];
-  return { ok: true, message: "", installs: await Promise.all(rows.map((row) => withSignedMedia(row).then((item) => item ?? row))) };
+  return { ok: true, message: "", installs: rows };
 }
 
 export async function readInstall(installId: string): Promise<InstallActionResult> {

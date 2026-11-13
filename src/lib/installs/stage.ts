@@ -1,6 +1,6 @@
 export type InstallStage = "quoting" | "booked" | "awaiting_access" | "ready" | "completed";
 
-/** quoting is reserved for subcontractor quotes. Live bookings do not use it yet. */
+/** quoting is reserved for subcontractor quotes. accessComplete means the form was submitted. Media is optional. */
 export function installStage(input: {
   status: string;
   accessSent: boolean;
