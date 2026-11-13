@@ -77,17 +77,28 @@ describe("install follow-on", () => {
     assert.equal(storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "video/mp4", 1024).ok, false);
   });
 
-  it("hides the fixture upload route in production", async () => {
+  it("opens the fixture upload route only when the flag is set", async () => {
     const { PUT } = await import("../../app/api/access/media/fixture-upload/route");
-    const previous = process.env.VERCEL_ENV;
-    process.env.VERCEL_ENV = "production";
+    const previousFlag = process.env.ACCESS_FIXTURE_UPLOAD;
+    const previousVercel = process.env.VERCEL_ENV;
+    const restore = () => {
+      if (previousFlag === undefined) delete process.env.ACCESS_FIXTURE_UPLOAD;
+      else process.env.ACCESS_FIXTURE_UPLOAD = previousFlag;
+      if (previousVercel === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = previousVercel;
+    };
     try {
+      delete process.env.ACCESS_FIXTURE_UPLOAD;
+      process.env.VERCEL_ENV = "preview";
       assert.equal((await PUT()).status, 404);
+      delete process.env.VERCEL_ENV;
+      process.env.VERCEL_ENV = "production";
+      assert.equal((await PUT()).status, 404);
+      process.env.ACCESS_FIXTURE_UPLOAD = "1";
+      assert.equal((await PUT()).status, 200);
     } finally {
-      if (previous === undefined) delete process.env.VERCEL_ENV;
-      else process.env.VERCEL_ENV = previous;
+      restore();
     }
-    assert.equal((await PUT()).status, 200);
   });
 
   it("reads a 206 range body without the stream reader", async () => {

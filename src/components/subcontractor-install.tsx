@@ -10,7 +10,7 @@ import { isWeekday } from "@/lib/subcontractors/draft";
 type Message = { id: string; direction: string; from: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null; bodyUnavailable?: boolean };
 type Thread = { id: string; subcontractorId: string; name: string; status: string; suggestedPrice: number | null; confirmedPrice: number | null; messages: Message[] };
 
-export function SubcontractorInstall({ installId, stage, subcontractorName, threads, canAward, followup = null }: { installId: string; stage: string; subcontractorName: string | null; threads: Thread[]; canAward: boolean; followup?: AskAnotherOffer | null }) {
+export function SubcontractorInstall({ installId, stage, status, subcontractorName, threads, canAward, followup = null }: { installId: string; stage: string; status: string; subcontractorName: string | null; threads: Thread[]; canAward: boolean; followup?: AskAnotherOffer | null }) {
   if (threads.length === 0 && stage !== "quoting" && !subcontractorName) return null;
   return (
     <section className="space-y-4 rounded-3xl border border-line bg-card px-5 py-5">
@@ -24,7 +24,7 @@ export function SubcontractorInstall({ installId, stage, subcontractorName, thre
           <SubcontractorQuote offer={followup} embedded />
         </details>
       ) : null}
-      {subcontractorName ? <JobSheetButton installId={installId} /> : null}
+      {subcontractorName && status !== "cancelled" && status !== "completed" ? <JobSheetButton installId={installId} /> : null}
     </section>
   );
 }

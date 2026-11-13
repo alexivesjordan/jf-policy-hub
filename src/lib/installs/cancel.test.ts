@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { canCancelInstall } from "./access-auth";
+import { canCancelInstall, closedInstallMessage } from "./access-auth";
+import { messageFromError } from "../errors";
 import type { Profile } from "../types";
 
 function person(overrides: Partial<Profile> = {}): Profile {
@@ -64,5 +65,28 @@ describe("cancel a booked install", () => {
     assert.match(sql, /update ops\.install_quotes set install_id = null where install_id = p_id/);
     assert.equal(sql.includes("caller_is_field_engineer"), false);
     assert.equal(/sendPulseEmail|deliverPulseEmail|resend\.com/.test(sql), false);
+  });
+
+  it("refuses a new link once the install is closed", () => {
+    assert.equal(closedInstallMessage("cancelled"), "This install is cancelled.");
+    assert.equal(closedInstallMessage("completed"), "This install is completed.");
+    assert.equal(closedInstallMessage("booked"), null);
+  });
+
+  it("turns a stale quote booking into a reload message", () => {
+    const raw = 'duplicate key value violates unique constraint "installs_quote_id_key"';
+    assert.equal(messageFromError({ message: raw }, "Could not book that install."), "This quote has changed. Reload the order.");
+  });
+
+  it("extends the access token when the install dates move", () => {
+    const sql = readFileSync(new URL("../../../supabase/migrations/20261113290000_access_token_on_move.sql", import.meta.url), "utf8");
+    assert.match(sql, /purpose = 'access_form'/);
+    assert.match(sql, /expires_at = \(v_end::timestamp \+ time '23:59:59'\) at time zone 'UTC'/);
+    assert.match(sql, /ops\.is_field_engineer\(\)/);
+    assert.match(sql, /Award the subcontractor quote before moving dates/);
+    assert.match(sql, /v_weekends boolean := false/);
+    assert.match(sql, /install_assert_linkable/);
+    assert.match(sql, /This install is cancelled/);
+    assert.match(sql, /This install is completed/);
   });
 });

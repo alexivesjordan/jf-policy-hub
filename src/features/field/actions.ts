@@ -173,6 +173,13 @@ export async function createSubcontractorLink(installId: string): Promise<FieldR
     const supabase = await createClient();
     const allowed = await supabase.rpc("install_sees_all");
     if (allowed.error || allowed.data !== true) return { ok: false, message: "You cannot create that link." };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { refusedClosedInstall } = await import("@/lib/installs/issue-access");
+    const admin = createAdminClient();
+    if (admin) {
+      const blocked = await refusedClosedInstall(admin, installId);
+      if (blocked) return { ok: false, message: blocked };
+    }
     const link = await createTokenLink({
       purpose: "subcontractor_job",
       entitySchema: "ops",

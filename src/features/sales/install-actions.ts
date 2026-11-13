@@ -4,7 +4,7 @@ import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
-import { canCancelInstall, canManageInstall } from "@/lib/installs/access-auth";
+import { canCancelInstall, canManageInstall, closedInstallMessage } from "@/lib/installs/access-auth";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
 import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
@@ -113,10 +113,12 @@ export async function setInstallContactEmail(installId: string, email: string): 
   await requireInstallReader();
   if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
   const supabase = await createClient();
+  const loaded = await supabase.rpc("install_read", { p_id: installId });
+  const row = loaded.data as { endOn?: string; contactEmail?: string; status?: string } | null;
+  const closed = closedInstallMessage(row?.status);
+  if (closed) return { ok: false, message: closed };
   const saved = await supabase.rpc("install_set_contact_email", { p_install: installId, p_email: email });
   if (saved.error) return { ok: false, message: messageFromError(saved.error, "Could not save that email.") };
-  const loaded = await supabase.rpc("install_read", { p_id: installId });
-  const row = loaded.data as { endOn?: string; contactEmail?: string } | null;
   try {
     const access = await issueInstallAccess({ id: installId, contactEmail: email, endOn: String(row?.endOn ?? "").slice(0, 10) || null });
     if (!access.sent) return { ok: true, message: "Email saved. The access form was not emailed. Copy the link from the install.", path: access.path ?? undefined };
@@ -132,7 +134,7 @@ async function managedInstall(installId: string) {
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });
   if (loaded.error || !loaded.data) return { ok: false as const, message: messageFromError(loaded.error, "That install was not found.") };
-  const row = loaded.data as { bookingRepId?: string | null; contactEmail?: string | null; endOn?: string };
+  const row = loaded.data as { bookingRepId?: string | null; contactEmail?: string | null; endOn?: string; status?: string };
   if (!canManageInstall(profile, row.bookingRepId)) {
     return { ok: false as const, message: "You cannot change that install." };
   }
@@ -142,6 +144,8 @@ async function managedInstall(installId: string) {
 export async function resendInstallAccess(installId: string): Promise<InstallActionResult> {
   const managed = await managedInstall(installId);
   if (!managed.ok) return managed;
+  const closed = closedInstallMessage(managed.row.status);
+  if (closed) return { ok: false, message: closed };
   if (!managed.row.contactEmail) return { ok: false, message: "Add the customer's email first." };
   try {
     const access = await issueInstallAccess({

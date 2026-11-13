@@ -28,8 +28,8 @@ export function InstallAccessPanel({ install }: { install: Record<string, unknow
       </div>
       {noPhotos ? <p className="text-sm text-grey">no photos</p> : null}
       {notEmailed ? <p className="text-sm">Access form not emailed</p> : null}
-      {needsEmail ? <EmailPrompt installId={String(install.id ?? "")} /> : null}
-      <LinkActions installId={String(install.id ?? "")} />
+      {needsEmail && !closedInstall(install.status) ? <EmailPrompt installId={String(install.id ?? "")} /> : null}
+      <LinkActions installId={String(install.id ?? "")} allowResend={!closedInstall(install.status)} />
       <Answers answers={access?.answers ?? null} />
       <MediaGallery media={access?.media ?? []} />
     </section>
@@ -64,7 +64,11 @@ function EmailPrompt({ installId }: { installId: string }) {
   );
 }
 
-function LinkActions({ installId }: { installId: string }) {
+function closedInstall(status: unknown) {
+  return status === "cancelled" || status === "completed";
+}
+
+function LinkActions({ installId, allowResend }: { installId: string; allowResend: boolean }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<"copy" | "resend" | null>(null);
   const [confirmResend, setConfirmResend] = useState(false);
@@ -89,7 +93,7 @@ function LinkActions({ installId }: { installId: string }) {
       <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void copy()}>
         {pending === "copy" ? "Copying..." : "Copy link"}
       </Button>
-      {confirmResend ? (
+      {allowResend && confirmResend ? (
         <>
           <p className="w-full text-sm">The old link will stop working.</p>
           <Button
@@ -110,9 +114,11 @@ function LinkActions({ installId }: { installId: string }) {
           <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => setConfirmResend(false)}>Cancel</Button>
         </>
       ) : (
-        <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => setConfirmResend(true)}>
-          Resend link
-        </Button>
+        allowResend ? (
+          <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => setConfirmResend(true)}>
+            Resend link
+          </Button>
+        ) : null
       )}
       {message ? <p className="w-full text-sm">{message}</p> : null}
     </div>

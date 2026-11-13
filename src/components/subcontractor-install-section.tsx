@@ -15,5 +15,6 @@ export async function SubcontractorInstallSection({ profile, install }: { profil
   if (threads.length === 0 && stage !== "quoting" && !name) return null;
   const emailed = threads.filter((thread) => thread.status !== "failed").map((thread) => thread.subcontractorId);
   const followup = canEdit && stage === "quoting" ? await loadAskAnother(id, emailed) : null;
-  return <SubcontractorInstall installId={id} stage={stage} subcontractorName={name} threads={threads} canAward={canEdit} followup={followup} />;
+  const status = String(install.status ?? "");
+  return <SubcontractorInstall installId={id} stage={stage} status={status} subcontractorName={name} threads={threads} canAward={canEdit} followup={followup} />;
 }

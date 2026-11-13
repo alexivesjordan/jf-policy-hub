@@ -23,3 +23,10 @@ export function canCancelInstall(input: {
   if (input.fieldEngineer && !admin) return false;
   return canManageInstall(input.profile, input.bookingRepId);
 }
+
+/** Closed installs must not mint a new access or visit link, or send another email. */
+export function closedInstallMessage(status: unknown) {
+  if (status === "cancelled") return "This install is cancelled.";
+  if (status === "completed") return "This install is completed.";
+  return null;
+}

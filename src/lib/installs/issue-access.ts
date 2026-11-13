@@ -1,6 +1,7 @@
 import "server-only";
 
 import { deliverPulseEmail } from "@/lib/email/deliver";
+import { closedInstallMessage } from "@/lib/installs/access-auth";
 import { siteUrl } from "@/lib/site-url";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -25,6 +26,8 @@ export async function issueInstallAccess(
   const rotate = options.rotate !== false;
   const admin = createAdminClient();
   if (!admin) return { sent: false, needsEmail: !install.contactEmail, status: "logged", path: null };
+  const closed = await refusedClosedInstall(admin, install.id);
+  if (closed) return { sent: false, needsEmail: false, status: "failed", path: null };
 
   let tokenLinkId: string | null = null;
   let path: string | null = null;
@@ -80,4 +83,17 @@ export async function issueInstallAccess(
     p_reason: delivered ? null : "not_delivered",
   });
   return { sent: delivered, needsEmail: !delivered && true, status: result.status, path };
+}
+
+/** Null when the install can still receive a link. A missing function does not block. */
+export async function refusedClosedInstall(client: unknown, installId: string) {
+  const gate = await (client as { rpc: (fn: string, args: { p_id: string }) => Promise<{ error: { message?: string } | null }> }).rpc("install_assert_linkable", { p_id: installId });
+  if (!gate.error) return null;
+  return closedInstallMessage(statusFromGate(gate.error.message));
+}
+
+function statusFromGate(message: string | undefined) {
+  if (message?.includes("This install is cancelled.")) return "cancelled";
+  if (message?.includes("This install is completed.")) return "completed";
+  return null;
 }

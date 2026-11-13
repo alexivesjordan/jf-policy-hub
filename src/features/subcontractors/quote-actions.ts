@@ -7,7 +7,9 @@ import type { ActionState } from "@/lib/action-state";
 import { getCurrentProfile, requireSalesUser } from "@/lib/auth";
 import { deliverPulseEmail } from "@/lib/email/deliver";
 import { messageFromError } from "@/lib/errors";
-import { issueInstallAccess } from "@/lib/installs/issue-access";
+import { closedInstallMessage } from "@/lib/installs/access-auth";
+import { issueInstallAccess, refusedClosedInstall } from "@/lib/installs/issue-access";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { buildSubcontractorDraft, draftHtml, isWeekday } from "@/lib/subcontractors/draft";
 import { inboundDomain, newReplyToken, replyAddress } from "@/lib/subcontractors/inbound";
 import { deliverableEmails, jobTypesForKit, markAlreadyEmailed, rankSubcontractors, selectionGate, type QuoteChoice } from "@/lib/subcontractors/capability";
@@ -229,7 +231,9 @@ export async function resendJobSheet(installId: string): Promise<ActionState & {
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });
   if (loaded.error || !loaded.data) return { ok: false, message: messageFromError(loaded.error, "That install was not found.") };
-  const install = loaded.data as { subcontractorId?: string | null; orderNumber?: string; siteAddress?: string | null; endOn?: string | null };
+  const install = loaded.data as { status?: string; subcontractorId?: string | null; orderNumber?: string; siteAddress?: string | null; endOn?: string | null };
+  const closed = closedInstallMessage(install.status);
+  if (closed) return { ok: false, message: closed };
   if (!install.subcontractorId) return { ok: false, message: "Choose a subcontractor first." };
   try {
     const jobSheetUrl = await sendJobSheetLink({
@@ -280,6 +284,11 @@ async function subcontractorEmail(id: string) {
 }
 
 async function sendJobSheetLink(input: { installId: string; email: string; orderNumber: string; siteAddress: string | null; endOn: string | null }) {
+  const admin = createAdminClient();
+  if (admin) {
+    const closed = await refusedClosedInstall(admin, input.installId);
+    if (closed) throw new Error(closed);
+  }
   const link = await createTokenLink({
     purpose: "subcontractor_job",
     entitySchema: "ops",
