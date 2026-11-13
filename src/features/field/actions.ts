@@ -47,22 +47,13 @@ export async function issuePhotoUpload(installId: string, token: string | null, 
   }
 }
 
-export async function registerPhotoUpload(
-  installId: string,
-  token: string | null,
-  path: string,
-  kind: "concern" | "equipment",
-  mimeType: string,
-  byteSize: number,
-): Promise<FieldResult> {
+export async function registerPhotoUpload(installId: string, token: string | null, path: string, kind: "concern" | "equipment"): Promise<FieldResult> {
   try {
     const profile = await actor(token);
     await loadVisit(installId, token);
     const stored = await registerPhotoObject({
       path,
       ownerId: installId,
-      mimeType,
-      byteSize,
       kind,
       uploadedBy: profile?.id ?? null,
     });
@@ -153,7 +144,7 @@ export async function issueDocumentUpload(byteSize: number): Promise<FieldResult
   }
 }
 
-export async function registerDocumentUpload(key: VisitDocumentKey, path: string, byteSize: number): Promise<FieldResult> {
+export async function registerDocumentUpload(key: VisitDocumentKey, path: string): Promise<FieldResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, message: "You need to be signed in." };
   if (!VISIT_DOCUMENTS.includes(key)) return { ok: false, message: "That document is not on the list." };
@@ -161,7 +152,6 @@ export async function registerDocumentUpload(key: VisitDocumentKey, path: string
     const stored = await registerDocumentObject({
       path,
       ownerId: profile.id,
-      byteSize,
       kind: key,
       uploadedBy: profile.id,
     });

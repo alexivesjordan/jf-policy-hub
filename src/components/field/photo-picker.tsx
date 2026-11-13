@@ -39,7 +39,7 @@ export function PhotoPicker({
         const issued = await issuePhotoUpload(installId, token, compressed.type, compressed.size);
         if (!issued.ok || !issued.ticket) throw new Error(issued.message);
         await putSignedUpload(issued.ticket, compressed, compressed.type || "image/jpeg");
-        const registered = await registerPhotoUpload(installId, token, issued.ticket.path, kind, compressed.type, compressed.size);
+        const registered = await registerPhotoUpload(installId, token, issued.ticket.path, kind);
         if (!registered.ok || !registered.fileId) throw new Error(registered.message);
         next.push({ id: registered.fileId, url: URL.createObjectURL(compressed) });
       }

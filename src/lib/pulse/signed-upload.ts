@@ -1,6 +1,6 @@
 import "server-only";
 
-import { accessMediaPathOk, planAccessMediaUpload } from "@/lib/pulse/access-upload";
+import { accessMediaBytesMatch, accessMediaPathOk, planAccessMediaUpload, readStoredObjectHead, storedAccessMediaOk } from "@/lib/pulse/access-upload";
 import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { pathBelongsToInstall } from "@/lib/installs/permissions";
 import type { StorageTicket } from "@/lib/installs/upload-ticket";
@@ -31,26 +31,32 @@ export async function issuePhotoTicket(ownerId: string, mimeType: string, byteSi
   return signTicket("job-sheets", ownerId, plan.extension);
 }
 
-/** Confirms the object landed, then registers it. The bytes stay in Storage. */
-export async function registerPhotoObject(input: {
-  path: string;
-  ownerId: string;
-  mimeType: string;
-  byteSize: number;
-  kind: string;
-  uploadedBy: string | null;
-}) {
-  const plan = planAccessMediaUpload(input.mimeType, input.byteSize);
-  if (!plan.ok) throw new Error(plan.message);
-  if (plan.kind !== "photo") throw new Error("Use a photo.");
-  if (!accessMediaPathOk(input.ownerId, input.path) || !input.path.endsWith(`.${plan.extension}`)) {
-    throw new Error("That file path is not allowed.");
+/** Confirms the stored object the same way access media does, then registers it. */
+export async function registerPhotoObject(input: { path: string; ownerId: string; kind: string; uploadedBy: string | null }) {
+  const admin = adminOrThrow();
+  if (!accessMediaPathOk(input.ownerId, input.path)) throw new Error("That file path is not allowed.");
+  const info = await admin.storage.from("job-sheets").info(input.path);
+  if (info.error || info.data?.size == null || !info.data.contentType) throw new Error("Upload the file before saving it.");
+  const mimeType = info.data.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  const plan = storedAccessMediaOk(input.path, mimeType, info.data.size);
+  if (!plan.ok) {
+    await admin.storage.from("job-sheets").remove([input.path]);
+    throw new Error(plan.message);
   }
-  return registerListedObject({
+  if (plan.kind !== "photo") {
+    await admin.storage.from("job-sheets").remove([input.path]);
+    throw new Error("Use a photo.");
+  }
+  const head = await objectHead(admin, "job-sheets", input.path);
+  if (!head || !accessMediaBytesMatch(mimeType, head)) {
+    await admin.storage.from("job-sheets").remove([input.path]);
+    throw new Error("That file type is not allowed.");
+  }
+  return registerObject({
     bucket: "job-sheets",
     path: input.path,
-    mimeType: input.mimeType,
-    byteSize: input.byteSize,
+    mimeType,
+    byteSize: info.data.size,
     kind: input.kind,
     uploadedBy: input.uploadedBy,
     entityTable: "installs",
@@ -63,16 +69,28 @@ export async function issueDocumentTicket(ownerId: string, byteSize: number) {
   return signTicket("documents", ownerId, "pdf");
 }
 
-export async function registerDocumentObject(input: { path: string; ownerId: string; byteSize: number; kind: string; uploadedBy: string | null }) {
-  if (input.byteSize <= 0 || input.byteSize > PDF_LIMIT) throw new Error("PDFs must be 20 MB or smaller.");
-  if (!pathBelongsToInstall(input.ownerId, input.path) || !input.path.endsWith(".pdf")) {
+export async function registerDocumentObject(input: { path: string; ownerId: string; kind: string; uploadedBy: string | null }) {
+  const admin = adminOrThrow();
+  if (!pathBelongsToInstall(input.ownerId, input.path) || !input.path.toLowerCase().endsWith(".pdf")) {
     throw new Error("That file path is not allowed.");
   }
-  return registerListedObject({
+  const info = await admin.storage.from("documents").info(input.path);
+  if (info.error || info.data?.size == null || info.data.size <= 0 || info.data.size > PDF_LIMIT) {
+    if (!info.error) await admin.storage.from("documents").remove([input.path]);
+    throw new Error("Upload a PDF of 20 MB or smaller.");
+  }
+  const mimeType = info.data.contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const head = await objectHead(admin, "documents", input.path);
+  const pdf = head != null && head.length >= 4 && head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+  if (mimeType !== "application/pdf" || !pdf) {
+    await admin.storage.from("documents").remove([input.path]);
+    throw new Error("Upload a PDF.");
+  }
+  return registerObject({
     bucket: "documents",
     path: input.path,
     mimeType: "application/pdf",
-    byteSize: input.byteSize,
+    byteSize: info.data.size,
     kind: input.kind,
     uploadedBy: input.uploadedBy,
     entityTable: "visit_documents",
@@ -80,7 +98,21 @@ export async function registerDocumentObject(input: { path: string; ownerId: str
   });
 }
 
-async function registerListedObject(input: {
+async function objectHead(admin: ReturnType<typeof adminOrThrow>, bucket: string, path: string) {
+  const signed = await admin.storage.from(bucket).createSignedUrl(path, 60);
+  if (signed.error || !signed.data?.signedUrl) return null;
+  try {
+    const response = await fetch(signed.data.signedUrl, {
+      headers: { Range: "bytes=0-31" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    return readStoredObjectHead(response);
+  } catch {
+    return null;
+  }
+}
+
+async function registerObject(input: {
   bucket: StorageTicket["bucket"];
   path: string;
   mimeType: string;
@@ -90,12 +122,7 @@ async function registerListedObject(input: {
   entityTable: string;
   ownerId: string;
 }) {
-  const admin = adminOrThrow();
-  const folder = input.path.split("/").slice(0, -1).join("/");
-  const name = input.path.split("/").pop() ?? "";
-  const listed = await admin.storage.from(input.bucket).list(folder, { search: name, limit: 10 });
-  if (!listed.data?.some((item) => item.name === name)) throw new Error("Upload the file before saving it.");
-  const registered = await admin.rpc("orbit_register_file", {
+  const registered = await adminOrThrow().rpc("orbit_register_file", {
     p_bucket: input.bucket,
     p_storage_path: input.path,
     p_mime_type: input.mimeType,

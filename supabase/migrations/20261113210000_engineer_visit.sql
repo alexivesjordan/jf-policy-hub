@@ -930,3 +930,32 @@ grant execute on function public.install_save_visit_document(text, uuid) to auth
 grant execute on function public.install_engineer_links() to authenticated, service_role;
 grant execute on function public.install_calendar(date, date, boolean) to authenticated, service_role;
 grant execute on function public.install_read(uuid) to authenticated, service_role;
+
+-- Field engineers do not inherit a blanket operations edit. They can only act on their own job.
+create or replace function ops.install_actor_allowed(p_install uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ops, public
+as $$
+declare
+  v_rep uuid;
+begin
+  if coalesce(auth.role(), '') = 'service_role' then
+    return true;
+  end if;
+  if public.workspace_is_admin() then
+    return true;
+  end if;
+  if public.workspace_can('operations', 'edit') and not ops.is_field_engineer() then
+    return true;
+  end if;
+  if ops.install_assigned(p_install, auth.uid()) then
+    return true;
+  end if;
+  select booking_rep_id into v_rep from ops.installs where id = p_install;
+  return v_rep is not null and v_rep = auth.uid();
+end;
+$$;
+

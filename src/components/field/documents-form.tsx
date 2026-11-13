@@ -50,5 +50,5 @@ async function upload(key: VisitDocumentKey, file: File) {
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not upload that PDF." };
   }
-  return registerDocumentUpload(key, issued.ticket.path, file.size);
+  return registerDocumentUpload(key, issued.ticket.path);
 }
