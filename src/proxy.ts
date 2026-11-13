@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { passwordLinkHandoff } from "@/lib/auth-link";
 
-const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/api/access/media", "/api/amendments", "/api/policies"];
+const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/visit", "/api/access/media", "/api/amendments", "/api/policies"];
 /** Cron calls this with no session. The route itself rejects a missing Bearer CRON_SECRET. */
 const CRON_PATHS = ["/api/orbit/sync-products", "/api/orbit/access-reminders"];
 

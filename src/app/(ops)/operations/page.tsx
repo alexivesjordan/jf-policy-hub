@@ -57,6 +57,7 @@ export default async function OperationsHomePage() {
         <Stat href="/operations/jobs" label="Jobs you can see" value={String(jobs)} hint={`${fixtures} fixture`} />
         <Stat href="/operations/tasks" label="Open tasks" value={String(tasks)} hint="Exceptions list" />
         <Stat href="/operations/notifications" label="Unread" value={String(unread)} hint="Operations inbox" />
+        <Stat href="/field" label="My jobs" value="Open" hint="Phone job sheet" />
       </div>
 
       <Card>
