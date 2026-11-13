@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
 import { VisitFlow, type VisitScreen } from "@/components/field/visit-flow";
-import { mySignature, visitContext } from "@/features/field/queries";
+import { listActiveVans, mySignature, visitContext } from "@/features/field/queries";
 import { getCurrentProfile } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
@@ -40,6 +40,7 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
     return <FieldFrame title="Job" back={{ href: "/field", label: "Jobs" }}><p>{problem ?? "That job was not found."}</p></FieldFrame>;
   }
   const signature = visit.submitted ? null : await mySignature().catch(() => null);
+  const vans = await listActiveVans();
   const screen: VisitScreen = {
     installId: visit.job.id,
     token: null,
@@ -52,6 +53,7 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
     orderNo: visit.job.orderNumber,
     startOn: visit.job.startOn,
     lines: visit.lines,
+    vans,
     risk: visit.risk,
     submitted: visit.submitted || visit.job.status === "completed",
     engineerName: visit.engineerName,

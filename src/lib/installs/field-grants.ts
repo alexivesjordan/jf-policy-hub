@@ -17,6 +17,7 @@ export const FIELD_ENGINEER_ALLOW = [
   "install_calendar",
   "install_field_role",
   "install_visit_upload_gate",
+  "install_list_vans",
 ] as const;
 
 const ALLOW = new Set<string>(FIELD_ENGINEER_ALLOW);

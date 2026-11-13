@@ -4,7 +4,7 @@ import { asVisitContext, type VisitContext } from "@/features/field/queries";
 import { deliverPulseEmail } from "@/lib/email/deliver";
 import { messageFromError } from "@/lib/errors";
 import { DOCUMENT_FILENAMES, documentsForOrder, selectStoredDocuments, type OrderLine, type VisitDocumentKey } from "@/lib/installs/product-lines";
-import { RISK_ITEMS, sheetPayload, validateRisk, validateSheet, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { RISK_ITEMS, sheetPayload, validateRisk, validateSheet, vehicleChoiceProblem, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { prepareSignaturePng } from "@/lib/installs/signature-image";
 import { buildVisitPdf } from "@/lib/installs/visit-pdf";
 import { storePulseFile } from "@/lib/pulse/files";
@@ -121,6 +121,12 @@ export async function commitVisit(input: {
 }) {
   const problem = validateSheet(input.sheet);
   if (problem) throw new Error(problem);
+  const vans = (await callRpc(input.token, "install_list_vans", {})) as { registration?: string }[] | null;
+  const vehicle = vehicleChoiceProblem(
+    input.sheet.vehicleReg.trim(),
+    Array.isArray(vans) ? vans.flatMap((van) => (van?.registration ? [{ registration: van.registration }] : [])) : [],
+  );
+  if (vehicle) throw new Error(vehicle);
   if (input.sheet.parkingFee.trim() && !/^[0-9]+(\.[0-9]{1,2})?$/.test(input.sheet.parkingFee.trim())) {
     throw new Error("Enter the parking fee in pounds.");
   }

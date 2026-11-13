@@ -79,6 +79,7 @@ export const pulseModules: PulseModule[] = [
       { href: "/operations/subcontractors", label: "Subcontractors" },
       { href: "/operations/calendar", label: "Resource Availability" },
       { href: "/operations/documents", label: "Visit documents" },
+      { href: "/operations/vans", label: "Vans" },
       { href: "/operations/tasks", label: "Tasks" },
       { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
       { href: "/operations/settings", label: "Effort table", ownerOnly: true },

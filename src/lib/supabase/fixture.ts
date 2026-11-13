@@ -246,6 +246,33 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       officeIds: [],
     };
   }
+  if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "install_visit_context") {
+    const id = String(args?.p_install ?? "");
+    const submitted = id.endsWith("2222");
+    return {
+      role: "admin",
+      engineerName: "Sam Cole",
+      submitted,
+      risk: { answers: { accessClear: true, floorSuitable: true, powerSafe: true, handlingPlanned: true, peopleBriefed: true, notes: "" } },
+      lines: [
+        { sku: "", description: "Picking error sales order total", productLine: null, category: null, qty: 1 },
+        { sku: "JF-C2SE-2", description: "Concept2 SkiErg", productLine: null, category: null, qty: 1 },
+      ],
+      job: {
+        id,
+        orderNumber: "SO-00526",
+        customerName: "Sample Gym",
+        siteAddress: "1 High Street",
+        contactName: "Alex",
+        contactPhone: "01553 000000",
+        contactEmail: null,
+        startOn: "2026-11-16",
+        endOn: "2026-11-16",
+        status: submitted ? "completed" : "booked",
+      },
+    };
+  }
   if (fn === "install_field_home") {
     const role = process.env.PULSE_FIXTURE_ROLE === "engineer" ? "engineer" : process.env.PULSE_FIXTURE_ROLE === "lead" ? "ops" : "admin";
     return { role, jobs: [], needsLink: false };

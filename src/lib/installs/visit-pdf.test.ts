@@ -18,22 +18,17 @@ function sheet(): SheetDraft {
     orderNo: "SO-100",
     jobNo: "JOB-9",
     serviceContract: false,
-    callOutCharge: true,
     timeOn: "09:00",
     timeOff: "15:30",
-    overnightStay: false,
     parkingFee: "4.50",
     service: false,
     delivery: true,
     installation: true,
     warranty: false,
-    ladderCheck: true,
     lines: [{ code: "EL-1", description: "Elite lat pulldown", reportedJob: "Install" }],
     workCarriedOut: "Installed the lat pulldown and levelled it.",
     parts: [{ code: "BOLT", description: "Anchor bolt", qty: "8" }],
     locationOk: true,
-    fixingWall: false,
-    fixingFloor: true,
     workOk: true,
     siteOk: true,
     engineerName: "Lewis",
@@ -64,6 +59,12 @@ describe("visit PDF pack", () => {
     expect(text).toContain("Risk assessment");
     expect(text).toContain("Cable tray is low");
     expect(text).toContain("Lewis");
+    expect(text).not.toContain("Call out charge");
+    expect(text).not.toContain("Overnight stay");
+    expect(text).not.toContain("All receipts must be attached");
+    expect(text).not.toContain("fixing to wall");
+    expect(text).not.toContain("fixing to floor");
+    expect(text).not.toContain("Ladder");
   });
 
   it("still builds a sheet when optional rows are empty", async () => {
