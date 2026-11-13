@@ -35,7 +35,10 @@ function outsideProduction(env: Record<string, string | undefined>) {
 }
 
 /** Sends through Resend, or only writes the log when the key or a preview override says so. */
-export async function sendPulseEmail(input: PulseEmail, io: EmailIo) {
+export async function sendPulseEmail(
+  input: PulseEmail,
+  io: EmailIo,
+): Promise<{ status: EmailLogRow["status"]; providerId: string | null }> {
   const key = io.env.RESEND_API_KEY?.trim() ?? "";
   const redirect = io.env.EMAIL_REDIRECT_TO?.trim() ?? "";
   const base = {
