@@ -59,7 +59,7 @@ export function BookInstallDialog({
   const [start, setStart] = useState<Date | undefined>();
   const [option, setOption] = useState<WarrantyChoice>("none");
   const [message, setMessage] = useState("");
-  const [booked, setBooked] = useState<{ id: string; startOn: string; endOn: string } | null>(null);
+  const [booked, setBooked] = useState<{ id: string; startOn: string; endOn: string; note: string } | null>(null);
 
   async function load() {
     const from = new Date().toISOString().slice(0, 10);
@@ -89,6 +89,7 @@ export function BookInstallDialog({
       id: String(row.id ?? ""),
       startOn: String(row.startOn ?? iso(start)),
       endOn: String(row.endOn ?? iso(start)),
+      note: result.message,
     });
   }
 
@@ -102,6 +103,7 @@ export function BookInstallDialog({
         {booked ? (
           <div className="space-y-3 text-center">
             <p className="font-semibold">Booked for {ukDate(booked.startOn)} – {ukDate(booked.endOn)}</p>
+            {booked.note && booked.note !== "Install booked." ? <p className="text-sm">{booked.note}</p> : null}
             {booked.id ? <Link className="font-semibold underline decoration-primary" href={`/sales/installs/${booked.id}`}>Open the install</Link> : null}
           </div>
         ) : (

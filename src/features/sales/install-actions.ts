@@ -88,25 +88,29 @@ export async function bookInstall(quoteId: string, startDate: string, warrantyOp
     return { ok: false, message, dates };
   }
   const install = (booked.data ?? null) as { id?: string; contactEmail?: string | null; endOn?: string | null } | null;
-  let needsEmail = false;
+  const missingEmail = !String(install?.contactEmail ?? "").trim();
+  let message = "Install booked.";
   if (install?.id) {
     try {
       const access = await issueInstallAccess({ id: install.id, contactEmail: install.contactEmail, endOn: String(install.endOn ?? "").slice(0, 10) || null });
-      needsEmail = !access.sent;
+      if (missingEmail) message = "Install booked. There is no customer email, so the access form was not sent.";
+      else if (!access.sent) message = "Install booked. The access form was not emailed.";
     } catch (error) {
       console.error("Access link was not sent", error);
-      needsEmail = true;
+      message = missingEmail
+        ? "Install booked. There is no customer email, so the access form was not sent."
+        : "Install booked. The access form was not emailed.";
     }
   }
   return {
     ok: true,
-    message: needsEmail ? "Install booked. The access form was not emailed. Copy the link from the install." : "Install booked.",
+    message,
     install: (booked.data ?? null) as Record<string, unknown> | null,
   };
 }
 
 export async function setInstallContactEmail(installId: string, email: string): Promise<InstallActionResult> {
-  await requireSalesUser();
+  await requireInstallReader();
   if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
   const supabase = await createClient();
   const saved = await supabase.rpc("install_set_contact_email", { p_install: installId, p_email: email });
@@ -123,7 +127,7 @@ export async function setInstallContactEmail(installId: string, email: string): 
 }
 
 async function managedInstall(installId: string) {
-  const profile = await requireSalesUser();
+  const profile = await requireInstallReader();
   if (!ID.test(installId)) return { ok: false as const, message: "That install was not found." };
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });

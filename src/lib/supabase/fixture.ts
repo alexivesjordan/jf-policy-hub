@@ -406,12 +406,54 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return fixtureInstall(start, String(args?.p_warranty ?? "none"), true);
   }
   if (fn === "install_calendar") {
-    const rows = [fixtureInstall("2026-11-16", "annual", true), fixtureInstall("2026-11-23", "none", false)];
+    const spanning = fixtureInstall("2026-11-13", "annual", true, "booked", "awaiting_access");
+    spanning.endOn = "2026-11-17";
+    const rows = [
+      spanning,
+      fixtureInstall("2026-11-23", "none", false, "booked", "booked"),
+      fixtureInstall("2026-11-18", "none", true, "completed", "ready"),
+      fixtureInstall("2026-10-20", "none", false, "completed", "completed"),
+    ];
     return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
   }
+  if (fn === "install_access_preview") {
+    const hash = String(args?.p_token_hash ?? "");
+    const submitted = hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0";
+    return {
+      install_id: submitted ? "11111111-1111-4111-8111-1111111111c3" : "11111111-1111-4111-8111-1111111111a1",
+      customer_name: "Example Sports Centre",
+      site_address: "1 Harbour Road",
+      submitted,
+      media_count: submitted ? 1 : 0,
+      accepted_by_name: submitted ? "Alex Example" : null,
+      answers: submitted ? { groundFloor: true, floorNumber: null, hasLift: false, dropZone: "Front car park" } : null,
+      terms: {
+        id: "terms-1",
+        version_label: "v1-original",
+        lines: [
+          { label: "Additional installer time, within agreed hours", rate: 30, unit: "per installer per hour" },
+          { label: "Materials and consumables", basis: "cost_plus_25" },
+          { label: "Equipment movement beyond the agreed floor plan", basis: "additional_installer_time" },
+          { label: "Parking, permits, congestion fees (clause 8)", basis: "at_cost" },
+        ],
+      },
+      media: submitted
+        ? [{ id: "media-1", kind: "photo", fileName: "door.jpg", mime: "image/jpeg", bucket: "access-media", path: "ops/11111111-1111-4111-8111-1111111111c3/door.jpg" }]
+        : [],
+    };
+  }
+  if (fn === "orbit_register_file") return "22222222-2222-4222-8222-222222222222";
+  if (fn === "install_save_access") return { ok: true };
+  if (fn === "install_set_contact_email" || fn === "install_revoke_access_links" || fn === "install_mark_access_sent") return true;
   if (fn === "install_read") {
     const id = String(args?.p_id ?? "");
-    const row = id.endsWith("b2") ? fixtureInstall("2026-11-23", "none", false) : fixtureInstall("2026-11-16", "annual", true);
+    const row = id.endsWith("b2")
+      ? fixtureInstall("2026-11-23", "none", false)
+      : id.endsWith("c3")
+        ? fixtureInstall("2026-11-18", "none", true, "completed", "ready")
+        : id.endsWith("d4")
+          ? fixtureInstall("2026-10-20", "none", false, "completed", "completed")
+          : fixtureInstall("2026-11-16", "annual", true, "booked", "awaiting_access");
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       const source = row as Record<string, unknown>;
       const sales: Record<string, unknown> = {};
@@ -436,23 +478,34 @@ function isoPlus(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked") {
+function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked", stage = "booked") {
   const end = isoPlus(start, 2);
   return {
-    id: mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
-    orderNumber: mine ? "EXAMPLE-00490" : "SO-1002",
+    id: stage === "ready" ? "11111111-1111-4111-8111-1111111111c3" : stage === "completed" ? "11111111-1111-4111-8111-1111111111d4" : mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
+    orderNumber: stage === "ready" ? "SO-1008" : stage === "completed" ? "SO-1009" : mine ? "EXAMPLE-00490" : "SO-1002",
+    customerName: stage === "ready" ? "Harbour Gym" : stage === "completed" ? "Northside Fitness" : mine ? "Example Sports Centre" : "Northside Fitness",
     goodsNet: 49066.53,
     installPrice: 4743.62,
     warrantyOption: warranty === "none" ? null : warranty,
     warrantyPrice: warranty === "annual" ? 1895 : null,
     startOn: start,
     endOn: end,
-    customerName: mine ? "Example Sports Centre" : "Northside Fitness",
     contactName: "Alex Example",
-    contactEmail: "alex.example@example.com",
+    contactEmail: stage === "booked" && !mine ? null : "alex.example@example.com",
     contactPhone: "01603 000000",
     siteAddress: "Example Road, Exampletown IP1 9ZZ",
     status,
+    stage,
+    needsCustomerEmail: stage === "booked" && !mine,
+    access: {
+      sentAt: stage === "booked" ? null : "2026-11-01T09:00:00Z",
+      submittedAt: stage === "ready" || stage === "completed" ? "2026-11-02T09:00:00Z" : null,
+      mediaCount: stage === "ready" || stage === "completed" ? 1 : 0,
+      answers: stage === "ready" || stage === "completed" ? { groundFloor: true, dropZone: "Front car park" } : null,
+      media: stage === "ready" || stage === "completed"
+        ? [{ id: "media-1", mime: "image/svg+xml", kind: "photo", url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='120' height='120' fill='%23146336'/%3E%3C/svg%3E" }]
+        : [],
+    },
     bookingRepId: mine ? USER_ID : "00000000-0000-4000-8000-000000000003",
     bookingRepName: mine ? "Alex Ives" : "Riley Hart",
     proposalPath: mine ? "ops/proposal.docx" : null,
@@ -560,6 +613,33 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 }
 
+function fixtureAccessMime(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "heic") return "image/heic";
+  return "image/jpeg";
+}
+
+function fixtureAccessBytes(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "png") return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (ext === "webp") return Uint8Array.from([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")]);
+  if (ext === "mp4" || ext === "mov" || ext === "heic") {
+    const bytes = new Uint8Array(16);
+    bytes.set(Buffer.from("ftyp"), 4);
+    bytes.set(Buffer.from(ext === "mov" ? "qt  " : ext === "heic" ? "heic" : "isom"), 8);
+    return bytes;
+  }
+  return Buffer.from("/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAMAAwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAb/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCZACpZ/9k=", "base64");
+}
+
+function fixtureAccessBytesUrl(path: string) {
+  return `data:${fixtureAccessMime(path)};base64,${Buffer.from(fixtureAccessBytes(path)).toString("base64")}`;
+}
+
 export function createFixtureClient() {
   const client = {
     auth: {
@@ -574,13 +654,23 @@ export function createFixtureClient() {
       return { data: rpcData(fn, args), error: null };
     },
     storage: {
-      from() {
+      from(bucket: string) {
         return {
           async upload() {
             return { data: { path: "proposal.docx" }, error: null };
           },
           async createSignedUrl(path: string) {
+            if (bucket === "access-media") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
             return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
+          },
+          async createSignedUploadUrl(path: string) {
+            return { data: { path, token: "fixture", signedUrl: "/api/access/media/fixture-upload" }, error: null };
+          },
+          async info(path: string) {
+            return { data: { size: 128, contentType: fixtureAccessMime(path) }, error: null };
+          },
+          async remove() {
+            return { data: [], error: null };
           },
         };
       },

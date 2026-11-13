@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/pulse/ui";
 import { moveInstall, setInstallStatus } from "@/features/sales/install-actions";
+import { isWeekend } from "@/lib/pulse/booking-range";
 
 const STATUSES = [
   ["booked", "Booked"],
@@ -42,8 +43,9 @@ export function InstallOpsControls({
 
   async function saveDates() {
     if (!start) return;
+    const iso = dayIso(start);
+    if (isWeekend(iso)) return;
     setPending(true);
-    const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
     const result = await moveInstall(installId, iso);
     setMessage(result.message);
     setPending(false);
@@ -69,7 +71,11 @@ export function InstallOpsControls({
             locale={enGB}
             weekStartsOn={1}
             selected={start}
-            onSelect={setStart}
+            onSelect={(day) => {
+              if (!day || isWeekend(dayIso(day))) return;
+              setStart(day);
+            }}
+            disabled={(date) => isWeekend(dayIso(date))}
             className="mt-2"
           />
           <Button className="mt-3" type="button" disabled={pending || !start} onClick={saveDates}>Move dates</Button>
@@ -78,4 +84,8 @@ export function InstallOpsControls({
       {message ? <p className="mt-4 text-sm">{message}</p> : null}
     </section>
   );
+}
+
+function dayIso(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
