@@ -2,9 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { FieldResourceSelect, type FieldResourceOption } from "@/components/field-resource-select";
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { saveWorkspaceUser } from "@/features/workspace/actions";
+import { engineerNameFromPerson } from "@/lib/installs/new-engineer";
 import { fieldEngineerBlankLabel } from "@/lib/installs/field-engineer-label";
 import { PULSE_MODULE_IDS } from "@/lib/types";
 
@@ -45,7 +47,7 @@ function levelFor(moduleId: string, effective: Record<string, string>) {
   return effective[moduleId] ?? "none";
 }
 
-export type FieldResourceOption = { id: string; name: string; profileId: string | null };
+export type { FieldResourceOption };
 
 export function WorkspaceUserCard({
   person,
@@ -60,6 +62,8 @@ export function WorkspaceUserCard({
   officeIds?: string[];
   installsTeamId?: string;
 }) {
+  const [firstName, setFirstName] = useState(person.first_name ?? "");
+  const [lastName, setLastName] = useState(person.last_name ?? "");
   const [role, setRole] = useState(person.workspace_role);
   const [mode, setMode] = useState<WorkspaceDirectoryUser["access_mode"]>(person.access_mode);
   const [levels, setLevels] = useState(() => Object.fromEntries(PULSE_MODULE_IDS.map((moduleId) => [moduleId, levelFor(moduleId, person.effective)])));
@@ -88,11 +92,11 @@ export function WorkspaceUserCard({
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">
             <span className="mb-1 block text-grey">First name</span>
-            <Input name="firstName" required defaultValue={person.first_name ?? ""} autoComplete="given-name" />
+            <Input name="firstName" required value={firstName} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-grey">Last name</span>
-            <Input name="lastName" defaultValue={person.last_name ?? ""} autoComplete="family-name" />
+            <Input name="lastName" value={lastName} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
           </label>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -105,19 +109,17 @@ export function WorkspaceUserCard({
           </Select>
         </div>
         {resources ? (
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="mb-1 block text-grey">Field engineer resource</span>
-            <Select name="fieldResource" defaultValue={fieldChoice} aria-label="Field engineer resource" className="w-full sm:w-80">
-              <option value="">{blankLabel}</option>
-              <option value="office">Office user (not a field engineer)</option>
-              {resources.map((resource) => (
-                <option key={resource.id} value={resource.id}>
-                  {resource.name.replace(/^FIXTURE — /, "")}
-                  {resource.profileId && resource.profileId !== person.id ? " (linked)" : ""}
-                </option>
-              ))}
-            </Select>
-          </label>
+            <FieldResourceSelect
+              resources={resources}
+              defaultChoice={fieldChoice}
+              blankLabel={blankLabel}
+              suggestedName={engineerNameFromPerson(firstName, lastName)}
+              exceptProfileId={person.id}
+              className="w-full sm:w-80"
+            />
+          </div>
         ) : null}
         <fieldset>
           <legend className="mb-2 text-sm font-semibold text-ink">Teams</legend>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { FieldResourceSelect, type FieldResourceOption } from "@/components/field-resource-select";
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { inviteWorkspaceUser } from "@/features/workspace/actions";
-import type { FieldResourceOption } from "@/components/workspace-user-card";
+import { engineerNameFromPerson } from "@/lib/installs/new-engineer";
 
 const ROLES = [
   ["owner", "Owner"],
@@ -24,6 +25,8 @@ export function WorkspaceInviteForm({
   installsTeamId: string;
 }) {
   const [state, action, pending] = useActionState(inviteWorkspaceUser, null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   return (
     <form action={action} className="grid gap-3 rounded-3xl border border-line bg-card p-5 md:grid-cols-4">
       <input type="hidden" name="installsTeamId" value={installsTeamId} />
@@ -33,11 +36,11 @@ export function WorkspaceInviteForm({
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-grey">First name</span>
-        <Input name="firstName" required autoComplete="given-name" />
+        <Input name="firstName" required autoComplete="given-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-grey">Last name</span>
-        <Input name="lastName" required autoComplete="family-name" />
+        <Input name="lastName" required autoComplete="family-name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
       </label>
       <label className="text-sm">
         <span className="mb-1 block text-grey">Role</span>
@@ -56,16 +59,15 @@ export function WorkspaceInviteForm({
           ))}
         </div>
       </fieldset>
-      <label className="text-sm md:col-span-2">
+      <div className="text-sm md:col-span-2">
         <span className="mb-1 block text-grey">Field engineer resource</span>
-        <Select name="fieldResource" defaultValue="" aria-label="Field engineer resource">
-          <option value="">Not a field engineer</option>
-          <option value="office">Office user (not a field engineer)</option>
-          {resources.map((resource) => (
-            <option key={resource.id} value={resource.id}>{resource.name.replace(/^FIXTURE — /, "")}</option>
-          ))}
-        </Select>
-      </label>
+        <FieldResourceSelect
+          resources={resources}
+          defaultChoice=""
+          blankLabel="Not a field engineer"
+          suggestedName={engineerNameFromPerson(firstName, lastName)}
+        />
+      </div>
       <p className="text-sm text-grey md:col-span-4">Installs needs a resource, or office. Until an admin chooses, that person only sees My jobs.</p>
       {state?.message ? <p className="text-sm font-semibold text-red md:col-span-4">{state.message}</p> : null}
       <div className="md:col-span-4">

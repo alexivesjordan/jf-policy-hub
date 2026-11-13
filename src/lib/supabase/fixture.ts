@@ -237,6 +237,15 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return "none";
     return "admin";
   }
+  if (fn === "install_field_resources") {
+    return {
+      resources: [
+        { id: "f3000000-0000-4000-8000-000000000001", name: "Lewis", profileId: null },
+        { id: "f3000000-0000-4000-8000-000000000003", name: "Ben", profileId: null },
+      ],
+      officeIds: [],
+    };
+  }
   if (fn === "install_field_home") {
     const role = process.env.PULSE_FIXTURE_ROLE === "engineer" ? "engineer" : process.env.PULSE_FIXTURE_ROLE === "lead" ? "ops" : "admin";
     return { role, jobs: [], needsLink: false };
