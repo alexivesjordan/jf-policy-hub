@@ -29,7 +29,7 @@ export function InstallAccessPanel({ install }: { install: Record<string, unknow
       {noPhotos ? <p className="text-sm text-grey">no photos</p> : null}
       {notEmailed ? <p className="text-sm">Access form not emailed</p> : null}
       {needsEmail ? <EmailPrompt installId={String(install.id ?? "")} /> : null}
-      <LinkActions installId={String(install.id ?? "")} />}
+      <LinkActions installId={String(install.id ?? "")} />
       <Answers answers={access?.answers ?? null} />
       <MediaGallery media={access?.media ?? []} />
     </section>
