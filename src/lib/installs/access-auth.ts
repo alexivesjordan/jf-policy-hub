@@ -9,7 +9,7 @@ export function canManageInstall(profile: Profile, bookingRepId: string | null |
   return Boolean(bookingRepId) && bookingRepId === profile.id;
 }
 
-/** Booked or awaiting access only. Field engineers cannot cancel someone else's install. */
+/** Booked, awaiting access, or a quoting subcontractor install. Field engineers cannot cancel. */
 export function canCancelInstall(input: {
   profile: Profile;
   bookingRepId: string | null | undefined;
@@ -18,9 +18,8 @@ export function canCancelInstall(input: {
   fieldEngineer?: boolean;
 }) {
   if (input.status === "cancelled") return false;
-  if (input.stage !== "booked" && input.stage !== "awaiting_access") return false;
+  if (input.stage !== "booked" && input.stage !== "awaiting_access" && input.stage !== "quoting") return false;
   const admin = input.profile.workspace_role === "owner" || input.profile.workspace_role === "admin" || input.profile.role === "admin";
-  const ownBooking = Boolean(input.bookingRepId) && input.bookingRepId === input.profile.id;
-  if (input.fieldEngineer && !admin && !ownBooking) return false;
+  if (input.fieldEngineer && !admin) return false;
   return canManageInstall(input.profile, input.bookingRepId);
 }

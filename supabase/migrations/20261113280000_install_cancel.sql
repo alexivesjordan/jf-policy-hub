@@ -1,23 +1,6 @@
--- A booked install can be cancelled by the booking rep, an operations editor, or an admin.
--- Field engineers cannot. The customer is not emailed. Reminders stop because the status is cancelled.
-
-create or replace function ops.caller_is_field_engineer()
-returns boolean
-language sql
-stable
-security definer
-set search_path = core, public
-as $$
-  select exists (
-    select 1
-    from core.ops_roles
-    where profile_id = auth.uid()
-      and ops_role = 'installer'
-  )
-  and not public.workspace_is_admin();
-$$;
-
-revoke all on function ops.caller_is_field_engineer() from public, anon, authenticated;
+-- Cancel after the subcontractor calendar and order-key guards.
+-- Keeps the field-engineer refusal, the quoting status rule, and weekday booking.
+-- A quoting install is cancelled the same way: links revoked, quote released, no email.
 
 create or replace function ops.finish_install_cancel(p_id uuid, p_reason text)
 returns void
@@ -33,6 +16,9 @@ begin
     raise exception 'app: That install was not found.';
   end if;
   if v_status is distinct from 'cancelled' then
+    if v_status = 'quoting' then
+      update ops.install_quotes set install_id = null where install_id = p_id;
+    end if;
     update ops.installs
     set status = 'cancelled', updated_at = now()
     where id = p_id;
@@ -75,9 +61,7 @@ begin
   if v_row.id is null then
     raise exception 'app: That install was not found.';
   end if;
-  if coalesce(auth.role(), '') is distinct from 'service_role'
-     and ops.caller_is_field_engineer()
-     and v_row.booking_rep_id is distinct from auth.uid() then
+  if ops.is_field_engineer() then
     raise exception 'app: You cannot cancel that install.';
   end if;
   if not ops.install_actor_allowed(p_id) then
@@ -95,33 +79,30 @@ security definer
 set search_path = ops, core, public
 as $$
 declare
-  v_row ops.installs%rowtype;
+  v_status text;
 begin
+  perform public.install_claim_engineer();
+  if ops.is_field_engineer() and not public.workspace_is_admin() then
+    raise exception 'app: You cannot change that install.';
+  end if;
   if not public.workspace_can('operations', 'edit') then
     raise exception 'app: You cannot change that install.';
   end if;
   if p_status not in ('booked', 'scheduled', 'in_progress', 'completed', 'cancelled') then
     raise exception 'app: Choose a status.';
   end if;
+  select status into v_status from ops.installs where id = p_id for update;
+  if v_status is null then
+    raise exception 'app: That install was not found.';
+  end if;
+  if v_status = 'quoting' and p_status <> 'cancelled' then
+    raise exception 'app: Award the subcontractor quote before changing the status.';
+  end if;
   if p_status = 'cancelled' then
-    select * into v_row from ops.installs where id = p_id;
-    if v_row.id is null then
-      raise exception 'app: That install was not found.';
-    end if;
-    if coalesce(auth.role(), '') is distinct from 'service_role'
-       and ops.caller_is_field_engineer()
-       and v_row.booking_rep_id is distinct from auth.uid() then
-      raise exception 'app: You cannot cancel that install.';
-    end if;
     perform ops.finish_install_cancel(p_id, 'Cancelled from the operations status control.');
     return public.install_read(p_id);
   end if;
-  update ops.installs
-  set status = p_status, updated_at = now()
-  where id = p_id;
-  if not found then
-    raise exception 'app: That install was not found.';
-  end if;
+  update ops.installs set status = p_status, updated_at = now() where id = p_id;
   return public.install_read(p_id);
 end;
 $$;

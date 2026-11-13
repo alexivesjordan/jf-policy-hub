@@ -26,6 +26,7 @@ describe("cancel a booked install", () => {
     const rep = person();
     assert.equal(canCancelInstall({ profile: rep, bookingRepId: "rep-1", status: "booked", stage: "booked" }), true);
     assert.equal(canCancelInstall({ profile: rep, bookingRepId: "rep-1", status: "booked", stage: "awaiting_access" }), true);
+    assert.equal(canCancelInstall({ profile: rep, bookingRepId: "rep-1", status: "quoting", stage: "quoting" }), true);
     assert.equal(canCancelInstall({ profile: rep, bookingRepId: "rep-2", status: "booked", stage: "booked" }), false);
   });
 
@@ -52,11 +53,16 @@ describe("cancel a booked install", () => {
   });
 
   it("revokes access and visit links and frees the reservations", () => {
-    const sql = readFileSync(new URL("../../../supabase/migrations/20261113260000_install_cancel.sql", import.meta.url), "utf8");
+    const sql = readFileSync(new URL("../../../supabase/migrations/20261113280000_install_cancel.sql", import.meta.url), "utf8");
     assert.match(sql, /delete from ops\.install_reservations where install_id = p_id/);
     assert.match(sql, /purpose in \('access_form', 'subcontractor_job'\)/);
     assert.match(sql, /set revoked_at = coalesce\(revoked_at, now\(\)\)/);
     assert.match(sql, /jsonb_build_object\('reason', p_reason\)/);
+    assert.match(sql, /ops\.is_field_engineer\(\)/);
+    assert.match(sql, /install_claim_engineer\(\)/);
+    assert.match(sql, /Award the subcontractor quote before changing the status/);
+    assert.match(sql, /update ops\.install_quotes set install_id = null where install_id = p_id/);
+    assert.equal(sql.includes("caller_is_field_engineer"), false);
     assert.equal(/sendPulseEmail|deliverPulseEmail|resend\.com/.test(sql), false);
   });
 });
