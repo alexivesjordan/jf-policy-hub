@@ -36,7 +36,7 @@ function dueOn(day: string, bookedOn: string, startOn: string, cadence: AccessRe
 /**
  * Weekly from the booking date, plus one reminder the set number of days before the start.
  * A missed cron day is caught up on the next run. Nothing goes out on or after the install
- * start, or once the form has been submitted. Photos and videos stay optional.
+ * start, or once the form has been submitted, even when no photos were added.
  */
 export function accessReminderDue(item: AccessReminderInstall, cadence: AccessReminderCadence) {
   if (item.today >= item.startOn) return false;

@@ -33,7 +33,7 @@ describe("install follow-on", () => {
     assert.equal(installStage({ status: "booked", accessSent: false, accessComplete: false, quoting: true }), "quoting");
   });
 
-  it("sends a weekly reminder, catches a missed day, and stops once the form is in", () => {
+  it("sends a weekly reminder, catches a missed day, and stops once the form is submitted even with no photos", () => {
     assert.equal(reminder({ today: "2026-11-08" }), true);
     assert.equal(reminder({ today: "2026-11-09" }), true);
     assert.equal(reminder({ today: "2026-11-09", lastReminderOn: "2026-11-08" }), false);
