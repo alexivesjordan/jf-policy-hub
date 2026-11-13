@@ -406,8 +406,10 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return fixtureInstall(start, String(args?.p_warranty ?? "none"), true);
   }
   if (fn === "install_calendar") {
+    const spanning = fixtureInstall("2026-11-13", "annual", true, "booked", "awaiting_access");
+    spanning.endOn = "2026-11-17";
     const rows = [
-      fixtureInstall("2026-11-16", "annual", true, "booked", "awaiting_access"),
+      spanning,
       fixtureInstall("2026-11-23", "none", false, "booked", "booked"),
       fixtureInstall("2026-11-18", "none", true, "completed", "ready"),
       fixtureInstall("2026-10-20", "none", false, "completed", "completed"),
@@ -416,10 +418,29 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   }
   if (fn === "install_access_preview") {
     const hash = String(args?.p_token_hash ?? "");
-    if (hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0") {
-      return { install_id: "11111111-1111-4111-8111-1111111111c3", customer_name: "Example Sports Centre", submitted: true, media_count: 1 };
-    }
-    return { install_id: "11111111-1111-4111-8111-1111111111a1", customer_name: "Example Sports Centre", submitted: false, media_count: 0 };
+    const submitted = hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0";
+    return {
+      install_id: submitted ? "11111111-1111-4111-8111-1111111111c3" : "11111111-1111-4111-8111-1111111111a1",
+      customer_name: "Example Sports Centre",
+      site_address: "1 Harbour Road",
+      submitted,
+      media_count: submitted ? 1 : 0,
+      accepted_by_name: submitted ? "Alex Example" : null,
+      answers: submitted ? { groundFloor: true, floorNumber: null, hasLift: false, dropZone: "Front car park" } : null,
+      terms: {
+        id: "terms-1",
+        version_label: "v1-original",
+        lines: [
+          { label: "Additional installer time, within agreed hours", rate: 30, unit: "per installer per hour" },
+          { label: "Materials and consumables", basis: "cost_plus_25" },
+          { label: "Equipment movement beyond the agreed floor plan", basis: "additional_installer_time" },
+          { label: "Parking, permits, congestion fees (clause 8)", basis: "at_cost" },
+        ],
+      },
+      media: submitted
+        ? [{ id: "media-1", kind: "photo", fileName: "door.jpg", mime: "image/jpeg", bucket: "access-media", path: "ops/11111111-1111-4111-8111-1111111111c3/door.jpg" }]
+        : [],
+    };
   }
   if (fn === "orbit_register_file") return "22222222-2222-4222-8222-222222222222";
   if (fn === "install_save_access") return { ok: true };
@@ -592,6 +613,33 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 }
 
+function fixtureAccessMime(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "heic") return "image/heic";
+  return "image/jpeg";
+}
+
+function fixtureAccessBytes(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "png") return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (ext === "webp") return Uint8Array.from([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")]);
+  if (ext === "mp4" || ext === "mov" || ext === "heic") {
+    const bytes = new Uint8Array(16);
+    bytes.set(Buffer.from("ftyp"), 4);
+    bytes.set(Buffer.from(ext === "mov" ? "qt  " : ext === "heic" ? "heic" : "isom"), 8);
+    return bytes;
+  }
+  return Buffer.from("/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAMAAwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAb/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCZACpZ/9k=", "base64");
+}
+
+function fixtureAccessBytesUrl(path: string) {
+  return `data:${fixtureAccessMime(path)};base64,${Buffer.from(fixtureAccessBytes(path)).toString("base64")}`;
+}
+
 export function createFixtureClient() {
   const client = {
     auth: {
@@ -606,13 +654,23 @@ export function createFixtureClient() {
       return { data: rpcData(fn, args), error: null };
     },
     storage: {
-      from() {
+      from(bucket: string) {
         return {
           async upload() {
             return { data: { path: "proposal.docx" }, error: null };
           },
           async createSignedUrl(path: string) {
+            if (bucket === "access-media") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
             return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
+          },
+          async createSignedUploadUrl(path: string) {
+            return { data: { path, token: "fixture", signedUrl: "/api/access/media/fixture-upload" }, error: null };
+          },
+          async info(path: string) {
+            return { data: { size: 128, contentType: fixtureAccessMime(path) }, error: null };
+          },
+          async remove() {
+            return { data: [], error: null };
           },
         };
       },

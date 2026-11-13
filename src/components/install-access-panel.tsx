@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { MediaGallery } from "@/components/access-form";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { copyInstallAccessLink, resendInstallAccess, setInstallContactEmail } from "@/features/sales/install-actions";
-import { accessChip } from "@/lib/installs/access-ui";
+import { accessChip, orderedAnswers } from "@/lib/installs/access-ui";
 
 export function InstallAccessPanel({ install }: { install: Record<string, unknown> }) {
   const access = install.access && typeof install.access === "object" ? install.access as {
@@ -67,6 +67,7 @@ function EmailPrompt({ installId }: { installId: string }) {
 function LinkActions({ installId }: { installId: string }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<"copy" | "resend" | null>(null);
+  const [confirmResend, setConfirmResend] = useState(false);
   async function copy() {
     setPending("copy");
     const result = await copyInstallAccessLink(installId);
@@ -88,34 +89,45 @@ function LinkActions({ installId }: { installId: string }) {
       <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void copy()}>
         {pending === "copy" ? "Copying..." : "Copy link"}
       </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={pending !== null}
-        onClick={() => {
-          setPending("resend");
-          void resendInstallAccess(installId).then((result) => {
-            setMessage(result.message);
-            setPending(null);
-          });
-        }}
-      >
-        {pending === "resend" ? "Sending..." : "Resend link"}
-      </Button>
+      {confirmResend ? (
+        <>
+          <p className="w-full text-sm">The old link will stop working.</p>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending !== null}
+            onClick={() => {
+              setPending("resend");
+              void resendInstallAccess(installId).then((result) => {
+                setMessage(result.message);
+                setPending(null);
+                setConfirmResend(false);
+              });
+            }}
+          >
+            {pending === "resend" ? "Sending..." : "Send new link"}
+          </Button>
+          <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => setConfirmResend(false)}>Cancel</Button>
+        </>
+      ) : (
+        <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => setConfirmResend(true)}>
+          Resend link
+        </Button>
+      )}
       {message ? <p className="w-full text-sm">{message}</p> : null}
     </div>
   );
 }
 
 function Answers({ answers }: { answers: Record<string, unknown> | null }) {
-  const rows = Object.entries(answers ?? {});
+  const rows = orderedAnswers(answers);
   if (rows.length === 0) return null;
   return (
     <dl className="space-y-2 text-sm">
-      {rows.map(([key, value]) => (
-        <div key={key} className="flex justify-between gap-3">
-          <dt className="text-grey">{key}</dt>
-          <dd className="text-right font-semibold">{String(value ?? "—")}</dd>
+      {rows.map((row) => (
+        <div key={row.key} className="flex justify-between gap-3">
+          <dt className="text-grey">{row.label}</dt>
+          <dd className="text-right font-semibold">{row.text}</dd>
         </div>
       ))}
     </dl>

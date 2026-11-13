@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { submitAccessForm } from "@/features/operations/access-actions";
-import { termsBoxReady } from "@/lib/installs/access-ui";
+import { basisText, orderedAnswers, termsBoxReady } from "@/lib/installs/access-ui";
 
 type Line = { label?: string; rate?: number; unit?: string; basis?: string; mileage?: number };
 type SavedMedia = { id: string; url?: string | null; mime?: string | null; kind?: string | null };
@@ -91,7 +91,8 @@ export function AccessForm({
         </Field>
       </div>
       <MediaPicker token={token} />
-      <Terms lines={lines} versionLabel={versionLabel} scrolled={scrolled} onReady={() => setScrolled(true)} />
+      <Terms lines={lines} versionLabel={versionLabel} onReady={() => setScrolled(true)} />
+      {!scrolled ? <p className="text-sm text-grey">Scroll to the end of this list before you can accept.</p> : null}
       <label className="flex min-h-11 items-start gap-3 text-sm leading-6">
         <input type="checkbox" name="accept" value="yes" disabled={!scrolled} className="mt-1 size-5 accent-[#ce0037]" />
         <span>
@@ -112,12 +113,10 @@ export function AccessForm({
 function Terms({
   lines,
   versionLabel,
-  scrolled,
   onReady,
 }: {
   lines: Line[];
   versionLabel: string;
-  scrolled: boolean;
   onReady: () => void;
 }) {
   return (
@@ -144,7 +143,6 @@ function Terms({
           </li>
         ))}
       </ul>
-      {!scrolled ? <p className="mt-4 text-grey">Scroll to the end of this list before you can accept.</p> : null}
     </div>
   );
 }
@@ -221,18 +219,17 @@ function AddMedia({ token }: { token: string }) {
 }
 
 function SentSummary({ saved }: { saved: Saved | null }) {
-  const answers = saved?.answers ?? {};
-  const rows = Object.entries(answers);
+  const rows = orderedAnswers(saved?.answers);
   return (
     <section className="space-y-3 rounded-3xl border border-line bg-card p-4">
       <h2 className="font-display text-2xl">What you sent</h2>
       {saved?.acceptedName ? <p className="text-sm">{saved.acceptedName}</p> : null}
       {rows.length > 0 ? (
         <dl className="space-y-2 text-sm">
-          {rows.map(([key, value]) => (
-            <div key={key} className="flex justify-between gap-3">
-              <dt className="text-grey">{labelFor(key)}</dt>
-              <dd className="text-right font-semibold">{String(value ?? "—")}</dd>
+          {rows.map((row) => (
+            <div key={row.key} className="flex justify-between gap-3">
+              <dt className="text-grey">{row.label}</dt>
+              <dd className="text-right font-semibold">{row.text}</dd>
             </div>
           ))}
         </dl>
@@ -325,29 +322,3 @@ function YesNo({ name, label, defaultYes = false }: { name: string; label: strin
   );
 }
 
-function basisText(basis?: string) {
-  if (basis === "cost_plus_25") return "Cost + 25%";
-  if (basis === "tbc") return "To be confirmed";
-  return basis ?? "";
-}
-
-function labelFor(key: string) {
-  const labels: Record<string, string> = {
-    groundFloor: "Ground floor",
-    floorNumber: "Floor",
-    hasLift: "Lift",
-    levelStepFree: "Step-free",
-    doubleDoorsOrClear: "Door clearance",
-    openingWidthMm: "Opening width mm",
-    openingHeightMm: "Opening height mm",
-    tailLiftAdjacent: "Tail-lift",
-    dropZone: "Drop zone",
-    startAtEight: "Start at 08:00",
-    roomClear: "Room clear",
-    floorFinished: "Floor finished",
-    townCentre: "Town centre",
-    siteHoursStart: "Hours start",
-    siteHoursEnd: "Hours end",
-  };
-  return labels[key] ?? key;
-}

@@ -2,12 +2,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { enGB } from "date-fns/locale";
+import { InstallKanban, InstallMonthGrid, type CalendarInstall } from "@/components/install-calendar-views";
 import { PageHeader } from "@/components/pulse/page-header";
 import { listInstalls } from "@/features/sales/install-actions";
-import { KANBAN_COLUMNS, kanbanColumn } from "@/lib/installs/access-ui";
-import { ukDate, money } from "@/components/install-sales-view";
+import { installCoversDay } from "@/lib/installs/access-ui";
 
-type InstallDay = { id: string; orderNumber: string; customerName: string; startOn: string; endOn: string; stage: string; installPrice: unknown };
 
 function one(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -59,63 +58,36 @@ export async function InstallCalendarPage({
         {basePath.startsWith("/sales") ? <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "kanban" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "kanban")}>Kanban</Link> : null}
         <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view, !mine)}>{mine ? "All installs" : "My installs"}</Link>
       </div>
-      {view === "kanban" ? <Kanban installs={installs} basePath={basePath} /> : null}
-      {view === "kanban" ? null : <div className={`grid gap-2 ${view === "week" ? "md:grid-cols-7" : "grid-cols-7"}`}>
-        {view === "month" ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((label) => (
-          <p key={label} className="px-1 text-xs font-semibold text-grey">{label}</p>
-        )) : null}
-        {days.map((day) => {
-          const key = iso(day);
-          const rows = installs.filter((row) => row.startOn <= key && row.endOn >= key);
-          return (
-            <div key={key} className="min-h-24 rounded-2xl border border-line bg-card p-2">
-              <p className="text-xs font-semibold">{format(day, "dd/MM", { locale: enGB })}</p>
-              <ul className="mt-1 space-y-1">
-                {rows.map((row) => (
-                  <li key={row.id}>
-                    <Link className="block rounded-lg bg-muted px-2 py-1 text-xs font-semibold" href={`${basePath}/${row.id}`}>
-                      {row.orderNumber}
-                      <span className="mt-0.5 block font-normal text-grey">{row.customerName}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>}
+      {view === "kanban" ? <InstallKanban installs={installs} basePath={basePath} /> : null}
+      {view === "month" ? <InstallMonthGrid days={days.map(iso)} installs={installs} basePath={basePath} /> : null}
+      {view === "week" ? (
+        <div className="grid gap-2 md:grid-cols-7">
+          {days.map((day) => {
+            const key = iso(day);
+            const rows = installs.filter((row) => installCoversDay(row.startOn, row.endOn, key));
+            return (
+              <div key={key} className="min-h-24 rounded-2xl border border-line bg-card p-2">
+                <p className="text-xs font-semibold">{format(day, "dd/MM", { locale: enGB })}</p>
+                <ul className="mt-1 space-y-1">
+                  {rows.map((row) => (
+                    <li key={row.id}>
+                      <Link className="block rounded-lg bg-muted px-2 py-1 text-xs font-semibold" href={`${basePath}/${row.id}`}>
+                        {row.orderNumber}
+                        <span className="mt-0.5 block font-normal text-grey">{row.customerName}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function Kanban({ installs, basePath }: { installs: InstallDay[]; basePath: string }) {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2 snap-x md:grid md:grid-cols-5 md:overflow-visible">
-      {KANBAN_COLUMNS.map(([id, label]) => {
-        const cards = installs.filter((row) => kanbanColumn(row.stage) === id);
-        return (
-          <section key={id} className="w-64 shrink-0 snap-start rounded-3xl bg-muted/50 p-3 md:w-auto">
-            <h2 className="text-sm font-semibold">{label}</h2>
-            <ul className="mt-3 space-y-2">
-              {cards.map((card) => (
-                <li key={card.id}>
-                  <Link href={`${basePath}/${card.id}`} className="block rounded-2xl border border-line bg-card p-3">
-                    <p className="font-semibold">{card.customerName}</p>
-                    <p className="text-sm text-grey">{card.orderNumber}</p>
-                    <p className="mt-2 text-sm">{ukDate(card.startOn)}</p>
-                    <p className="text-sm font-semibold">{money(card.installPrice)}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function asDay(row: Record<string, unknown>): InstallDay {
+function asDay(row: Record<string, unknown>): CalendarInstall {
   return {
     id: String(row.id ?? ""),
     orderNumber: String(row.orderNumber ?? "Install"),

@@ -1,30 +1,14 @@
 import { NextResponse } from "next/server";
-import { hashPulseToken } from "@/lib/pulse/token-hash";
-import { accessMediaExtension, pulseStoragePath } from "@/lib/pulse/prepare-upload";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isFixtureMode } from "@/lib/env";
+import { prepareAccessMediaUpload } from "@/features/operations/access-actions";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { token?: string; mime?: string };
-    const hash = hashPulseToken(String(body.token ?? ""));
-    const mime = String(body.mime ?? "");
-    const extension = accessMediaExtension(mime);
-    if (!hash || !extension) return NextResponse.json({ message: "That file type is not allowed." }, { status: 400 });
-    const admin = createAdminClient();
-    if (!admin) return NextResponse.json({ message: "Supabase is not configured." }, { status: 500 });
-    const preview = await admin.rpc("install_access_preview", { p_token_hash: hash });
-    const installId = (preview.data as { install_id?: string } | null)?.install_id;
-    if (!installId) return NextResponse.json({ message: "That link is not valid." }, { status: 400 });
-    const path = pulseStoragePath("ops", installId, extension);
-    if (isFixtureMode()) {
-      return NextResponse.json({ signedUrl: "/api/access/media/fixture-upload", path, token: "fixture" });
+    const body = await request.json() as { token?: string; mime?: string; byteSize?: number };
+    const result = await prepareAccessMediaUpload(String(body.token ?? ""), String(body.mime ?? ""), Number(body.byteSize ?? 0));
+    if (!result.ok || !result.signedUrl || !result.path) {
+      return NextResponse.json({ message: result.ok ? "Could not start that upload." : result.message }, { status: 400 });
     }
-    const signed = await admin.storage.from("access-media").createSignedUploadUrl(path);
-    if (signed.error || !signed.data?.signedUrl) {
-      return NextResponse.json({ message: "Could not start that upload." }, { status: 400 });
-    }
-    return NextResponse.json({ signedUrl: signed.data.signedUrl, path: signed.data.path, token: signed.data.token });
+    return NextResponse.json({ signedUrl: result.signedUrl, path: result.path, token: result.token });
   } catch {
     return NextResponse.json({ message: "Could not start that upload." }, { status: 400 });
   }
