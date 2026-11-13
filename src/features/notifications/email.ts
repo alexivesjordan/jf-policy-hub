@@ -1,5 +1,7 @@
 import "server-only";
 
+import { deliverPulseEmail } from "@/lib/email/deliver";
+
 export type EmailNotification = {
   toUserId: string;
   toEmail: string;
@@ -9,13 +11,20 @@ export type EmailNotification = {
 };
 
 /**
- * Email delivery hook.
- *
- * v1 only stores notifications in the app. Do not send mail from anywhere else.
- * When email is ready, implement it here (for example Resend). Callers already
- * pass the recipient, title, body, and link. This function must not throw:
- * a mail failure should not undo an approval or an upload.
+ * In-app notifications call this after the bell row is stored.
+ * A mail failure must not undo the action that created the bell.
  */
 export async function deliverEmailNotification(input: EmailNotification) {
-  void input;
+  const link = input.link ? `\n${input.link}` : "";
+  try {
+    await deliverPulseEmail({
+      to: input.toEmail,
+      subject: input.title,
+      template: "notification",
+      text: `${input.body}${link}`,
+      html: `<p>${input.body}</p>${input.link ? `<p><a href="${input.link}">${input.link}</a></p>` : ""}`,
+    });
+  } catch (error) {
+    console.error("Email notification hook failed", error);
+  }
 }

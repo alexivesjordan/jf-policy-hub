@@ -32,6 +32,20 @@ async function AccessContent({ params }: { params: Promise<{ token: string }> })
   if (!hash || !admin) {
     return <Invalid />;
   }
+  const installPreview = await admin.rpc("install_access_preview", { p_token_hash: hash });
+  const install = installPreview.data as { customer_name?: string; site_address?: string | null } | null;
+  if (install?.customer_name) {
+    return (
+      <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">Jordan Fitness</p>
+        <h1 className="font-display mt-2 text-4xl">Site access</h1>
+        <p className="mt-2 text-ink/70">{install.customer_name}. No account is needed.</p>
+        <div className="mt-6">
+          <AccessForm token={token} versionLabel="current" lines={[]} />
+        </div>
+      </main>
+    );
+  }
   const preview = await admin.rpc("orbit_access_preview", { p_token_hash: hash });
   const data = preview.data as {
     customer_name?: string;

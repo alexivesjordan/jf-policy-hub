@@ -56,8 +56,8 @@ export function AccessForm({
           <Input name="hoursEnd" type="time" defaultValue="17:00" />
         </Field>
       </div>
-      <Field label="Photos of the entrance, route, room, and parking">
-        <Input name="photos" type="file" accept="image/*" multiple />
+      <Field label="Photos or videos of the entrance, route, room, and parking">
+        <Input name="photos" type="file" accept="image/*,video/mp4,video/quicktime" multiple />
       </Field>
 
       <div
