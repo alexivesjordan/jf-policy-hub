@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
     },
     proxyClientMaxBodySize: "12mb",
   },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [{ key: "X-Content-Type-Options", value: "nosniff" }],
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

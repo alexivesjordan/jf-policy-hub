@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { InstallAccessPanel } from "@/components/install-access-panel";
 import { InstallSalesView } from "@/components/install-sales-view";
 import { PageSkeleton } from "@/components/pulse/states";
 import { installProposalUrl, readInstall } from "@/features/sales/install-actions";
@@ -27,6 +28,7 @@ async function SalesInstall({ params }: { params: Promise<{ id: string }> }) {
     <div className="space-y-4">
       <Link href="/sales/installs" className="text-sm font-semibold underline decoration-primary">All installs</Link>
       <InstallSalesView install={loaded.install} proposalUrl={proposalUrl} />
+      <InstallAccessPanel install={loaded.install} />
     </div>
   );
 }
