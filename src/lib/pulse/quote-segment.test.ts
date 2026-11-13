@@ -16,6 +16,13 @@ describe("install quote segment", () => {
     assert.equal(canLoadQuote("SO-00564", "trade"), true);
   });
 
+  it("enables a quote when a PDF stands in for the order number", () => {
+    assert.equal(canLoadQuote("", "trade", true), true);
+    assert.equal(canLoadQuote("  ", "big_corporate", true), true);
+    assert.equal(canLoadQuote("", "", true), false);
+    assert.equal(canLoadQuote("", "trade", false), false);
+  });
+
   it("uses the latest choice and overwrites the stored segment", () => {
     assert.equal(resolveQuoteSegment("").needsChoice, true);
     const stored = "independent";

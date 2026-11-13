@@ -19,6 +19,7 @@ import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import type { InstallPriceNotesData } from "@/components/price-workings";
 import { effortRowForSku, forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
 import { tilesFromSale } from "@/lib/pricer/flooring";
+import { orderKeyFromPdf, withUnlinkedOrderNote } from "@/lib/quotes/order-key";
 import { looksLikeUkPostcode, normaliseUkPostcode } from "@/lib/quotes/postcode";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
@@ -626,6 +627,16 @@ export async function parseUploadedQuote(_state: ActionState, formData: FormData
     return { ok: false, message: "No quote lines were found in that PDF.", draft: draftFromExtract(extracted, "pdf") };
   }
   const draft = draftFromExtract(extracted, "pdf");
+  const key = orderKeyFromPdf({
+    quoteNumber: extracted.quoteNumber,
+    orderNo: extracted.orderNo,
+    text,
+    typed: String(formData.get("quoteNumber") ?? ""),
+  });
+  draft.quoteNumber = key.orderNumber;
+  if (key.source === "upload") {
+    draft.warnings.push("No SO number was on this quote. It is saved on its own and will not block another order.");
+  }
   draft.warnings.push("No segment is printed on a Cin7 Core quote. Choose one before pricing.");
   return {
     ok: true,
@@ -720,10 +731,11 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const readyMessage = result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready.");
     const priced = salesOrderActionResult({
       ok: !result.blockedReason,
       needsSegment: false,
-      message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
+      message: result.blockedReason ? readyMessage : withUnlinkedOrderNote(readyMessage, draft.quoteNumber),
       quoteNumber: view.quoteNumber,
       customerName: view.customerName,
       postcode: view.postcode,
@@ -747,7 +759,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     });
     return {
       ...priced,
-      message: "Subcontractor quote ready.",
+      message: withUnlinkedOrderNote("Subcontractor quote ready.", draft.quoteNumber),
       subcontractor: {
         savedQuoteId,
         quoteNumber: view.quoteNumber,
