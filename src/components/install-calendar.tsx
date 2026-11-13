@@ -2,10 +2,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { enGB } from "date-fns/locale";
+import { CalendarDays, KanbanSquare } from "lucide-react";
 import { InstallKanban, InstallMonthGrid, type CalendarInstall } from "@/components/install-calendar-views";
 import { PageHeader } from "@/components/pulse/page-header";
 import { listInstalls } from "@/features/sales/install-actions";
 import { installCoversDay } from "@/lib/installs/access-ui";
+import { installsSurface } from "@/lib/installs/archive";
 
 
 function one(value: string | string[] | undefined) {
@@ -27,7 +29,10 @@ export async function InstallCalendarPage({
 }) {
   await connection();
   const params = await searchParams;
-  const view = one(params.view) === "week" ? "week" : one(params.view) === "kanban" ? "kanban" : "month";
+  const rawView = one(params.view);
+  const sales = basePath.startsWith("/sales");
+  const salesBoard = sales && installsSurface(rawView) === "board";
+  const view = salesBoard ? "kanban" : rawView === "week" ? "week" : rawView === "kanban" ? "kanban" : "month";
   const mine = one(params.mine) === "1";
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(one(params.on)) ? new Date(`${one(params.on)}T12:00:00`) : new Date();
   const start = view === "kanban" ? addMonths(anchor, -6) : view === "week" ? startOfWeek(anchor, { weekStartsOn: 1 }) : startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
@@ -37,12 +42,16 @@ export async function InstallCalendarPage({
   const days = eachDayOfInterval({ start, end });
   const previous = view === "week" ? addWeeks(anchor, -1) : addMonths(anchor, -1);
   const next = view === "week" ? addWeeks(anchor, 1) : addMonths(anchor, 1);
-  const query = (date: Date, nextView = view, nextMine = mine) => {
+  const query = (date: Date, nextView: "board" | "month" | "week" | "kanban" = view === "kanban" ? "board" : view, nextMine = mine) => {
     const search = new URLSearchParams();
-    search.set("on", iso(date));
-    search.set("view", nextView);
+    if (nextView !== "board") search.set("on", iso(date));
+    if (nextView === "month" && sales) search.set("view", "calendar");
+    else if (nextView === "week") search.set("view", "week");
+    else if (nextView === "kanban") search.set("view", "kanban");
+    else if (nextView === "month") search.set("view", "month");
     if (nextMine) search.set("mine", "1");
-    return `${basePath}?${search.toString()}`;
+    const text = search.toString();
+    return text ? `${basePath}?${text}` : basePath;
   };
 
   return (
@@ -50,13 +59,14 @@ export async function InstallCalendarPage({
       <PageHeader eyebrow={basePath.startsWith("/operations") ? "Pulse Operations" : "Pulse Sales"} title={title} />
       {listed.ok ? null : <p className="text-sm">{listed.message}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(previous)}>Previous</Link>}
-        <p className="font-display text-2xl">{view === "kanban" ? "Kanban" : format(anchor, view === "week" ? "'Week of' dd/MM/yyyy" : "MMMM yyyy", { locale: enGB })}</p>
-        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(next)}>Next</Link>}
-        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "month" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "month")}>Month</Link>
-        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "week" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "week")}>Week</Link>
-        {basePath.startsWith("/sales") ? <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "kanban" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "kanban")}>Kanban</Link> : null}
-        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view, !mine)}>{mine ? "All installs" : "My installs"}</Link>
+        {sales ? <ViewToggle boardHref={query(anchor, "board", mine)} calendarHref={query(anchor, "month", mine)} surface={view === "kanban" ? "board" : "calendar"} /> : null}
+        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(previous, view === "week" ? "week" : "month")}>Previous</Link>}
+        {view === "kanban" ? null : <p className="font-display text-2xl">{format(anchor, view === "week" ? "'Week of' dd/MM/yyyy" : "MMMM yyyy", { locale: enGB })}</p>}
+        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(next, view === "week" ? "week" : "month")}>Next</Link>}
+        {view === "kanban" ? null : <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "month" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "month")}>Month</Link>}
+        {view === "kanban" ? null : <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "week" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "week")}>Week</Link>}
+        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view === "kanban" ? "board" : view === "week" ? "week" : "month", !mine)}>{mine ? "All installs" : "My installs"}</Link>
+        <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={`${basePath}/archive`}>Archive</Link>
       </div>
       {view === "kanban" ? <InstallKanban installs={installs} basePath={basePath} /> : null}
       {view === "month" ? <InstallMonthGrid days={days.map(iso)} installs={installs} basePath={basePath} /> : null}
@@ -83,6 +93,20 @@ export async function InstallCalendarPage({
           })}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ViewToggle({ boardHref, calendarHref, surface }: { boardHref: string; calendarHref: string; surface: "board" | "calendar" }) {
+  const item = (active: boolean) => `inline-flex size-11 items-center justify-center rounded-full ${active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`;
+  return (
+    <div className="inline-flex items-center rounded-full bg-muted p-1" role="group" aria-label="Install view">
+      <Link aria-label="Board" aria-current={surface === "board" ? "page" : undefined} className={item(surface === "board")} href={boardHref}>
+        <KanbanSquare className="size-5" aria-hidden="true" />
+      </Link>
+      <Link aria-label="Calendar" aria-current={surface === "calendar" ? "page" : undefined} className={item(surface === "calendar")} href={calendarHref}>
+        <CalendarDays className="size-5" aria-hidden="true" />
+      </Link>
     </div>
   );
 }

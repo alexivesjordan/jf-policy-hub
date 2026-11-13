@@ -474,8 +474,24 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       fixtureInstall("2026-11-18", "none", true, "completed", "ready"),
       fixtureInstall("2026-10-20", "none", false, "completed", "completed"),
     ];
-    return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
+    const visible = rows.filter((row) => row.stage !== "completed");
+    return args?.p_mine ? visible.filter((row) => row.bookingRepId === USER_ID) : visible;
   }
+  if (fn === "install_archive_due") return 0;
+  if (fn === "install_list_archived") {
+    const query = String(args?.p_query ?? "").trim().toLowerCase();
+    const archived = [{
+      id: "11111111-1111-4111-8111-1111111111d4",
+      orderNumber: "SO-1009",
+      customerName: "Northside Fitness",
+      status: "completed",
+      completedAt: "2026-10-20T12:00:00Z",
+      archivedAt: "2026-10-21T12:00:00Z",
+      startOn: "2026-10-20",
+    }];
+    return archived.filter((row) => query === "" || row.orderNumber.toLowerCase().includes(query) || row.customerName.toLowerCase().includes(query));
+  }
+  if (fn === "install_restore") return true;
   if (fn === "install_access_preview") {
     const hash = String(args?.p_token_hash ?? "");
     const submitted = hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0";

@@ -2,6 +2,7 @@
 
 import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
 import { canCancelInstall, canManageInstall, closedInstallMessage } from "@/lib/installs/access-auth";
@@ -238,6 +239,28 @@ export async function cancelInstall(installId: string, reason: string): Promise<
   const cancelled = await supabase.rpc("install_cancel", { p_id: installId, p_reason: trimmed });
   if (cancelled.error) return { ok: false, message: messageFromError(cancelled.error, "Could not cancel that install.") };
   return { ok: true, message: "Install cancelled.", install: (cancelled.data ?? null) as Record<string, unknown> | null };
+}
+
+export async function listArchivedInstalls(query: string): Promise<InstallActionResult> {
+  await requireInstallReader();
+  const supabase = await createClient();
+  const listed = await supabase.rpc("install_list_archived", { p_query: query.trim() });
+  if (listed.error) return { ok: false, message: messageFromError(listed.error, "Could not read archived installs."), installs: [] };
+  const rows = Array.isArray(listed.data) ? (listed.data as Record<string, unknown>[]) : [];
+  return { ok: true, message: "", installs: rows };
+}
+
+export async function restoreArchivedInstall(formData: FormData): Promise<void> {
+  await requireInstallReader();
+  const installId = String(formData.get("id") ?? "");
+  if (!ID.test(installId)) return;
+  const supabase = await createClient();
+  const restored = await supabase.rpc("install_restore", { p_id: installId });
+  if (restored.error) return;
+  revalidatePath("/sales/installs");
+  revalidatePath("/sales/installs/archive");
+  revalidatePath("/operations/installs");
+  revalidatePath("/operations/installs/archive");
 }
 
 export async function setInstallStatus(installId: string, status: string): Promise<InstallActionResult> {
