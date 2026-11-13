@@ -1,4 +1,5 @@
-export const ACCESS_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+/** Prod Supabase rejects anything over 50 MB, so the check stops there. */
+export const ACCESS_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 export const ACCESS_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 
 const VIDEO: Record<string, string> = {
@@ -18,7 +19,7 @@ export function planAccessMediaUpload(mimeType: string, byteSize: number) {
   const video = VIDEO[mime];
   if (video) {
     if (byteSize <= 0 || byteSize > ACCESS_VIDEO_MAX_BYTES) {
-      return { ok: false as const, message: "Videos must be 200 MB or smaller." };
+      return { ok: false as const, message: "Videos up to 50 MB" };
     }
     return { ok: true as const, extension: video, kind: "video" as const };
   }
