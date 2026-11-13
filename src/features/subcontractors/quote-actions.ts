@@ -201,28 +201,6 @@ export async function readSubcontractorBoard(installId: string) {
   }[];
 }
 
-export async function submitJobSheet(_state: ActionState, formData: FormData): Promise<ActionState> {
-  const token = String(formData.get("token") ?? "");
-  const installId = String(formData.get("installId") ?? "");
-  const engineerName = String(formData.get("engineerName") ?? "").trim();
-  const work = String(formData.get("workCarriedOut") ?? "").trim();
-  if (!engineerName) return { ok: false, message: "Add your name." };
-  if (!ID.test(installId)) return { ok: false, message: "That link is not valid." };
-  const { hashPulseToken } = await import("@/lib/pulse/token-hash");
-  const hash = hashPulseToken(token);
-  if (!hash) return { ok: false, message: "That link is not valid." };
-  const { createAdminClient } = await import("@/lib/supabase/admin");
-  const admin = createAdminClient();
-  if (!admin) return { ok: false, message: "The job sheet is not available." };
-  const saved = await admin.rpc("install_save_visit_sheet", {
-    p_install: installId,
-    p_sheet: { visitType: "install", engineerName, workCarriedOut: work, orderNo: String(formData.get("orderNo") ?? ""), address: String(formData.get("address") ?? "") },
-    p_token_hash: hash,
-  });
-  if (saved.error) return { ok: false, message: messageFromError(saved.error, "Could not save that job sheet.") };
-  return { ok: true, message: "Job sheet received." };
-}
-
 async function requireQuoteEditor() {
   const profile = await getCurrentProfile();
   if (!profile?.is_active || !profile.access_granted) return null;
@@ -245,7 +223,7 @@ async function sendJobSheetLink(input: { installId: string; email: string; order
     entityId: input.installId,
     expiresAt: input.endOn ? `${input.endOn}T23:59:59.000Z` : null,
   });
-  const url = `${siteUrl()}/job/${link.token}`;
+  const url = `${siteUrl()}/visit/${link.token}`;
   const text = [`Job sheet for order ${input.orderNumber}.`, input.siteAddress ? `Site: ${input.siteAddress}` : "", url].filter(Boolean).join("\n");
   await deliverPulseEmail({
     to: input.email,

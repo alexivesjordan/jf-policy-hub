@@ -75,7 +75,9 @@ declare
   v_email text;
   v_max integer := nullif(p_row->>'maxCrew', '')::integer;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not public.workspace_can('operations', 'edit') then
     raise exception 'app: You cannot change subcontractors.';
   end if;
@@ -126,7 +128,9 @@ $$;
 create or replace function public.subcontractor_remove(p_id uuid)
 returns void language plpgsql security definer set search_path = ops, public as $$
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not public.workspace_can('operations', 'edit') then
     raise exception 'app: You cannot remove subcontractors.';
   end if;
@@ -142,7 +146,9 @@ create or replace function public.subcontractor_attach_insurance(p_subcontractor
 returns uuid language plpgsql security definer set search_path = ops, public as $$
 declare v_id uuid;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if coalesce(auth.role(), '') is distinct from 'service_role' and not public.workspace_can('operations', 'edit') then
     raise exception 'app: You cannot add insurance.';
   end if;
@@ -164,7 +170,9 @@ $$;
 create or replace function public.subcontractor_drop_insurance(p_id uuid)
 returns void language plpgsql security definer set search_path = ops, public as $$
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not public.workspace_can('operations', 'edit') then
     raise exception 'app: You cannot remove insurance.';
   end if;
@@ -189,7 +197,9 @@ declare
   v_pending jsonb;
   v_threads jsonb := '[]'::jsonb;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not (public.workspace_can('sales', 'edit') or public.workspace_can('operations', 'edit')) then
     raise exception 'app: You cannot send a subcontractor quote.';
   end if;
@@ -290,7 +300,9 @@ declare
   v_emails text[];
   v_pending jsonb;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not (public.workspace_can('sales', 'edit') or public.workspace_can('operations', 'edit')) then
     raise exception 'app: You cannot send a subcontractor quote.';
   end if;
@@ -326,7 +338,9 @@ create or replace function public.subcontractor_log_message(
 ) returns uuid language plpgsql security definer set search_path = ops, public as $$
 declare v_id uuid;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if coalesce(auth.role(), '') is distinct from 'service_role'
      and not (public.workspace_can('sales', 'edit') or public.workspace_can('operations', 'edit')) then
     raise exception 'app: You cannot write that thread.';
@@ -387,7 +401,9 @@ create or replace function public.subcontractor_confirm_price(p_thread uuid, p_p
 returns void language plpgsql security definer set search_path = ops, public as $$
 declare v_install uuid; v_rep uuid;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if p_price is null or p_price <= 0 then raise exception 'app: Enter the subcontractor price.'; end if;
   select thread.install_id, install.booking_rep_id into v_install, v_rep
   from ops.subcontractor_threads thread
@@ -414,7 +430,9 @@ declare
   v_resources jsonb := '[]'::jsonb;
   v_end date;
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if p_customer_price is null or p_customer_price <= 0 then raise exception 'app: Enter the customer price.'; end if;
   select * into v_row from ops.installs where id = p_install for update;
   if v_row.id is null or v_row.status is distinct from 'quoting' then raise exception 'app: That quote is not open.'; end if;
@@ -455,7 +473,9 @@ $$;
 create or replace function public.install_subcontractor_board(p_id uuid)
 returns jsonb language plpgsql stable security definer set search_path = ops, public as $$
 begin
-  perform ops.reject_field_engineer();
+  if ops.is_field_engineer() then
+    raise exception 'app: Field engineers cannot do that.';
+  end if;
   if not (public.workspace_can('operations', 'view') or public.workspace_can('sales', 'view') or public.workspace_is_admin()) then
     raise exception 'app: You cannot see that install.';
   end if;
