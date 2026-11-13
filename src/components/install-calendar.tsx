@@ -4,8 +4,10 @@ import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, 
 import { enGB } from "date-fns/locale";
 import { PageHeader } from "@/components/pulse/page-header";
 import { listInstalls } from "@/features/sales/install-actions";
+import { KANBAN_COLUMNS, kanbanColumn } from "@/lib/installs/access-ui";
+import { ukDate, money } from "@/components/install-sales-view";
 
-type InstallDay = { id: string; orderNumber: string; customerName: string; startOn: string; endOn: string };
+type InstallDay = { id: string; orderNumber: string; customerName: string; startOn: string; endOn: string; stage: string; installPrice: unknown };
 
 function one(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -26,11 +28,11 @@ export async function InstallCalendarPage({
 }) {
   await connection();
   const params = await searchParams;
-  const view = one(params.view) === "week" ? "week" : "month";
+  const view = one(params.view) === "week" ? "week" : one(params.view) === "kanban" ? "kanban" : "month";
   const mine = one(params.mine) === "1";
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(one(params.on)) ? new Date(`${one(params.on)}T12:00:00`) : new Date();
-  const start = view === "week" ? startOfWeek(anchor, { weekStartsOn: 1 }) : startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
-  const end = view === "week" ? endOfWeek(anchor, { weekStartsOn: 1 }) : endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 });
+  const start = view === "kanban" ? addMonths(anchor, -6) : view === "week" ? startOfWeek(anchor, { weekStartsOn: 1 }) : startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
+  const end = view === "kanban" ? addMonths(anchor, 12) : view === "week" ? endOfWeek(anchor, { weekStartsOn: 1 }) : endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 });
   const listed = await listInstalls(iso(start), iso(end), mine);
   const installs = (listed.installs ?? []).map(asDay).filter((row) => row.id);
   const days = eachDayOfInterval({ start, end });
@@ -49,14 +51,16 @@ export async function InstallCalendarPage({
       <PageHeader eyebrow={basePath.startsWith("/operations") ? "Pulse Operations" : "Pulse Sales"} title={title} />
       {listed.ok ? null : <p className="text-sm">{listed.message}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(previous)}>Previous</Link>
-        <p className="font-display text-2xl">{format(anchor, view === "week" ? "'Week of' dd/MM/yyyy" : "MMMM yyyy", { locale: enGB })}</p>
-        <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(next)}>Next</Link>
+        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(previous)}>Previous</Link>}
+        <p className="font-display text-2xl">{view === "kanban" ? "Kanban" : format(anchor, view === "week" ? "'Week of' dd/MM/yyyy" : "MMMM yyyy", { locale: enGB })}</p>
+        {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(next)}>Next</Link>}
         <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "month" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "month")}>Month</Link>
         <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "week" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "week")}>Week</Link>
+        {basePath.startsWith("/sales") ? <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "kanban" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "kanban")}>Kanban</Link> : null}
         <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view, !mine)}>{mine ? "All installs" : "My installs"}</Link>
       </div>
-      <div className={`grid gap-2 ${view === "week" ? "md:grid-cols-7" : "grid-cols-7"}`}>
+      {view === "kanban" ? <Kanban installs={installs} basePath={basePath} /> : null}
+      {view === "kanban" ? null : <div className={`grid gap-2 ${view === "week" ? "md:grid-cols-7" : "grid-cols-7"}`}>
         {view === "month" ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((label) => (
           <p key={label} className="px-1 text-xs font-semibold text-grey">{label}</p>
         )) : null}
@@ -79,7 +83,34 @@ export async function InstallCalendarPage({
             </div>
           );
         })}
-      </div>
+      </div>}
+    </div>
+  );
+}
+
+function Kanban({ installs, basePath }: { installs: InstallDay[]; basePath: string }) {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 snap-x md:grid md:grid-cols-5 md:overflow-visible">
+      {KANBAN_COLUMNS.map(([id, label]) => {
+        const cards = installs.filter((row) => kanbanColumn(row.stage) === id);
+        return (
+          <section key={id} className="w-64 shrink-0 snap-start rounded-3xl bg-muted/50 p-3 md:w-auto">
+            <h2 className="text-sm font-semibold">{label}</h2>
+            <ul className="mt-3 space-y-2">
+              {cards.map((card) => (
+                <li key={card.id}>
+                  <Link href={`${basePath}/${card.id}`} className="block rounded-2xl border border-line bg-card p-3">
+                    <p className="font-semibold">{card.customerName}</p>
+                    <p className="text-sm text-grey">{card.orderNumber}</p>
+                    <p className="mt-2 text-sm">{ukDate(card.startOn)}</p>
+                    <p className="text-sm font-semibold">{money(card.installPrice)}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -91,5 +122,7 @@ function asDay(row: Record<string, unknown>): InstallDay {
     customerName: String(row.customerName ?? ""),
     startOn: String(row.startOn ?? "").slice(0, 10),
     endOn: String(row.endOn ?? "").slice(0, 10),
+    stage: String(row.stage ?? "booked"),
+    installPrice: row.installPrice,
   };
 }

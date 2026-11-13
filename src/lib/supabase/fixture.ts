@@ -406,12 +406,33 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return fixtureInstall(start, String(args?.p_warranty ?? "none"), true);
   }
   if (fn === "install_calendar") {
-    const rows = [fixtureInstall("2026-11-16", "annual", true), fixtureInstall("2026-11-23", "none", false)];
+    const rows = [
+      fixtureInstall("2026-11-16", "annual", true, "booked", "awaiting_access"),
+      fixtureInstall("2026-11-23", "none", false, "booked", "booked"),
+      fixtureInstall("2026-11-18", "none", true, "completed", "ready"),
+      fixtureInstall("2026-10-20", "none", false, "completed", "completed"),
+    ];
     return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
   }
+  if (fn === "install_access_preview") {
+    const hash = String(args?.p_token_hash ?? "");
+    if (hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0") {
+      return { install_id: "11111111-1111-4111-8111-1111111111c3", customer_name: "Example Sports Centre", submitted: true, media_count: 1 };
+    }
+    return { install_id: "11111111-1111-4111-8111-1111111111a1", customer_name: "Example Sports Centre", submitted: false, media_count: 0 };
+  }
+  if (fn === "orbit_register_file") return "22222222-2222-4222-8222-222222222222";
+  if (fn === "install_save_access") return { ok: true };
+  if (fn === "install_set_contact_email" || fn === "install_revoke_access_links" || fn === "install_mark_access_sent") return true;
   if (fn === "install_read") {
     const id = String(args?.p_id ?? "");
-    const row = id.endsWith("b2") ? fixtureInstall("2026-11-23", "none", false) : fixtureInstall("2026-11-16", "annual", true);
+    const row = id.endsWith("b2")
+      ? fixtureInstall("2026-11-23", "none", false)
+      : id.endsWith("c3")
+        ? fixtureInstall("2026-11-18", "none", true, "completed", "ready")
+        : id.endsWith("d4")
+          ? fixtureInstall("2026-10-20", "none", false, "completed", "completed")
+          : fixtureInstall("2026-11-16", "annual", true, "booked", "awaiting_access");
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       const source = row as Record<string, unknown>;
       const sales: Record<string, unknown> = {};
@@ -436,23 +457,34 @@ function isoPlus(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked") {
+function fixtureInstall(start: string, warranty: string, mine: boolean, status = "booked", stage = "booked") {
   const end = isoPlus(start, 2);
   return {
-    id: mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
-    orderNumber: mine ? "EXAMPLE-00490" : "SO-1002",
+    id: stage === "ready" ? "11111111-1111-4111-8111-1111111111c3" : stage === "completed" ? "11111111-1111-4111-8111-1111111111d4" : mine ? "11111111-1111-4111-8111-1111111111a1" : "11111111-1111-4111-8111-1111111111b2",
+    orderNumber: stage === "ready" ? "SO-1008" : stage === "completed" ? "SO-1009" : mine ? "EXAMPLE-00490" : "SO-1002",
+    customerName: stage === "ready" ? "Harbour Gym" : stage === "completed" ? "Northside Fitness" : mine ? "Example Sports Centre" : "Northside Fitness",
     goodsNet: 49066.53,
     installPrice: 4743.62,
     warrantyOption: warranty === "none" ? null : warranty,
     warrantyPrice: warranty === "annual" ? 1895 : null,
     startOn: start,
     endOn: end,
-    customerName: mine ? "Example Sports Centre" : "Northside Fitness",
     contactName: "Alex Example",
-    contactEmail: "alex.example@example.com",
+    contactEmail: stage === "booked" && !mine ? null : "alex.example@example.com",
     contactPhone: "01603 000000",
     siteAddress: "Example Road, Exampletown IP1 9ZZ",
     status,
+    stage,
+    needsCustomerEmail: stage === "booked" && !mine,
+    access: {
+      sentAt: stage === "booked" ? null : "2026-11-01T09:00:00Z",
+      submittedAt: stage === "ready" || stage === "completed" ? "2026-11-02T09:00:00Z" : null,
+      mediaCount: stage === "ready" || stage === "completed" ? 1 : 0,
+      answers: stage === "ready" || stage === "completed" ? { groundFloor: true, dropZone: "Front car park" } : null,
+      media: stage === "ready" || stage === "completed"
+        ? [{ id: "media-1", mime: "image/svg+xml", kind: "photo", url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='120' height='120' fill='%23146336'/%3E%3C/svg%3E" }]
+        : [],
+    },
     bookingRepId: mine ? USER_ID : "00000000-0000-4000-8000-000000000003",
     bookingRepName: mine ? "Alex Ives" : "Riley Hart",
     proposalPath: mine ? "ops/proposal.docx" : null,

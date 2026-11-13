@@ -110,7 +110,7 @@ export async function submitAccessForm(_state: ActionState, formData: FormData):
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function mediaIdsFrom(formData: FormData) {
-  return formData.getAll("mediaIds").map((value) => String(value)).filter((value) => FILE_ID.test(value));
+  return [...formData.getAll("mediaIds"), ...formData.getAll("mediaId")].map((value) => String(value)).filter((value) => FILE_ID.test(value));
 }
 
 async function storeAccessFile(file: File, entityTable: string, entityId: string) {

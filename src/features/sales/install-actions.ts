@@ -106,7 +106,7 @@ export async function bookInstall(quoteId: string, startDate: string, warrantyOp
 }
 
 export async function setInstallContactEmail(installId: string, email: string): Promise<InstallActionResult> {
-  await requireSalesUser();
+  await requireInstallReader();
   if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
   const supabase = await createClient();
   const saved = await supabase.rpc("install_set_contact_email", { p_install: installId, p_email: email });
@@ -123,7 +123,7 @@ export async function setInstallContactEmail(installId: string, email: string): 
 }
 
 async function managedInstall(installId: string) {
-  const profile = await requireSalesUser();
+  const profile = await requireInstallReader();
   if (!ID.test(installId)) return { ok: false as const, message: "That install was not found." };
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });
