@@ -623,11 +623,13 @@ function fixtureAccessMime(path: string) {
   if (ext === "png") return "image/png";
   if (ext === "webp") return "image/webp";
   if (ext === "heic") return "image/heic";
+  if (ext === "pdf") return "application/pdf";
   return "image/jpeg";
 }
 
 function fixtureAccessBytes(path: string) {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return Uint8Array.from(Buffer.from("%PDF-1.4"));
   if (ext === "png") return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   if (ext === "webp") return Uint8Array.from([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")]);
   if (ext === "mp4" || ext === "mov" || ext === "heic") {
@@ -667,7 +669,7 @@ export function createFixtureClient() {
             return { data: { path: "proposal.docx" }, error: null };
           },
           async createSignedUrl(path: string) {
-            if (bucket === "access-media") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
+            if (bucket === "access-media" || bucket === "insurance") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
             return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
           },
           async createSignedUploadUrl(path: string) {

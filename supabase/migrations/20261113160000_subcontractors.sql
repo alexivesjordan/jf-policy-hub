@@ -125,14 +125,14 @@ as $$
   select case
     when p_row.status = 'completed' then 'completed'
     when p_row.status = 'quoting' then 'quoting'
-    when p_row.access_submitted_at is not null and p_row.access_media_count > 0 then 'ready'
+    when p_row.access_submitted_at is not null then 'ready'
     when p_row.access_sent_at is not null then 'awaiting_access'
     else 'booked'
   end;
 $$;
 
 comment on function ops.install_stage(ops.installs) is
-  'quoting while a subcontractor quote is open. Otherwise booked, awaiting_access, ready, or completed.';
+  'quoting while a subcontractor quote is open. ready means the form was submitted. Photos and videos stay optional.';
 
 create or replace function ops.install_span(p_row ops.installs)
 returns jsonb

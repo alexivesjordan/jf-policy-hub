@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { moduleAllows } from "@/lib/access";
 import type { ActionState } from "@/lib/action-state";
 import { requireOperationsUser } from "@/lib/auth";
-import { isFixtureMode } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
-import { insurancePathFor, planInsuranceUpload, SignedUploadError } from "@/lib/pulse/signed-upload";
+import { insuranceBytesMatch, insurancePathOk, planInsuranceUpload, readStoredObjectHead, storedInsuranceOk } from "@/lib/pulse/access-upload";
+import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -57,29 +57,26 @@ export async function removeSubcontractor(id: string): Promise<ActionState> {
   return { ok: true, message: "Subcontractor removed." };
 }
 
-/** Signed URL so the browser uploads straight to storage and skips the Vercel body limit. */
+/** Same direct-to-storage step as prepareAccessMediaUpload. The file does not pass through Vercel. */
 export async function signInsuranceUpload(subcontractorId: string, mimeType: string, byteSize: number): Promise<SignedInsuranceUpload> {
   const profile = await requireOperationsUser();
   if (!moduleAllows(profile, "operations", "edit")) return { ok: false, message: "You cannot add insurance." };
-  try {
-    const plan = planInsuranceUpload({ entityId: subcontractorId, mimeType, byteSize });
-    if (isFixtureMode()) return { ok: true, message: "", bucket: "insurance", path: plan.path, token: "fixture", signedUrl: "" };
-    const admin = createAdminClient();
-    if (!admin) return { ok: false, message: "Supabase is not configured." };
-    const signed = await admin.storage.from(plan.bucket).createSignedUploadUrl(plan.path);
-    if (signed.error || !signed.data?.token) return { ok: false, message: "Could not prepare that upload." };
-    return {
-      ok: true,
-      message: "",
-      bucket: "insurance",
-      path: signed.data.path || plan.path,
-      token: signed.data.token,
-      signedUrl: signed.data.signedUrl,
-    };
-  } catch (error) {
-    if (error instanceof SignedUploadError) return { ok: false, message: error.message };
-    return { ok: false, message: "Could not prepare that upload." };
-  }
+  if (!ID.test(subcontractorId)) return { ok: false, message: "That subcontractor was not found." };
+  const plan = planInsuranceUpload(mimeType, byteSize);
+  if (!plan.ok) return plan;
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, message: "Supabase is not configured." };
+  const path = pulseStoragePath("ops", subcontractorId, plan.extension);
+  const signed = await admin.storage.from("insurance").createSignedUploadUrl(path);
+  if (signed.error || !signed.data) return { ok: false, message: "Could not start that upload." };
+  return {
+    ok: true,
+    message: "",
+    bucket: "insurance",
+    path: signed.data.path,
+    token: signed.data.token,
+    signedUrl: signed.data.signedUrl,
+  };
 }
 
 export async function completeInsuranceUpload(input: {
@@ -94,21 +91,29 @@ export async function completeInsuranceUpload(input: {
   if (!moduleAllows(profile, "operations", "edit")) return { ok: false, message: "You cannot add insurance." };
   if (!ID.test(input.subcontractorId)) return { ok: false, message: "That subcontractor was not found." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn)) return { ok: false, message: "Enter an expiry date." };
-  if (!insurancePathFor(input.subcontractorId, input.path)) return { ok: false, message: "That file path is not allowed." };
+  if (!insurancePathOk(input.subcontractorId, input.path)) return { ok: false, message: "That file path is not allowed." };
   const admin = createAdminClient();
   if (!admin) return { ok: false, message: "Supabase is not configured." };
-  if (!isFixtureMode()) {
-    const folder = input.path.slice(0, input.path.lastIndexOf("/"));
-    const name = input.path.slice(input.path.lastIndexOf("/") + 1);
-    const listed = await admin.storage.from("insurance").list(folder);
-    const found = listed.data?.some((item) => item.name === name);
-    if (listed.error || !found) return { ok: false, message: "That file did not arrive." };
+  const info = await admin.storage.from("insurance").info(input.path);
+  if (info.error || info.data?.size == null || !info.data.contentType) {
+    return { ok: false, message: "Upload the file before saving it." };
+  }
+  const mimeType = info.data.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  const plan = storedInsuranceOk(input.path, mimeType, info.data.size);
+  if (!plan.ok) {
+    await admin.storage.from("insurance").remove([input.path]);
+    return plan;
+  }
+  const head = await insuranceObjectHead(admin, input.path);
+  if (!head || !insuranceBytesMatch(mimeType, head)) {
+    await admin.storage.from("insurance").remove([input.path]);
+    return { ok: false, message: "That file type is not allowed." };
   }
   const registered = await admin.rpc("orbit_register_file", {
     p_bucket: "insurance",
     p_storage_path: input.path,
-    p_mime_type: input.mimeType,
-    p_byte_size: input.byteSize,
+    p_mime_type: mimeType,
+    p_byte_size: info.data.size,
     p_checksum: null,
     p_uploaded_by: profile.id,
     p_entity_schema: "ops",
@@ -139,6 +144,20 @@ export async function dropInsurance(subcontractorId: string, documentId: string)
   if (dropped.error) return { ok: false, message: messageFromError(dropped.error, "Could not remove that document.") };
   revalidatePath(`/operations/subcontractors/${subcontractorId}`);
   return { ok: true, message: "Insurance document removed." };
+}
+
+async function insuranceObjectHead(admin: NonNullable<ReturnType<typeof createAdminClient>>, path: string) {
+  const signed = await admin.storage.from("insurance").createSignedUrl(path, 60);
+  if (signed.error || !signed.data?.signedUrl) return null;
+  try {
+    const response = await fetch(signed.data.signedUrl, {
+      headers: { Range: "bytes=0-31" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    return readStoredObjectHead(response);
+  } catch {
+    return null;
+  }
 }
 
 function splitList(value: string) {

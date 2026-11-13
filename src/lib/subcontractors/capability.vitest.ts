@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
 import { buildSubcontractorDraft, isWeekday } from "@/lib/subcontractors/draft";
 import { CHECK_EMAILS, SEEDED_SUBCONTRACTORS } from "@/lib/subcontractors/seed-data";
-import { insurancePathFor, planInsuranceUpload, SignedUploadError } from "@/lib/pulse/signed-upload";
+import { INSURANCE_MAX_BYTES, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
 
 const today = "2026-11-13";
 
@@ -35,11 +35,15 @@ describe("insurance gate", () => {
     expect(blocked.preselected).toBe(false);
   });
 
-  it("plans a direct storage path and refuses a file that would pass through the app limit", () => {
-    const plan = planInsuranceUpload({ entityId: "10000000-0000-4000-8000-000000000001", mimeType: "application/pdf", byteSize: 8 * 1024 * 1024 });
-    expect(plan.bucket).toBe("insurance");
-    expect(insurancePathFor("10000000-0000-4000-8000-000000000001", plan.path)).toBe(true);
-    expect(() => planInsuranceUpload({ entityId: "10000000-0000-4000-8000-000000000001", mimeType: "application/pdf", byteSize: 21 * 1024 * 1024 })).toThrow(SignedUploadError);
+  it("plans a direct storage path and refuses a file over the insurance bucket limit", () => {
+    const plan = planInsuranceUpload("application/pdf", 8 * 1024 * 1024);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      const path = `ops/10000000-0000-4000-8000-000000000001/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.${plan.extension}`;
+      expect(insurancePathOk("10000000-0000-4000-8000-000000000001", path)).toBe(true);
+    }
+    expect(planInsuranceUpload("application/pdf", INSURANCE_MAX_BYTES + 1).ok).toBe(false);
+    expect(planInsuranceUpload("video/mp4", 1024).ok).toBe(false);
   });
 });
 
@@ -83,7 +87,7 @@ describe("seed and draft", () => {
     expect(emailNeedsCheck(["sarah@amazon-leisure", "chris@draigfitness.com"])).toBe(true);
     expect(emailNeedsCheck(["chris@draigfitness.com"])).toBe(false);
     expect([...CHECK_EMAILS]).toContain("service@poerleisure.info");
-    const sql = readFileSync(new URL("../../../supabase/migrations/20261113120000_subcontractors.sql", import.meta.url), "utf8");
+    const sql = readFileSync(new URL("../../../supabase/migrations/20261113160000_subcontractors.sql", import.meta.url), "utf8");
     for (const seeded of SEEDED_SUBCONTRACTORS) {
       expect(sql).toContain(seeded.name.replaceAll("'", "''"));
       if (seeded.email) expect(sql).toContain(seeded.email);
