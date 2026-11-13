@@ -153,15 +153,18 @@ function MediaPicker({ token }: { token: string }) {
   const [items, setItems] = useState<{ name: string; url: string; progress: number; id?: string; error?: string; video: boolean }[]>([]);
 
   async function add(list: FileList | null) {
-    const files = [...(list ?? [])];
-    for (const file of files) {
-      const url = URL.createObjectURL(file);
-      const video = file.type.startsWith("video/");
-      setItems((current) => [...current, { name: file.name, url, progress: 0, video }]);
-      const id = await upload(token, file, (progress) => {
-        setItems((current) => current.map((item) => (item.url === url ? { ...item, progress } : item)));
-      });
-      setItems((current) => current.map((item) => (item.url === url ? { ...item, id: id ?? undefined, error: id ? undefined : "Could not store that file.", progress: id ? 100 : item.progress } : item)));
+    for (const file of [...(list ?? [])]) {
+      try {
+        const url = URL.createObjectURL(file);
+        const video = file.type.startsWith("video/");
+        setItems((current) => [...current, { name: file.name, url, progress: 0, video }]);
+        const uploaded = await uploadAccessFile(token, file, (progress) => {
+          setItems((current) => current.map((item) => (item.url === url ? { ...item, progress } : item)));
+        });
+        setItems((current) => current.map((item) => (item.url === url ? { ...item, id: uploaded.id ?? undefined, error: uploaded.error ?? undefined, progress: uploaded.id ? 100 : item.progress } : item)));
+      } catch {
+        setItems((current) => [...current, { name: file.name, url: file.name, progress: 0, video: false, error: "Could not store that file." }]);
+      }
     }
   }
 
@@ -258,27 +261,52 @@ export function MediaGallery({ media }: { media: SavedMedia[] }) {
   );
 }
 
-function upload(token: string, file: File, onProgress: (value: number) => void) {
-  return new Promise<string | null>((resolve) => {
+async function uploadAccessFile(token: string, file: File, onProgress: (value: number) => void) {
+  try {
+    const mime = file.type || (file.name.toLowerCase().endsWith(".mov") ? "video/quicktime" : "application/octet-stream");
+    const signed = await fetch("/api/access/media/sign", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, mime, byteSize: file.size }),
+    });
+    const signBody = await signed.json() as { signedUrl?: string; path?: string; message?: string };
+    if (!signed.ok || !signBody.signedUrl || !signBody.path) {
+      return { id: null, error: signBody.message || "Could not start that upload." };
+    }
+    await putFile(signBody.signedUrl, file, onProgress);
+    const checksum = await sha256(file);
+    const registered = await fetch("/api/access/media/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, path: signBody.path, mime, byteSize: file.size, checksum }),
+    });
+    const saved = await registered.json() as { fileId?: string; message?: string };
+    if (!registered.ok || !saved.fileId) return { id: null, error: saved.message || "Could not store that file." };
+    return { id: saved.fileId, error: null };
+  } catch {
+    return { id: null, error: "Could not store that file." };
+  }
+}
+
+function putFile(url: string, file: File, onProgress: (value: number) => void) {
+  return new Promise<void>((resolve, reject) => {
     const body = new FormData();
-    body.set("token", token);
-    body.set("file", file);
+    body.append("cacheControl", "3600");
+    body.append("file", file);
     const request = new XMLHttpRequest();
-    request.open("POST", "/api/access/media");
+    request.open("PUT", url);
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     };
-    request.onload = () => {
-      try {
-        const payload = JSON.parse(request.responseText) as { fileId?: string };
-        resolve(request.status < 300 ? payload.fileId ?? null : null);
-      } catch {
-        resolve(null);
-      }
-    };
-    request.onerror = () => resolve(null);
+    request.onload = () => (request.status < 300 ? resolve() : reject(new Error("upload failed")));
+    request.onerror = () => reject(new Error("upload failed"));
     request.send(body);
   });
+}
+
+async function sha256(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function YesNo({ name, label, defaultYes = false }: { name: string; label: string; defaultYes?: boolean }) {
