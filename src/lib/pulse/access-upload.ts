@@ -50,6 +50,35 @@ function startsWith(bytes: Uint8Array, signature: number[]) {
   return signature.every((value, index) => bytes[index] === value);
 }
 
+/**
+ * A ranged storage response is 206 and already holds the first bytes.
+ * Reading it with getReader() hangs in the Next server. A full 200 still uses the reader.
+ */
+export async function readStoredObjectHead(response: Response) {
+  if (response.status === 206) return new Uint8Array(await response.arrayBuffer()).slice(0, 32);
+  if (response.status !== 200) return null;
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (total < 32) {
+    const next = await reader.read();
+    if (next.done || !next.value) break;
+    chunks.push(next.value);
+    total += next.value.length;
+  }
+  await reader.cancel().catch(() => undefined);
+  const head = new Uint8Array(Math.min(total, 32));
+  let offset = 0;
+  for (const chunk of chunks) {
+    const slice = chunk.subarray(0, head.length - offset);
+    head.set(slice, offset);
+    offset += slice.length;
+    if (offset >= head.length) break;
+  }
+  return head;
+}
+
 /** True when the first stored bytes match the content type. GIF is not accepted. */
 export function accessMediaBytesMatch(mimeType: string, bytes: Uint8Array) {
   const mime = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";

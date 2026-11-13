@@ -4,7 +4,7 @@ import { sendPulseEmail, type EmailLogRow } from "../email/send";
 import { canManageInstall } from "./access-auth";
 import { installStage } from "./stage";
 import { accessReminderDue, type AccessReminderCadence } from "./reminders";
-import { ACCESS_VIDEO_MAX_BYTES, accessMediaBytesMatch, planAccessMediaUpload, storedAccessMediaOk } from "../pulse/access-upload";
+import { ACCESS_VIDEO_MAX_BYTES, accessMediaBytesMatch, planAccessMediaUpload, readStoredObjectHead, storedAccessMediaOk } from "../pulse/access-upload";
 import type { Profile } from "../types";
 
 const cadence: AccessReminderCadence = { weekly: true, finalDaysBeforeStart: 7 };
@@ -72,6 +72,18 @@ describe("install follow-on", () => {
     const stored = storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "image/jpeg", 1024);
     assert.equal(stored.ok, true);
     assert.equal(storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "video/mp4", 1024).ok, false);
+  });
+
+  it("reads a 206 range body without the stream reader", async () => {
+    const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    const ranged = new Response(jpeg, { status: 206, headers: { "content-range": "bytes 0-5/6" } });
+    const head = await readStoredObjectHead(ranged);
+    assert.ok(head);
+    assert.equal(accessMediaBytesMatch("image/jpeg", head), true);
+    const html = new Response(Buffer.from("<html>not a jpeg</html>"), { status: 206 });
+    const posed = await readStoredObjectHead(html);
+    assert.ok(posed);
+    assert.equal(accessMediaBytesMatch("image/jpeg", posed), false);
   });
 
   it("logs email without sending when the Resend key is missing", async () => {

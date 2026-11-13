@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
-import { accessMediaBytesMatch, accessMediaPathOk, planAccessMediaUpload, storedAccessMediaOk } from "@/lib/pulse/access-upload";
+import { accessMediaBytesMatch, accessMediaPathOk, planAccessMediaUpload, readStoredObjectHead, storedAccessMediaOk } from "@/lib/pulse/access-upload";
 import { storePulseFile } from "@/lib/pulse/files";
 import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { hashPulseToken } from "@/lib/pulse/token-hash";
@@ -196,28 +196,15 @@ export async function finishAccessMediaUpload(token: string, path: string) {
 async function storedObjectHead(admin: NonNullable<ReturnType<typeof createAdminClient>>, path: string) {
   const signed = await admin.storage.from("access-media").createSignedUrl(path, 60);
   if (signed.error || !signed.data?.signedUrl) return null;
-  const response = await fetch(signed.data.signedUrl, { headers: { Range: "bytes=0-31" } });
-  if (!response.ok && response.status !== 206) return null;
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (total < 32) {
-    const next = await reader.read();
-    if (next.done || !next.value) break;
-    chunks.push(next.value);
-    total += next.value.length;
+  try {
+    const response = await fetch(signed.data.signedUrl, {
+      headers: { Range: "bytes=0-31" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    return readStoredObjectHead(response);
+  } catch {
+    return null;
   }
-  await reader.cancel().catch(() => undefined);
-  const head = new Uint8Array(Math.min(total, 32));
-  let offset = 0;
-  for (const chunk of chunks) {
-    const slice = chunk.subarray(0, head.length - offset);
-    head.set(slice, offset);
-    offset += slice.length;
-    if (offset >= head.length) break;
-  }
-  return head;
 }
 
 function answersFrom(formData: FormData) {
