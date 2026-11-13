@@ -5,10 +5,9 @@ import { getCurrentProfile } from "@/lib/auth";
 import { messageFromError } from "@/lib/errors";
 import { DOCUMENT_LABELS, VISIT_DOCUMENTS, type VisitDocumentKey } from "@/lib/installs/product-lines";
 import type { StorageTicket } from "@/lib/installs/upload-ticket";
-import { pathBelongsToInstall } from "@/lib/installs/permissions";
 import type { RiskAnswers, SheetDraft } from "@/lib/installs/visit-form";
 import { storePulseFile } from "@/lib/pulse/files";
-import { issueStorageTicket, registerStorageObject } from "@/lib/pulse/signed-upload";
+import { issueDocumentTicket, issuePhotoTicket, registerDocumentObject, registerPhotoObject } from "@/lib/pulse/signed-upload";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { createClient } from "@/lib/supabase/server";
 import { commitVisit, loadVisit, presentedToken, saveRiskForVisit } from "@/features/field/submit";
@@ -37,31 +36,35 @@ async function actor(token: string | null) {
   return profile;
 }
 
-export async function issuePhotoUpload(installId: string, token: string | null): Promise<FieldResult> {
+export async function issuePhotoUpload(installId: string, token: string | null, mimeType: string, byteSize: number): Promise<FieldResult> {
   try {
-    const profile = await actor(token);
+    await actor(token);
     await loadVisit(installId, token);
-    const ticket = await issueStorageTicket({ bucket: "job-sheets", ownerId: installId, extension: "jpg" });
-    void profile;
+    const ticket = await issuePhotoTicket(installId, mimeType, byteSize);
     return { ok: true, message: "Upload ready.", ticket };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not start that upload." };
   }
 }
 
-export async function registerPhotoUpload(installId: string, token: string | null, path: string, kind: "concern" | "equipment"): Promise<FieldResult> {
+export async function registerPhotoUpload(
+  installId: string,
+  token: string | null,
+  path: string,
+  kind: "concern" | "equipment",
+  mimeType: string,
+  byteSize: number,
+): Promise<FieldResult> {
   try {
     const profile = await actor(token);
     await loadVisit(installId, token);
-    if (!pathBelongsToInstall(installId, path)) return { ok: false, message: "That photo is not on this job." };
-    const stored = await registerStorageObject({
-      bucket: "job-sheets",
+    const stored = await registerPhotoObject({
       path,
       ownerId: installId,
+      mimeType,
+      byteSize,
       kind,
       uploadedBy: profile?.id ?? null,
-      entityTable: "installs",
-      expect: "photo",
     });
     return { ok: true, message: "Photo stored.", fileId: stored.fileId };
   } catch (error) {
@@ -135,7 +138,7 @@ export async function saveStaffSignature(formData: FormData): Promise<FieldResul
   }
 }
 
-export async function issueDocumentUpload(): Promise<FieldResult> {
+export async function issueDocumentUpload(byteSize: number): Promise<FieldResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, message: "You need to be signed in." };
   try {
@@ -143,27 +146,24 @@ export async function issueDocumentUpload(): Promise<FieldResult> {
     await supabase.rpc("install_claim_engineer");
     const allowed = await supabase.rpc("install_sees_all");
     if (allowed.error || allowed.data !== true) return { ok: false, message: "You cannot update those documents." };
-    const ticket = await issueStorageTicket({ bucket: "documents", ownerId: profile.id, extension: "pdf" });
+    const ticket = await issueDocumentTicket(profile.id, byteSize);
     return { ok: true, message: "Upload ready.", ticket };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not start that upload." };
   }
 }
 
-export async function registerDocumentUpload(key: VisitDocumentKey, path: string): Promise<FieldResult> {
+export async function registerDocumentUpload(key: VisitDocumentKey, path: string, byteSize: number): Promise<FieldResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, message: "You need to be signed in." };
   if (!VISIT_DOCUMENTS.includes(key)) return { ok: false, message: "That document is not on the list." };
   try {
-    if (!pathBelongsToInstall(profile.id, path)) return { ok: false, message: "That file is not yours." };
-    const stored = await registerStorageObject({
-      bucket: "documents",
+    const stored = await registerDocumentObject({
       path,
       ownerId: profile.id,
+      byteSize,
       kind: key,
       uploadedBy: profile.id,
-      entityTable: "visit_documents",
-      expect: "pdf",
     });
     const supabase = await createClient();
     const saved = await supabase.rpc("install_save_visit_document", { p_key: key, p_file_id: stored.fileId });

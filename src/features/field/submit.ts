@@ -73,6 +73,8 @@ async function logEmail(input: { to: string; subject: string; template: string; 
     p_provider_id: null,
     p_status: "logged",
     p_detail: input.detail,
+    p_token_link: null,
+    p_access_path: null,
   });
 }
 

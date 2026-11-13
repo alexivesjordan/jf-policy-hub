@@ -76,7 +76,8 @@ begin
     raise exception 'app: That file bucket is not valid.';
   end if;
   if p_storage_path is null
-     or p_storage_path !~ '^[a-z0-9][a-z0-9_./-]{0,480}$'
+     or char_length(p_storage_path) > 255
+     or p_storage_path !~ '^[a-z0-9][a-z0-9_./-]{0,254}$'
      or p_storage_path like '%..%'
      or p_storage_path like '/%'
   then

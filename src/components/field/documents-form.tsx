@@ -43,12 +43,12 @@ export function DocumentsForm({ uploaded }: { uploaded: VisitDocumentKey[] }) {
 }
 
 async function upload(key: VisitDocumentKey, file: File) {
-  const issued = await issueDocumentUpload();
+  const issued = await issueDocumentUpload(file.size);
   if (!issued.ok || !issued.ticket) return issued;
   try {
     await putSignedUpload(issued.ticket, file, "application/pdf");
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not upload that PDF." };
   }
-  return registerDocumentUpload(key, issued.ticket.path);
+  return registerDocumentUpload(key, issued.ticket.path, file.size);
 }
