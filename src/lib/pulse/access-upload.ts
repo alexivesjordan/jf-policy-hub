@@ -11,7 +11,6 @@ const IMAGE: Record<string, string> = {
   "image/png": "png",
   "image/heic": "heic",
   "image/webp": "webp",
-  "image/gif": "gif",
 };
 
 export function planAccessMediaUpload(mimeType: string, byteSize: number) {
@@ -34,7 +33,34 @@ export function planAccessMediaUpload(mimeType: string, byteSize: number) {
 }
 
 export function accessMediaPathOk(installId: string, path: string) {
-  return new RegExp(`^ops/${installId}/[0-9a-f-]{36}\\.(mp4|mov|jpg|png|heic|webp|gif)$`, "i").test(path);
+  return new RegExp(`^ops/${installId}/[0-9a-f-]{36}\\.(mp4|mov|jpg|png|heic|webp)$`, "i").test(path);
+}
+
+const HEIC_BRANDS = new Set(["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"]);
+
+function ascii(bytes: Uint8Array, start: number, end: number) {
+  let text = "";
+  for (let index = start; index < end && index < bytes.length; index += 1) {
+    text += String.fromCharCode(bytes[index] ?? 0);
+  }
+  return text;
+}
+
+function startsWith(bytes: Uint8Array, signature: number[]) {
+  return signature.every((value, index) => bytes[index] === value);
+}
+
+/** True when the first stored bytes match the content type. GIF is not accepted. */
+export function accessMediaBytesMatch(mimeType: string, bytes: Uint8Array) {
+  const mime = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (mime === "image/jpeg") return startsWith(bytes, [0xff, 0xd8, 0xff]);
+  if (mime === "image/png") return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (mime === "image/webp") return ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP";
+  if (bytes.length < 12 || ascii(bytes, 4, 8) !== "ftyp") return false;
+  const brand = ascii(bytes, 8, 12);
+  if (mime === "image/heic") return HEIC_BRANDS.has(brand);
+  if (mime === "video/mp4" || mime === "video/quicktime") return !HEIC_BRANDS.has(brand);
+  return false;
 }
 
 /** The stored object's type and size, not the values the browser claimed. */

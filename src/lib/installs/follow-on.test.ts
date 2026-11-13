@@ -4,7 +4,7 @@ import { sendPulseEmail, type EmailLogRow } from "../email/send";
 import { canManageInstall } from "./access-auth";
 import { installStage } from "./stage";
 import { accessReminderDue, type AccessReminderCadence } from "./reminders";
-import { ACCESS_VIDEO_MAX_BYTES, planAccessMediaUpload, storedAccessMediaOk } from "../pulse/access-upload";
+import { ACCESS_VIDEO_MAX_BYTES, accessMediaBytesMatch, planAccessMediaUpload, storedAccessMediaOk } from "../pulse/access-upload";
 import type { Profile } from "../types";
 
 const cadence: AccessReminderCadence = { weekly: true, finalDaysBeforeStart: 7 };
@@ -60,6 +60,15 @@ describe("install follow-on", () => {
     assert.equal(planAccessMediaUpload("video/quicktime", ACCESS_VIDEO_MAX_BYTES + 1).ok, false);
     assert.equal(planAccessMediaUpload("image/jpeg", 1024).ok, true);
     assert.equal(planAccessMediaUpload("image/heic", 1024).ok, true);
+    assert.equal(planAccessMediaUpload("image/gif", 1024).ok, false);
+    assert.equal(accessMediaBytesMatch("image/jpeg", Uint8Array.from([0xff, 0xd8, 0xff, 0xe0])), true);
+    assert.equal(accessMediaBytesMatch("image/jpeg", Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), false);
+    assert.equal(accessMediaBytesMatch("image/png", Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), true);
+    assert.equal(accessMediaBytesMatch("image/webp", Uint8Array.from([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")])), true);
+    assert.equal(accessMediaBytesMatch("image/heic", ftyp("heic")), true);
+    assert.equal(accessMediaBytesMatch("video/mp4", ftyp("isom")), true);
+    assert.equal(accessMediaBytesMatch("video/quicktime", ftyp("qt  ")), true);
+    assert.equal(accessMediaBytesMatch("video/mp4", ftyp("heic")), false);
     const stored = storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "image/jpeg", 1024);
     assert.equal(stored.ok, true);
     assert.equal(storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "video/mp4", 1024).ok, false);
@@ -139,6 +148,13 @@ describe("install follow-on", () => {
     assert.equal(rows[0]?.to, "customer@example.com");
   });
 });
+
+function ftyp(brand: string) {
+  const bytes = new Uint8Array(16);
+  bytes.set(Buffer.from("ftyp"), 4);
+  bytes.set(Buffer.from(brand), 8);
+  return bytes;
+}
 
 function profile(overrides: Partial<Profile>): Profile {
   return {

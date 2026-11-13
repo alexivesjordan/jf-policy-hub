@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
-import { accessMediaPathOk, planAccessMediaUpload, storedAccessMediaOk } from "@/lib/pulse/access-upload";
+import { accessMediaBytesMatch, accessMediaPathOk, planAccessMediaUpload, storedAccessMediaOk } from "@/lib/pulse/access-upload";
 import { storePulseFile } from "@/lib/pulse/files";
 import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { hashPulseToken } from "@/lib/pulse/token-hash";
@@ -166,15 +166,21 @@ export async function finishAccessMediaUpload(token: string, path: string) {
   if (info.error || info.data?.size == null || !info.data.contentType) {
     return { ok: false as const, message: "Upload the file before saving it." };
   }
-  const plan = storedAccessMediaOk(path, info.data.contentType, info.data.size);
+  const mimeType = info.data.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  const plan = storedAccessMediaOk(path, mimeType, info.data.size);
   if (!plan.ok) {
     await admin.storage.from("access-media").remove([path]);
     return plan;
   }
+  const head = await storedObjectHead(admin, path);
+  if (!head || !accessMediaBytesMatch(mimeType, head)) {
+    await admin.storage.from("access-media").remove([path]);
+    return { ok: false as const, message: "That file type is not allowed." };
+  }
   const registered = await admin.rpc("orbit_register_file", {
     p_bucket: "access-media",
     p_storage_path: path,
-    p_mime_type: info.data.contentType.split(";")[0]?.trim().toLowerCase() ?? info.data.contentType,
+    p_mime_type: mimeType,
     p_byte_size: info.data.size,
     p_checksum: null,
     p_uploaded_by: null,
@@ -185,6 +191,33 @@ export async function finishAccessMediaUpload(token: string, path: string) {
   });
   if (registered.error || !registered.data) return { ok: false as const, message: "Could not register that file." };
   return { ok: true as const, fileId: registered.data as string };
+}
+
+async function storedObjectHead(admin: NonNullable<ReturnType<typeof createAdminClient>>, path: string) {
+  const signed = await admin.storage.from("access-media").createSignedUrl(path, 60);
+  if (signed.error || !signed.data?.signedUrl) return null;
+  const response = await fetch(signed.data.signedUrl, { headers: { Range: "bytes=0-31" } });
+  if (!response.ok && response.status !== 206) return null;
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (total < 32) {
+    const next = await reader.read();
+    if (next.done || !next.value) break;
+    chunks.push(next.value);
+    total += next.value.length;
+  }
+  await reader.cancel().catch(() => undefined);
+  const head = new Uint8Array(Math.min(total, 32));
+  let offset = 0;
+  for (const chunk of chunks) {
+    const slice = chunk.subarray(0, head.length - offset);
+    head.set(slice, offset);
+    offset += slice.length;
+    if (offset >= head.length) break;
+  }
+  return head;
 }
 
 function answersFrom(formData: FormData) {
