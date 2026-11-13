@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
 import { buildSubcontractorDraft, isWeekday } from "@/lib/subcontractors/draft";
 import { CHECK_EMAILS, SEEDED_SUBCONTRACTORS } from "@/lib/subcontractors/seed-data";
-import { INSURANCE_MAX_BYTES, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
+import { INSURANCE_MAX_BYTES, insuranceBytesMatch, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
 
 const today = "2026-11-13";
 
@@ -44,6 +44,8 @@ describe("insurance gate", () => {
     }
     expect(planInsuranceUpload("application/pdf", INSURANCE_MAX_BYTES + 1).ok).toBe(false);
     expect(planInsuranceUpload("video/mp4", 1024).ok).toBe(false);
+    expect(insuranceBytesMatch("application/pdf", new Uint8Array(Buffer.from("%PDF-1.4")))).toBe(true);
+    expect(insuranceBytesMatch("application/pdf", new Uint8Array([0xff, 0xd8, 0xff]))).toBe(false);
   });
 });
 
@@ -87,7 +89,7 @@ describe("seed and draft", () => {
     expect(emailNeedsCheck(["sarah@amazon-leisure", "chris@draigfitness.com"])).toBe(true);
     expect(emailNeedsCheck(["chris@draigfitness.com"])).toBe(false);
     expect([...CHECK_EMAILS]).toContain("service@poerleisure.info");
-    const sql = readFileSync(new URL("../../../supabase/migrations/20261113160000_subcontractors.sql", import.meta.url), "utf8");
+    const sql = readFileSync(new URL("../../../supabase/migrations/20261113220000_subcontractors.sql", import.meta.url), "utf8");
     for (const seeded of SEEDED_SUBCONTRACTORS) {
       expect(sql).toContain(seeded.name.replaceAll("'", "''"));
       if (seeded.email) expect(sql).toContain(seeded.email);
