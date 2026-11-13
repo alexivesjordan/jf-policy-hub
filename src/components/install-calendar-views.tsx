@@ -5,7 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { money, ukDate } from "@/components/install-sales-view";
-import { KANBAN_COLUMNS, firstFilledKanban, installCoversDay, kanbanColumn } from "@/lib/installs/access-ui";
+import { KANBAN_COLUMNS, firstFilledKanban, installCoversDay, kanbanAccessChip, kanbanColumn } from "@/lib/installs/access-ui";
 import { isWeekend } from "@/lib/pulse/booking-range";
 
 export type CalendarInstall = {
@@ -16,6 +16,7 @@ export type CalendarInstall = {
   endOn: string;
   stage: string;
   installPrice: unknown;
+  mediaCount: number | null;
 };
 
 export function InstallMonthGrid({
@@ -105,16 +106,20 @@ export function InstallKanban({ installs, basePath }: { installs: CalendarInstal
           <section key={id} data-column={id} className="w-64 shrink-0 snap-start rounded-3xl bg-muted/50 p-3 md:w-auto">
             <h2 className="text-sm font-semibold">{label}</h2>
             <ul className="mt-3 space-y-2">
-              {cards.map((card) => (
+              {cards.map((card) => {
+                const chip = kanbanAccessChip(card.stage, card.mediaCount);
+                return (
                 <li key={card.id}>
                   <Link href={`${basePath}/${card.id}`} className="block rounded-2xl border border-line bg-card p-3">
                     <p className="font-semibold">{card.customerName}</p>
                     <p className="text-sm text-grey">{card.orderNumber}</p>
+                    {chip ? <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold">{chip}</span> : null}
                     <p className="mt-2 text-sm">{ukDate(card.startOn)}</p>
                     <p className="text-sm font-semibold">{money(card.installPrice)}</p>
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
         );

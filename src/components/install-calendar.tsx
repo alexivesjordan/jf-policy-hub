@@ -96,5 +96,13 @@ function asDay(row: Record<string, unknown>): CalendarInstall {
     endOn: String(row.endOn ?? "").slice(0, 10),
     stage: String(row.stage ?? "booked"),
     installPrice: row.installPrice,
+    mediaCount: mediaCountOf(row),
   };
+}
+
+function mediaCountOf(row: Record<string, unknown>) {
+  const access = row.access;
+  if (!access || typeof access !== "object" || !("mediaCount" in access)) return null;
+  const count = Number((access as { mediaCount?: unknown }).mediaCount);
+  return Number.isFinite(count) ? count : null;
 }

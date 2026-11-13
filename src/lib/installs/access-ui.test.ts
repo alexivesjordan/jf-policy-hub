@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { accessChip, answerText, basisText, firstFilledKanban, installCoversDay, kanbanColumn, orderedAnswers, termsBoxReady } from "./access-ui";
+import { accessChip, answerText, basisText, firstFilledKanban, installCoversDay, kanbanAccessChip, kanbanColumn, orderedAnswers, termsBoxReady } from "./access-ui";
 
 describe("install access UI", () => {
   it("names the access chip from what has been sent", () => {
@@ -22,6 +22,10 @@ describe("install access UI", () => {
     assert.equal(kanbanColumn("mystery"), "booked");
     assert.equal(firstFilledKanban(["ready", "booked"]), "booked");
     assert.equal(firstFilledKanban([]), null);
+    assert.equal(kanbanAccessChip("awaiting_access", 0), "Awaiting form");
+    assert.equal(kanbanAccessChip("ready", 2), "Submitted");
+    assert.equal(kanbanAccessChip("ready", 0), "No photos");
+    assert.equal(kanbanAccessChip("booked", 0), null);
   });
 
   it("names every charges basis in plain words", () => {

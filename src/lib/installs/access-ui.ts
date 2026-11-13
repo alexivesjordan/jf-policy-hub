@@ -30,6 +30,15 @@ export function kanbanColumn(stage: unknown) {
   return KANBAN_COLUMNS.some(([id]) => id === value) ? value : "booked";
 }
 
+/** Ready and Awaiting look alike on a card, so the chip names the access state. */
+export function kanbanAccessChip(stage: unknown, mediaCount: unknown): "Awaiting form" | "Submitted" | "No photos" | null {
+  if (stage === "awaiting_access") return "Awaiting form";
+  if (stage !== "ready") return null;
+  const count = Number(mediaCount);
+  if (Number.isFinite(count) && count === 0) return "No photos";
+  return "Submitted";
+}
+
 /** First column that has a card. Quoting stays empty until a later phase. */
 export function firstFilledKanban(stages: unknown[]) {
   const found = KANBAN_COLUMNS.find(([id]) => stages.some((stage) => kanbanColumn(stage) === id));
