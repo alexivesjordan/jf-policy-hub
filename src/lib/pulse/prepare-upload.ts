@@ -27,6 +27,16 @@ export function isPulseBucket(value: string): value is PulseBucket {
   return (PULSE_BUCKETS as readonly string[]).includes(value);
 }
 
+export function accessMediaExtension(mimeType: string) {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/gif") return "gif";
+  if (mimeType === "video/mp4") return "mp4";
+  if (mimeType === "video/quicktime") return "mov";
+  return null;
+}
+
 /** Images are resized to a JPEG. PDF and video bytes are stored as given. */
 export async function preparePulseUpload(bucket: PulseBucket, mimeType: string, bytes: Buffer) {
   if (!ALLOWED[bucket].includes(mimeType)) {
