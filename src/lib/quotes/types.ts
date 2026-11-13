@@ -8,6 +8,7 @@ export type ExtractedLine = {
   priceEach: number;
   lineTotal: number;
   lineVat: number;
+  unitWeightKg?: number | null;
 };
 
 /** A quote pulled from text. Segment is never inferred from a Cin7 Core PDF. */
@@ -29,6 +30,8 @@ export type ExtractedQuote = {
   totalOrderNet: number | null;
   vat: number | null;
   total: number | null;
+  /** Printed total weight, when the PDF states one. */
+  totalWeightKg: number | null;
   warnings: string[];
 };
 

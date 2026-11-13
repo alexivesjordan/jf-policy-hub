@@ -11,6 +11,7 @@ import { closedInstallMessage } from "@/lib/installs/access-auth";
 import { issueInstallAccess, refusedClosedInstall } from "@/lib/installs/issue-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildSubcontractorDraft, draftHtml, isWeekday } from "@/lib/subcontractors/draft";
+import { orderWeightKg, subcontractorKitLines } from "@/lib/subcontractors/quote-kit";
 import { inboundDomain, newReplyToken, replyAddress } from "@/lib/subcontractors/inbound";
 import { deliverableEmails, jobTypesForKit, markAlreadyEmailed, rankSubcontractors, selectionGate, type QuoteChoice } from "@/lib/subcontractors/capability";
 import { createTokenLink } from "@/lib/pulse/tokens";
@@ -25,11 +26,11 @@ export async function sendSubcontractorQuote(_state: ActionState, formData: Form
   const quoteId = String(formData.get("savedQuoteId") ?? "");
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  const dates = String(formData.get("dates") ?? "").split(",").map((day) => day.trim()).filter(Boolean);
+  const timeframe = String(formData.get("timeframe") ?? "").trim();
   const ids = formData.getAll("subcontractorId").map(String).filter((id) => ID.test(id));
   if (!ID.test(quoteId)) return { ok: false, message: "Load the quote again." };
   if (!subject || !body) return { ok: false, message: "Write the email before sending." };
-  if (dates.length === 0 || dates.some((day) => !isWeekday(day))) return { ok: false, message: "Suggested dates have to be weekdays." };
+  if (!timeframe) return { ok: false, message: "Say when you want it installed." };
   if (ids.length === 0) return { ok: false, message: "Choose a subcontractor." };
 
   const today = new Date().toISOString().slice(0, 10);
@@ -48,7 +49,7 @@ export async function sendSubcontractorQuote(_state: ActionState, formData: Form
   }));
   if (sends.some((send) => send.to.length === 0)) return { ok: false, message: "Check email before sending." };
   const supabase = await createClient();
-  const opened = await supabase.rpc("subcontractor_open", { p_quote_id: quoteId, p_dates: dates, p_sends: sends });
+  const opened = await supabase.rpc("subcontractor_open", { p_quote_id: quoteId, p_dates: [], p_sends: sends });
   if (opened.error || !opened.data) return { ok: false, message: messageFromError(opened.error, "Could not open that quote.") };
   const result = opened.data as { installId: string; threads: { id: string; replyToken: string; emails: string[] }[] };
   await mailThreads(supabase, result.installId, subject, body, domain, result.threads ?? []);
@@ -88,19 +89,21 @@ export async function loadAskAnother(installId: string, emailedIds: string[]): P
   };
   if (!row.quoteId) return null;
   const lines = (row.lines ?? []).map((line) => ({
+    sku: (line as { sku?: string | null }).sku ?? null,
     qty: Number(line.qty ?? 0),
     description: String(line.description ?? ""),
     category: line.category ?? null,
+    unitWeightKg: (line as { unitWeightKg?: number | null }).unitWeightKg ?? null,
   }));
-  const dates = (row.suggestedDates ?? []).map((day) => String(day).slice(0, 10)).filter(isWeekday);
+  const kit = subcontractorKitLines(lines);
   const jobTypes = jobTypesForKit(lines);
   const postcode = String(row.postcode ?? "");
+  const profileName = profile.first_name || profile.full_name?.split(" ")[0] || "";
   const email = buildSubcontractorDraft({
-    orderNumber: String(row.orderNumber ?? ""),
-    customerName: String(row.customerName ?? ""),
     postcode,
-    lines,
-    dates,
+    lines: kit,
+    weightKg: orderWeightKg(lines),
+    repFirstName: profileName,
   });
   const directory = await listSubcontractorRecords();
   return {
@@ -111,7 +114,7 @@ export async function loadAskAnother(installId: string, emailedIds: string[]): P
     jobTypes,
     subject: email.subject,
     draft: email.text,
-    initialDates: dates,
+    initialDates: [],
     choices: markAlreadyEmailed(rankSubcontractors(directory, {
       postcode,
       jobTypes,

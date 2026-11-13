@@ -28,6 +28,8 @@ export type SheetDraft = {
   delivery: boolean;
   installation: boolean;
   warranty: boolean;
+  kitAsOrdered: boolean;
+  kitNotes: string;
   lines: SheetLine[];
   workCarriedOut: string;
   parts: SheetPart[];
@@ -94,6 +96,7 @@ export function validateSheet(sheet: SheetDraft) {
   if (!sheet.sheetOn) return "Add the date.";
   if (!sheet.customerName.trim()) return "Add the customer name.";
   if (!sheet.engineerName.trim()) return "Add the engineer name.";
+  if (!sheet.kitAsOrdered) return "Confirm all kit was installed as ordered.";
   if (!sheet.workCarriedOut.trim()) return "Add the work carried out.";
   return (
     boolAnswer(sheet.locationOk, "the location question") ||

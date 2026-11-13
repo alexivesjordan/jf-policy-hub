@@ -1,3 +1,5 @@
+import { formatKitQty, formatOrderWeight } from "@/lib/subcontractors/quote-kit";
+
 export function isWeekday(iso: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
   const day = new Date(`${iso}T00:00:00Z`).getUTCDay();
@@ -11,44 +13,40 @@ export function formatUkDate(iso: string) {
 }
 
 export function buildSubcontractorDraft(input: {
-  orderNumber: string;
-  customerName: string;
   postcode: string;
   lines: { qty: number; description: string }[];
-  dates: string[];
+  weightKg: number | null;
+  timeframe?: string;
+  repFirstName?: string;
 }) {
-  const kit = input.lines.map((line) => `- ${line.qty}× ${line.description}`).join("\n");
-  const dates = input.dates.filter(isWeekday).map((day) => `- ${formatUkDate(day)}`).join("\n");
-  const subject = `Install quote ${input.orderNumber}`;
+  const kit = input.lines.map((line) => `${formatKitQty(line.qty)}x ${line.description}`).join("\n");
   const text = [
-    "Hello,",
+    "Hello, hope you're well.",
     "",
-    `Please quote for this install for ${input.customerName}.`,
+    `Can you please provide me with a quote for the below kit list? The total weight of the order is ${formatOrderWeight(input.weightKg)}kg.`,
     "",
-    `Order: ${input.orderNumber}`,
-    `Postcode: ${input.postcode || "Not set"}`,
+    kit,
     "",
-    "Kit:",
-    kit || "- No lines on the quote",
+    `The install postcode is ${input.postcode.trim() || "[POSTCODE]"}.`,
     "",
-    "Suggested dates:",
-    dates || "- Not set",
+    `We're currently looking at installing this kit ${input.timeframe?.trim() || "[TIMEFRAME]"}`,
     "",
-    "Reply with your price.",
+    "Looking forward to seeing a price.",
     "",
+    "Best wishes,",
+    input.repFirstName?.trim() || "[NAME]",
     "Jordan Fitness",
   ].join("\n");
-  return { subject, text };
+  return { subject: "Install quote", text };
 }
 
-/** Replaces only the suggested-dates block so the rest of an edited draft stays. */
-export function replaceDateBlock(text: string, dates: string[]) {
-  const lines = dates.filter(isWeekday).map((day) => `- ${formatUkDate(day)}`);
-  const block = ["Suggested dates:", ...(lines.length ? lines : ["- Not set"])].join("\n");
-  if (/Suggested dates:\n(?:- .*(?:\n|$))*/.test(text)) {
-    return text.replace(/Suggested dates:\n(?:- .*(?:\n|$))*/, `${block}\n`);
+/** Keeps an edited draft and only swaps the timeframe sentence. */
+export function replaceTimeframe(text: string, timeframe: string) {
+  const line = `We're currently looking at installing this kit ${timeframe.trim() || "[TIMEFRAME]"}`;
+  if (/We're currently looking at installing this kit .*/.test(text)) {
+    return text.replace(/We're currently looking at installing this kit .*/, line);
   }
-  return `${text.trim()}\n\n${block}\n`;
+  return `${text.trim()}\n\n${line}\n`;
 }
 
 export function draftHtml(text: string) {

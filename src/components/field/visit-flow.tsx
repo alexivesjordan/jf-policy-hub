@@ -6,8 +6,7 @@ import { SignaturePad } from "@/components/field/signature-pad";
 import { Choice, YesNo } from "@/components/field/yes-no";
 import { Input, TextArea } from "@/components/pulse/ui";
 import { createSubcontractorLink, saveVisitRisk, submitVisit } from "@/features/field/actions";
-import { orderKitLines } from "@/lib/installs/kit-lines";
-import { FORM_NOTICES, RISK_ITEMS, blankLine, blankPart, emptyRisk, jobSheetCompleteLine, vehicleChoiceProblem, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { FORM_NOTICES, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, vehicleChoiceProblem, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { Select } from "@/components/pulse/ui";
 
 export type VisitScreen = {
@@ -33,7 +32,6 @@ export type VisitScreen = {
 const steps = ["Risk", "Sheet", "Photos", "Sign"];
 
 function draftFrom(screen: VisitScreen): SheetDraft {
-  const lines = orderKitLines(screen.lines);
   return {
     visitType: "install",
     sheetOn: screen.startOn || "",
@@ -51,7 +49,9 @@ function draftFrom(screen: VisitScreen): SheetDraft {
     delivery: false,
     installation: true,
     warranty: false,
-    lines: lines.map((line) => ({ code: line.sku, description: line.description, reportedJob: "", qty: line.qty && line.qty > 0 ? String(line.qty) : "1", fromOrder: true })),
+    kitAsOrdered: false,
+    kitNotes: "",
+    lines: [],
     workCarriedOut: "",
     parts: [blankPart()],
     locationOk: null,
@@ -241,54 +241,11 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
   );
 }
 
-function stepQty(value: string | undefined, delta: number) {
-  const current = Number(value);
-  const next = (Number.isFinite(current) && current > 0 ? current : 1) + delta;
-  return String(Math.max(1, next));
-}
-
-function KitList({ lines, onChange }: { lines: SheetDraft["lines"]; onChange: (lines: SheetDraft["lines"]) => void }) {
-  const count = lines.filter((line) => line.code || line.description).length;
-  function setLine(index: number, partial: Partial<SheetDraft["lines"][number]>) {
-    onChange(lines.map((line, item) => (item === index ? { ...line, ...partial } : line)));
-  }
-  return (
-    <div className="space-y-3">
-      <p className="text-base font-semibold">Kit · {count}</p>
-      {lines.map((line, index) => (
-        <div key={`${line.fromOrder ? "order" : "added"}-${index}`} className="space-y-2 rounded-2xl border border-line bg-card p-3">
-          {line.fromOrder ? (
-            <div className="flex items-center gap-2">
-              <button type="button" aria-label={`Less of ${line.description || line.code || "product"}`} className="inline-flex size-11 items-center justify-center rounded-full border border-line text-lg" onClick={() => setLine(index, { qty: stepQty(line.qty, -1) })}>−</button>
-              <span className="w-8 text-center text-base font-semibold">{line.qty || "1"}</span>
-              <button type="button" aria-label={`More of ${line.description || line.code || "product"}`} className="inline-flex size-11 items-center justify-center rounded-full border border-line text-lg" onClick={() => setLine(index, { qty: stepQty(line.qty, 1) })}>+</button>
-              <span className="min-w-0 flex-1 text-sm">{line.description || line.code}</span>
-            </div>
-          ) : (
-            <>
-              <Input aria-label="Product description" placeholder="Description" value={line.description} onChange={(event) => setLine(index, { description: event.target.value })} />
-              <div className="grid grid-cols-[1fr_5rem] gap-2">
-                <Input aria-label="Product code" placeholder="SKU" value={line.code} onChange={(event) => setLine(index, { code: event.target.value })} />
-                <Input aria-label="Quantity" inputMode="numeric" value={line.qty ?? "1"} onChange={(event) => setLine(index, { qty: event.target.value })} />
-              </div>
-              <button type="button" className="min-h-11 text-sm font-semibold underline decoration-red" onClick={() => onChange(lines.filter((_, item) => item !== index))}>
-                Remove
-              </button>
-            </>
-          )}
-        </div>
-      ))}
-      <button type="button" className="min-h-12 text-base font-semibold underline decoration-red" onClick={() => onChange([...lines, blankLine()])}>
-        Add product
-      </button>
-    </div>
-  );
-}
-
 function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partial: Partial<SheetDraft>) => void; onNext: () => void }) {
   function setPart(index: number, partial: Partial<SheetDraft["parts"][number]>) {
     patch({ parts: sheet.parts.map((part, item) => (item === index ? { ...part, ...partial } : part)) });
   }
+  const [note, setNote] = useState("");
   return (
     <section className="space-y-4">
       <h2 className="font-display text-3xl">Job sheet</h2>
@@ -313,7 +270,11 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Delivery" value={sheet.delivery} onChange={(next) => patch({ delivery: next })} />
       <YesNo label="Installation" value={sheet.installation} onChange={(next) => patch({ installation: next })} />
       <YesNo label="Warranty" value={sheet.warranty} onChange={(next) => patch({ warranty: next })} />
-      <KitList lines={sheet.lines} onChange={(lines) => patch({ lines })} />
+      <label className="flex min-h-12 items-start gap-3 text-base font-semibold">
+        <input type="checkbox" className="mt-1 size-5" checked={sheet.kitAsOrdered} onChange={(event) => { patch({ kitAsOrdered: event.target.checked }); if (event.target.checked) setNote(""); }} />
+        All kit installed as ordered
+      </label>
+      <Field label="Anything missing or damaged"><TextArea value={sheet.kitNotes} onChange={(event) => patch({ kitNotes: event.target.value })} /></Field>
       <Field label="Work carried out"><TextArea value={sheet.workCarriedOut} onChange={(event) => patch({ workCarriedOut: event.target.value })} /></Field>
       <div className="space-y-3">
         <h3 className="text-base font-semibold">Parts used</h3>
@@ -331,7 +292,8 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Satisfied with rig / product location?" value={sheet.locationOk} onChange={(next) => patch({ locationOk: next })} />
       <YesNo label="Customer satisfied with work?" value={sheet.workOk} onChange={(next) => patch({ workOk: next })} />
       <YesNo label="Site left in satisfactory condition?" value={sheet.siteOk} onChange={(next) => patch({ siteOk: next })} />
-      <button type="button" onClick={onNext} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
+      {note ? <p className="text-sm font-semibold text-red">{note}</p> : null}
+      <button type="button" onClick={() => { if (!sheet.kitAsOrdered) { setNote("Confirm all kit was installed as ordered."); return; } onNext(); }} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
         Photos
       </button>
     </section>

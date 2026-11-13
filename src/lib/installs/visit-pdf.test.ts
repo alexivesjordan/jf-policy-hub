@@ -25,6 +25,8 @@ function sheet(): SheetDraft {
     delivery: true,
     installation: true,
     warranty: false,
+    kitAsOrdered: true,
+    kitNotes: "One collar scuffed.",
     lines: [{ code: "EL-1", description: "Elite lat pulldown", reportedJob: "Install" }],
     workCarriedOut: "Installed the lat pulldown and levelled it.",
     parts: [{ code: "BOLT", description: "Anchor bolt", qty: "8" }],
@@ -55,6 +57,8 @@ describe("visit PDF pack", () => {
     expect(text).toContain("INSTALLATION / SERVICE FORM");
     expect(text).toContain("Alex Customer");
     expect(text).toContain("SO-100");
+    expect(text).toContain("All kit installed as ordered");
+    expect(text).toContain("One collar scuffed");
     expect(text).toContain("Installed the lat pulldown");
     expect(text).toContain("Risk assessment");
     expect(text).toContain("Cable tray is low");

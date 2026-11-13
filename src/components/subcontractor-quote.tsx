@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Banner, Button, Field, Input, TextArea } from "@/components/pulse/ui";
 import { sendSubcontractorQuote } from "@/features/subcontractors/quote-actions";
 import type { QuoteChoice } from "@/lib/subcontractors/capability";
-import { formatUkDate, isWeekday, replaceDateBlock } from "@/lib/subcontractors/draft";
+import { replaceTimeframe } from "@/lib/subcontractors/draft";
 
 export function SubcontractorQuote({
   offer,
@@ -24,50 +24,27 @@ export function SubcontractorQuote({
   embedded?: boolean;
 }) {
   const [state, action, pending] = useActionState(sendSubcontractorQuote, null);
-  const [dates, setDates] = useState<string[]>(offer.initialDates ?? []);
-  const [date, setDate] = useState("");
-  const [dateNote, setDateNote] = useState("");
+  const [timeframe, setTimeframe] = useState("");
   const [body, setBody] = useState(offer.draft);
 
-  function setNextDates(next: string[]) {
-    setDates(next);
-    setBody((current) => replaceDateBlock(current, next));
-  }
-
-  function addDate() {
-    if (!isWeekday(date)) {
-      setDateNote("Weekends are not bookable.");
-      return;
-    }
-    setDateNote("");
-    setNextDates(dates.includes(date) ? dates : [...dates, date].sort());
-    setDate("");
+  function setWhen(next: string) {
+    setTimeframe(next);
+    setBody((current) => replaceTimeframe(current, next));
   }
 
   return (
     <form action={action} className={embedded ? "space-y-5 pt-4" : "space-y-5 rounded-3xl border border-line bg-card px-5 py-5"}>
       <input type="hidden" name="savedQuoteId" value={offer.savedQuoteId} />
-      <input type="hidden" name="dates" value={dates.join(",")} />
+      <input type="hidden" name="timeframe" value={timeframe} />
       {embedded ? null : (
         <div>
           <h2 className="font-display text-2xl">Subcontractor quote</h2>
           <p className="mt-1 text-sm text-grey">{offer.customerName} · {offer.postcode || "No postcode"} · {offer.jobTypes.join(", ")}</p>
         </div>
       )}
-      <Field label="Suggested dates" hint="Weekdays only.">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          <Button type="button" variant="secondary" onClick={addDate}>Add date</Button>
-        </div>
+      <Field label="When" hint="For example, w/c 7 December.">
+        <Input name="when" required value={timeframe} onChange={(event) => setWhen(event.target.value)} />
       </Field>
-      {dateNote ? <p className="text-sm">{dateNote}</p> : null}
-      {dates.length > 0 ? (
-        <ul className="flex flex-wrap gap-2 text-sm">
-          {dates.map((day) => (
-            <li key={day}><button type="button" className="rounded-full border border-line px-3 py-1" onClick={() => setNextDates(dates.filter((item) => item !== day))}>{formatUkDate(day)} ×</button></li>
-          ))}
-        </ul>
-      ) : null}
       <Field label="Subject"><Input name="subject" defaultValue={offer.subject} required /></Field>
       <Field label="Email"><TextArea name="body" value={body} onChange={(event) => setBody(event.target.value)} required className="min-h-64" /></Field>
       <fieldset className="space-y-2">
@@ -92,7 +69,7 @@ export function SubcontractorQuote({
         </ul>
       </fieldset>
       {state ? <Banner tone={state.ok ? "success" : "error"}>{state.message}</Banner> : null}
-      <Button type="submit" disabled={pending || dates.length === 0}>{pending ? "Sending…" : "Send separate emails"}</Button>
+      <Button type="submit" disabled={pending || timeframe.trim().length === 0}>{pending ? "Sending…" : "Send separate emails"}</Button>
     </form>
   );
 }

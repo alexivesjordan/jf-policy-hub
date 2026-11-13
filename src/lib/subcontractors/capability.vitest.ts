@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, markAlreadyEmailed, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
-import { buildSubcontractorDraft, isWeekday, replaceDateBlock } from "@/lib/subcontractors/draft";
+import { isWeekday } from "@/lib/subcontractors/draft";
 import { CHECK_EMAILS, SEEDED_SUBCONTRACTORS } from "@/lib/subcontractors/seed-data";
 import { INSURANCE_MAX_BYTES, insuranceBytesMatch, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
 
@@ -103,24 +103,9 @@ describe("seed and draft", () => {
     expect(sql).toContain("No insurance documents");
   });
 
-  it("writes the kit and weekdays without a price", () => {
-    const draft = buildSubcontractorDraft({
-      orderNumber: "SO-00490",
-      customerName: "Riverside Gym",
-      postcode: "LS1 4DY",
-      lines: [{ qty: 2, description: "FID Bench" }],
-      dates: ["2026-11-16", "2026-11-21"],
-    });
-    expect(draft.text).toContain("2× FID Bench");
-    expect(draft.text).toContain("16/11/2026");
-    expect(draft.text).not.toContain("21/11/2026");
-    expect(draft.text).not.toMatch(/£/);
+  it("keeps weekends off the booking calendar", () => {
+    expect(isWeekday("2026-11-16")).toBe(true);
     expect(isWeekday("2026-11-21")).toBe(false);
-    const edited = draft.text.replace("Hello,", "Hello Chris,");
-    const next = replaceDateBlock(edited, ["2026-11-18"]);
-    expect(next.startsWith("Hello Chris,")).toBe(true);
-    expect(next).toContain("18/11/2026");
-    expect(next).not.toContain("16/11/2026");
   });
 });
 

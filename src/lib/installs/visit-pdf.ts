@@ -170,10 +170,8 @@ export async function buildVisitPdf(input: VisitPdfInput) {
   pdf.pair("Installation", yesNo(sheet.installation));
   pdf.pair("Warranty", yesNo(sheet.warranty));
   pdf.gap(6);
-  pdf.text("Products", { bold: true, size: 12 });
-  const lines = sheet.lines.filter((line) => line.code || line.description || line.reportedJob);
-  if (lines.length === 0) pdf.text("Code    Description    Reported job");
-  for (const line of lines) pdf.text(`${line.code || "-"}    ${line.description || "-"}    ${line.qty || "-"}    ${line.reportedJob || "-"}`);
+  pdf.pair("All kit installed as ordered", sheet.kitAsOrdered ? "Yes" : "No");
+  pdf.text(`Anything missing or damaged: ${sheet.kitNotes.trim() || "None"}`);
   pdf.gap(6);
   pdf.text("Work carried out", { bold: true, size: 12 });
   pdf.text(sheet.workCarriedOut || "-");
