@@ -44,12 +44,16 @@ function levelFor(moduleId: string, effective: Record<string, string>) {
   return effective[moduleId] ?? "none";
 }
 
+export type FieldResourceOption = { id: string; name: string; profileId: string | null };
+
 export function WorkspaceUserCard({
   person,
   teams,
+  resources,
 }: {
   person: WorkspaceDirectoryUser;
   teams: { id: string; name: string }[];
+  resources?: FieldResourceOption[];
 }) {
   const [role, setRole] = useState(person.workspace_role);
   const [mode, setMode] = useState<WorkspaceDirectoryUser["access_mode"]>(person.access_mode);
@@ -89,6 +93,20 @@ export function WorkspaceUserCard({
             <option value="no">Deactivated</option>
           </Select>
         </div>
+        {resources ? (
+          <label className="block text-sm">
+            <span className="mb-1 block text-grey">Field engineer resource</span>
+            <Select name="fieldResource" defaultValue={resources.find((resource) => resource.profileId === person.id)?.id ?? ""} aria-label="Field engineer resource" className="w-full sm:w-80">
+              <option value="">Not a field engineer</option>
+              {resources.map((resource) => (
+                <option key={resource.id} value={resource.id}>
+                  {resource.name.replace(/^FIXTURE — /, "")}
+                  {resource.profileId && resource.profileId !== person.id ? " (linked)" : ""}
+                </option>
+              ))}
+            </Select>
+          </label>
+        ) : null}
         <fieldset>
           <legend className="mb-2 text-sm font-semibold text-ink">Teams</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-2">

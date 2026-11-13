@@ -10,7 +10,8 @@ import { storePulseFile } from "@/lib/pulse/files";
 import { issueDocumentTicket, issuePhotoTicket, registerDocumentObject, registerPhotoObject } from "@/lib/pulse/signed-upload";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { createClient } from "@/lib/supabase/server";
-import { commitVisit, loadVisit, presentedToken, saveRiskForVisit } from "@/features/field/submit";
+import { commitVisit, gateVisitUpload, presentedToken, saveRiskForVisit } from "@/features/field/submit";
+import { prepareSignaturePng } from "@/lib/installs/signature-image";
 
 export type FieldResult = { ok: boolean; message: string; path?: string; ticket?: StorageTicket; fileId?: string };
 
@@ -36,10 +37,10 @@ async function actor(token: string | null) {
   return profile;
 }
 
-export async function issuePhotoUpload(installId: string, token: string | null, mimeType: string, byteSize: number): Promise<FieldResult> {
+export async function issuePhotoUpload(installId: string, token: string | null, mimeType: string, byteSize: number, kind: string): Promise<FieldResult> {
   try {
     await actor(token);
-    await loadVisit(installId, token);
+    await gateVisitUpload(installId, token, kind);
     const ticket = await issuePhotoTicket(installId, mimeType, byteSize);
     return { ok: true, message: "Upload ready.", ticket };
   } catch (error) {
@@ -47,10 +48,10 @@ export async function issuePhotoUpload(installId: string, token: string | null, 
   }
 }
 
-export async function registerPhotoUpload(installId: string, token: string | null, path: string, kind: "concern" | "equipment"): Promise<FieldResult> {
+export async function registerPhotoUpload(installId: string, token: string | null, path: string, kind: string): Promise<FieldResult> {
   try {
     const profile = await actor(token);
-    await loadVisit(installId, token);
+    await gateVisitUpload(installId, token, kind);
     const stored = await registerPhotoObject({
       path,
       ownerId: installId,
@@ -109,10 +110,11 @@ export async function saveStaffSignature(formData: FormData): Promise<FieldResul
   const file = fileOf(formData, "signature");
   if (!file) return { ok: false, message: "Draw your signature." };
   try {
+    const bytes = await prepareSignaturePng(new Uint8Array(await file.arrayBuffer()));
     const stored = await storePulseFile({
       bucket: "job-sheets",
-      mimeType: file.type || "image/png",
-      bytes: Buffer.from(await file.arrayBuffer()),
+      mimeType: "image/png",
+      bytes: Buffer.from(bytes),
       uploadedBy: profile.id,
       entitySchema: "ops",
       entityTable: "staff_signatures",
@@ -134,7 +136,6 @@ export async function issueDocumentUpload(byteSize: number): Promise<FieldResult
   if (!profile) return { ok: false, message: "You need to be signed in." };
   try {
     const supabase = await createClient();
-    await supabase.rpc("install_claim_engineer");
     const allowed = await supabase.rpc("install_sees_all");
     if (allowed.error || allowed.data !== true) return { ok: false, message: "You cannot update those documents." };
     const ticket = await issueDocumentTicket(profile.id, byteSize);
@@ -170,7 +171,6 @@ export async function createSubcontractorLink(installId: string): Promise<FieldR
   if (!profile) return { ok: false, message: "You need to be signed in." };
   try {
     const supabase = await createClient();
-    await supabase.rpc("install_claim_engineer");
     const allowed = await supabase.rpc("install_sees_all");
     if (allowed.error || allowed.data !== true) return { ok: false, message: "You cannot create that link." };
     const link = await createTokenLink({

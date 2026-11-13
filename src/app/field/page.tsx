@@ -48,9 +48,14 @@ async function FieldHome() {
   return (
     <FieldFrame title="My jobs">
       <div className="mb-4 flex justify-end">
-        <Link href="/field/signature" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
-          My signature
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/operations/documents" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
+            Visit documents
+          </Link>
+          <Link href="/field/signature" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
+            My signature
+          </Link>
+        </div>
       </div>
       {home.jobs.length === 0 ? <p className="text-base">No jobs assigned.</p> : null}
       <div className="space-y-6">

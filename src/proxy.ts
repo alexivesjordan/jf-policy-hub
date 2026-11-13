@@ -6,12 +6,18 @@ const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", 
 /** Cron calls this with no session. The route itself rejects a missing Bearer CRON_SECRET. */
 const CRON_PATHS = ["/api/orbit/sync-products", "/api/orbit/access-reminders"];
 
+function continueRequest(request: NextRequest) {
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers } });
+}
+
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return NextResponse.next();
+  if (!url || !key) return continueRequest(request);
 
-  let response = NextResponse.next({ request });
+  let response = continueRequest(request);
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
@@ -21,7 +27,7 @@ export async function proxy(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
-        response = NextResponse.next({ request });
+        response = continueRequest(request);
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
         });
@@ -54,6 +60,15 @@ export async function proxy(request: NextRequest) {
 
   if (user && path === "/login") {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (user && path.startsWith("/operations") && !path.startsWith("/operations/documents")) {
+    const { data } = await supabase.rpc("install_field_role");
+    if (data === "engineer") {
+      const redirect = NextResponse.redirect(new URL("/field", request.url));
+      for (const cookie of response.headers.getSetCookie()) redirect.headers.append("set-cookie", cookie);
+      return redirect;
+    }
   }
 
   return response;

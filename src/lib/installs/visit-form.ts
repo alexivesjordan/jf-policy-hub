@@ -9,7 +9,7 @@ export const RISK_ITEMS = [
 
 export type RiskKey = (typeof RISK_ITEMS)[number]["key"];
 export type RiskAnswers = Record<RiskKey, boolean | null> & { notes: string };
-export type SheetLine = { code: string; description: string; reportedJob: string };
+export type SheetLine = { code: string; description: string; reportedJob: string; qty?: string };
 export type SheetPart = { code: string; description: string; qty: string };
 
 export type SheetDraft = {
@@ -114,9 +114,37 @@ export function validateSheet(sheet: SheetDraft) {
   );
 }
 
+function londonOffsetMinutes(instant: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  const asUtc = Date.UTC(pick("year"), pick("month") - 1, pick("day"), pick("hour"), pick("minute"), pick("second"));
+  return Math.round((asUtc - instant.getTime()) / 60_000);
+}
+
+export function londonLocalToUtcIso(day: string, time: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const [year, month, date] = day.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  if (!year || !month || !date || hour == null || minute == null || hour > 23 || minute > 59) return null;
+  let utc = Date.UTC(year, month - 1, date, hour, minute, 0);
+  for (let pass = 0; pass < 2; pass += 1) {
+    utc = Date.UTC(year, month - 1, date, hour, minute, 0) - londonOffsetMinutes(new Date(utc)) * 60_000;
+  }
+  return new Date(utc).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 function clock(day: string, time: string) {
   if (!day || !time) return null;
-  return `${day}T${time}:00Z`;
+  return londonLocalToUtcIso(day, time);
 }
 
 export function sheetPayload(
@@ -124,7 +152,12 @@ export function sheetPayload(
   files: { engineerSignatureFileId: string; customerSignatureFileId: string; pdfFileId: string },
 ) {
   const lines = sheet.lines
-    .map((line) => ({ code: line.code.trim(), description: line.description.trim(), reportedJob: line.reportedJob.trim() }))
+    .map((line) => ({
+      code: line.code.trim(),
+      description: line.description.trim(),
+      reportedJob: line.reportedJob.trim(),
+      qty: (line.qty ?? "").trim(),
+    }))
     .filter((line) => line.code || line.description || line.reportedJob);
   const parts = sheet.parts
     .map((part) => ({ code: part.code.trim(), description: part.description.trim(), qty: part.qty.trim() || "1" }))
@@ -167,7 +200,7 @@ export function sheetPayload(
 }
 
 export function blankLine(): SheetLine {
-  return { code: "", description: "", reportedJob: "" };
+  return { code: "", description: "", reportedJob: "", qty: "1" };
 }
 
 export function blankPart(): SheetPart {

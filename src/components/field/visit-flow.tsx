@@ -51,7 +51,7 @@ function draftFrom(screen: VisitScreen): SheetDraft {
     installation: true,
     warranty: false,
     ladderCheck: false,
-    lines: lines.length > 0 ? lines.map((line) => ({ code: line.sku, description: line.description, reportedJob: "" })) : [blankLine()],
+    lines: lines.length > 0 ? lines.map((line) => ({ code: line.sku, description: line.description, reportedJob: "", qty: line.qty && line.qty > 0 ? String(line.qty) : "1" })) : [blankLine()],
     workCarriedOut: "",
     parts: [blankPart()],
     locationOk: null,
@@ -80,6 +80,12 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(screen.submitted);
   const [link, setLink] = useState<string | null>(null);
+  const [uploads, setUploads] = useState(0);
+  const photosBusy = uploads > 0;
+
+  function onUpload(busy: boolean) {
+    setUploads((count) => Math.max(0, count + (busy ? 1 : -1)));
+  }
 
   function patch(partial: Partial<SheetDraft>) {
     setSheet((current) => ({ ...current, ...partial }));
@@ -96,6 +102,7 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
   }
 
   async function finish() {
+    if (photosBusy) return;
     setPending(true);
     setMessage(null);
     const body = new FormData();
@@ -137,6 +144,7 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
               type="button"
               className={`min-h-12 w-full rounded-2xl border text-sm font-semibold ${index === step ? "border-red bg-red text-white" : "border-line bg-card text-ink"}`}
               onClick={() => {
+                if (photosBusy && index === 3) return;
                 if (index === 0 || screen.risk || risk.accessClear != null) setStep(index);
               }}
             >
@@ -156,7 +164,7 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
             Notes
             <TextArea value={risk.notes} onChange={(event) => setRisk((current) => ({ ...current, notes: event.target.value }))} />
           </label>
-          <PhotoPicker installId={screen.installId} token={screen.token} kind="concern" photos={concerns} onChange={setConcerns} max={6} label="Photo of a concern" />
+          <PhotoPicker installId={screen.installId} token={screen.token} kind="concern" photos={concerns} onChange={setConcerns} max={6} label="Photo of a concern" onBusy={onUpload} />
           <button type="button" disabled={pending} onClick={() => void saveRisk()} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white disabled:opacity-60">
             {pending ? "Saving" : "Save and continue"}
           </button>
@@ -166,8 +174,9 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
       {step === 2 ? (
         <section className="space-y-4">
           <h2 className="font-display text-3xl">Equipment</h2>
-          <PhotoPicker installId={screen.installId} token={screen.token} kind="equipment" photos={photos} onChange={setPhotos} label="Add photos" />
-          <button type="button" onClick={() => setStep(3)} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
+          <PhotoPicker installId={screen.installId} token={screen.token} kind="equipment" photos={photos} onChange={setPhotos} label="Add photos" onBusy={onUpload} />
+          {photosBusy ? <p className="text-sm font-semibold">Wait for the photo upload to finish.</p> : null}
+          <button type="button" disabled={photosBusy} onClick={() => setStep(3)} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white disabled:opacity-60">
             Signatures
           </button>
         </section>
@@ -209,7 +218,7 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
           <p className="text-sm font-semibold">{FORM_NOTICES.signing}</p>
           <SignaturePad onChange={setCustomerBlob} />
           <p className="text-sm text-grey">{FORM_NOTICES.hours}</p>
-          <button type="button" disabled={pending} onClick={() => void finish()} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white disabled:opacity-60">
+          <button type="button" disabled={pending || photosBusy} onClick={() => void finish()} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white disabled:opacity-60">
             {pending ? "Sending" : "Submit"}
           </button>
         </section>
@@ -219,10 +228,48 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
   );
 }
 
-function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partial: Partial<SheetDraft>) => void; onNext: () => void }) {
+function stepQty(value: string | undefined, delta: number) {
+  const current = Number(value);
+  const next = (Number.isFinite(current) && current > 0 ? current : 1) + delta;
+  return String(Math.max(1, next));
+}
+
+function KitList({ lines, onChange }: { lines: SheetDraft["lines"]; onChange: (lines: SheetDraft["lines"]) => void }) {
+  const [open, setOpen] = useState(false);
+  const count = lines.filter((line) => line.code || line.description).length;
   function setLine(index: number, partial: Partial<SheetDraft["lines"][number]>) {
-    patch({ lines: sheet.lines.map((line, item) => (item === index ? { ...line, ...partial } : line)) });
+    onChange(lines.map((line, item) => (item === index ? { ...line, ...partial } : line)));
   }
+  return (
+    <div className="space-y-3">
+      <button type="button" className="min-h-12 text-base font-semibold" onClick={() => setOpen((current) => !current)}>
+        {open ? "Hide kit details" : `Kit · ${count}`}
+      </button>
+      {lines.map((line, index) => (
+        <div key={`${line.code}-${index}`} className="rounded-2xl border border-line bg-card p-3">
+          <div className="flex items-center gap-2">
+            <button type="button" aria-label={`Less of ${line.description || line.code || "product"}`} className="inline-flex size-11 items-center justify-center rounded-full border border-line text-lg" onClick={() => setLine(index, { qty: stepQty(line.qty, -1) })}>−</button>
+            <span className="w-8 text-center text-base font-semibold">{line.qty || "1"}</span>
+            <button type="button" aria-label={`More of ${line.description || line.code || "product"}`} className="inline-flex size-11 items-center justify-center rounded-full border border-line text-lg" onClick={() => setLine(index, { qty: stepQty(line.qty, 1) })}>+</button>
+            <span className="min-w-0 flex-1 truncate text-sm">{line.description || line.code || "Product"}</span>
+          </div>
+          {open ? (
+            <div className="mt-3 space-y-2">
+              <Input aria-label="Product code" placeholder="Code" value={line.code} onChange={(event) => setLine(index, { code: event.target.value })} />
+              <Input aria-label="Product description" placeholder="Description" value={line.description} onChange={(event) => setLine(index, { description: event.target.value })} />
+              <Input aria-label="Reported job" placeholder="Reported job" value={line.reportedJob} onChange={(event) => setLine(index, { reportedJob: event.target.value })} />
+            </div>
+          ) : null}
+        </div>
+      ))}
+      <button type="button" className="min-h-12 text-base font-semibold underline decoration-red" onClick={() => onChange([...lines, blankLine()])}>
+        Add product
+      </button>
+    </div>
+  );
+}
+
+function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partial: Partial<SheetDraft>) => void; onNext: () => void }) {
   function setPart(index: number, partial: Partial<SheetDraft["parts"][number]>) {
     patch({ parts: sheet.parts.map((part, item) => (item === index ? { ...part, ...partial } : part)) });
   }
@@ -254,19 +301,7 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Warranty" value={sheet.warranty} onChange={(next) => patch({ warranty: next })} />
       <Choice label="Ladders and hop-ups checked" selected={sheet.ladderCheck} onClick={() => patch({ ladderCheck: !sheet.ladderCheck })} />
       <p className="text-sm text-grey">{FORM_NOTICES.receipts}</p>
-      <div className="space-y-3">
-        <h3 className="text-base font-semibold">Products</h3>
-        {sheet.lines.map((line, index) => (
-          <div key={index} className="space-y-2 rounded-2xl border border-line bg-card p-3">
-            <Input aria-label="Product code" placeholder="Code" value={line.code} onChange={(event) => setLine(index, { code: event.target.value })} />
-            <Input aria-label="Product description" placeholder="Description" value={line.description} onChange={(event) => setLine(index, { description: event.target.value })} />
-            <Input aria-label="Reported job" placeholder="Reported job" value={line.reportedJob} onChange={(event) => setLine(index, { reportedJob: event.target.value })} />
-          </div>
-        ))}
-        <button type="button" className="min-h-12 text-base font-semibold underline decoration-red" onClick={() => patch({ lines: [...sheet.lines, blankLine()] })}>
-          Add product
-        </button>
-      </div>
+      <KitList lines={sheet.lines} onChange={(lines) => patch({ lines })} />
       <Field label="Work carried out"><TextArea value={sheet.workCarriedOut} onChange={(event) => patch({ workCarriedOut: event.target.value })} /></Field>
       <div className="space-y-3">
         <h3 className="text-base font-semibold">Parts used</h3>

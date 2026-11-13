@@ -131,9 +131,14 @@ export async function mySignature() {
   return { fileId: data.fileId, url: signed.data?.signedUrl ?? null };
 }
 
+export async function fieldRole() {
+  const data = await userRpc<string>("install_field_role");
+  return data === "admin" || data === "ops" || data === "engineer" ? data : "none";
+}
+
 export async function canManageVisitDocuments() {
-  await userRpc("install_claim_engineer");
-  return (await userRpc<boolean>("install_sees_all")) === true;
+  const role = await fieldRole();
+  return role === "admin" || role === "ops";
 }
 
 export async function listVisitDocuments() {

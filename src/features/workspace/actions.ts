@@ -59,6 +59,14 @@ export async function saveWorkspaceUser(formData: FormData) {
     });
     if (named.error) throw new Error(messageFromError(named.error, "Could not save that name."));
   }
+  if (formData.has("fieldResource")) {
+    const resource = clean(formData.get("fieldResource"));
+    const linked = await supabase.rpc("install_set_field_resource", {
+      p_profile: clean(formData.get("userId")),
+      p_resource: resource || null,
+    });
+    if (linked.error) throw new Error(messageFromError(linked.error, "Could not link that engineer."));
+  }
   revalidatePath("/workspace/users");
 }
 
@@ -75,7 +83,15 @@ export async function inviteWorkspaceUser(formData: FormData) {
     p_workspace_role: clean(formData.get("workspaceRole")),
   });
   if (error) throw new Error(messageFromError(error, "We could not save that invite."));
-  const prepared = (data ?? {}) as { already_registered?: boolean };
+  const prepared = (data ?? {}) as { already_registered?: boolean; user_id?: string | null };
+  const resource = clean(formData.get("fieldResource"));
+  if (resource && prepared.user_id) {
+    const linked = await supabase.rpc("install_set_field_resource", {
+      p_profile: prepared.user_id,
+      p_resource: resource,
+    });
+    if (linked.error) throw new Error(messageFromError(linked.error, "Could not link that engineer."));
+  }
   if (!prepared.already_registered) {
     if (!hasServiceRole()) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
     const service = createAdminClient();

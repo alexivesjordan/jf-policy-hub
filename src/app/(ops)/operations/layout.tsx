@@ -1,9 +1,12 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
 import { Cin7Notice } from "@/components/cin7-notice";
+import { fieldRole } from "@/features/field/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
@@ -33,6 +36,16 @@ export default function OperationsLayout({ children }: { children: React.ReactNo
 
 async function OperationsShell({ children }: { children: React.ReactNode }) {
   const profile = await requireOperationsUser();
+  const path = (await headers()).get("x-pathname") ?? "";
+  let role: Awaited<ReturnType<typeof fieldRole>> = "none";
+  try {
+    role = await fieldRole();
+  } catch {
+    role = "none";
+  }
+  if (role === "engineer" && path.startsWith("/operations") && !path.startsWith("/operations/documents")) {
+    redirect("/field");
+  }
   let isOwner = false;
   let unread = 0;
   let notifications: BellItem[] = [];
@@ -71,9 +84,15 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
     isOwner = false;
   }
 
-  const nav = (pulseModules.find((module) => module.id === "operations")?.nav ?? []).filter(
+  const officeNav = (pulseModules.find((module) => module.id === "operations")?.nav ?? []).filter(
     (item) => !item.ownerOnly || isOwner,
   );
+  const nav = role === "engineer"
+    ? [
+        { href: "/field", label: "My jobs" },
+        { href: "/operations/documents", label: "Visit documents" },
+      ]
+    : officeNav;
 
   return (
     <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>

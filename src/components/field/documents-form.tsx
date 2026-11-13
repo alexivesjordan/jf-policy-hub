@@ -5,7 +5,7 @@ import { issueDocumentUpload, registerDocumentUpload } from "@/features/field/ac
 import { putSignedUpload } from "@/lib/installs/browser-upload";
 import { DOCUMENT_LABELS, VISIT_DOCUMENTS, type VisitDocumentKey } from "@/lib/installs/product-lines";
 
-export function DocumentsForm({ uploaded }: { uploaded: VisitDocumentKey[] }) {
+export function DocumentsForm({ uploaded, canUpload = true }: { uploaded: VisitDocumentKey[]; canUpload?: boolean }) {
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, setPending] = useState<VisitDocumentKey | null>(null);
@@ -17,7 +17,7 @@ export function DocumentsForm({ uploaded }: { uploaded: VisitDocumentKey[] }) {
         <li key={key} className="space-y-3 rounded-3xl border border-line bg-card p-4">
           <p className="text-base font-semibold">{DOCUMENT_LABELS[key]}</p>
           <p className="text-sm text-grey">{uploaded.includes(key) ? "Uploaded" : "Not uploaded yet"}</p>
-          <form
+          {canUpload ? <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
@@ -35,7 +35,7 @@ export function DocumentsForm({ uploaded }: { uploaded: VisitDocumentKey[] }) {
             <button type="submit" disabled={pending === key} className="min-h-12 rounded-full bg-red px-4 text-base font-semibold text-white disabled:opacity-60">
               {pending === key ? "Uploading" : "Upload"}
             </button>
-          </form>
+          </form> : null}
         </li>
       ))}
     </ul>

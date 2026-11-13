@@ -15,6 +15,7 @@ export function PhotoPicker({
   onChange,
   max = 8,
   label,
+  onBusy,
 }: {
   installId: string;
   token: string | null;
@@ -23,6 +24,7 @@ export function PhotoPicker({
   onChange: (photos: StoredPhoto[]) => void;
   max?: number;
   label: string;
+  onBusy?: (busy: boolean) => void;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -30,13 +32,14 @@ export function PhotoPicker({
   async function add(list: FileList | null) {
     if (!list) return;
     setPending(true);
+    onBusy?.(true);
     setMessage(null);
     const next = [...photos];
     try {
       for (const file of Array.from(list)) {
         if (next.length >= max) break;
         const compressed = await compressImageFile(file);
-        const issued = await issuePhotoUpload(installId, token, compressed.type, compressed.size);
+        const issued = await issuePhotoUpload(installId, token, compressed.type, compressed.size, kind);
         if (!issued.ok || !issued.ticket) throw new Error(issued.message);
         await putSignedUpload(issued.ticket, compressed, compressed.type || "image/jpeg");
         const registered = await registerPhotoUpload(installId, token, issued.ticket.path, kind);
@@ -49,6 +52,7 @@ export function PhotoPicker({
       onChange(next);
     } finally {
       setPending(false);
+      onBusy?.(false);
     }
   }
 

@@ -1,7 +1,7 @@
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState } from "@/components/pulse/states";
-import { WorkspaceUserCard, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
+import { WorkspaceUserCard, type FieldResourceOption, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
 import { inviteWorkspaceUser } from "@/features/workspace/actions";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -19,10 +19,14 @@ const ROLES = [
 export default async function WorkspaceUsersPage() {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
-  const [{ data: peopleData }, { data: teamData }] = await Promise.all([
+  const [{ data: peopleData }, { data: teamData }, resourceResult] = await Promise.all([
     supabase.rpc("workspace_directory"),
     supabase.rpc("workspace_teams"),
+    supabase.rpc("install_field_resources"),
   ]);
+  const resources = !resourceResult.error && Array.isArray(resourceResult.data)
+    ? (resourceResult.data as FieldResourceOption[])
+    : null;
   const people = ((Array.isArray(peopleData) ? peopleData : []) as WorkspaceDirectoryUser[]).slice().sort((a, b) => {
     const last = (person: WorkspaceDirectoryUser) => (person.last_name || person.full_name?.split(" ").slice(-1)[0] || person.email).toLocaleLowerCase();
     const first = (person: WorkspaceDirectoryUser) => (person.first_name || person.full_name?.split(" ")[0] || "").toLocaleLowerCase();
@@ -55,6 +59,20 @@ export default async function WorkspaceUsersPage() {
             {ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </label>
+        {resources ? (
+          <>
+            <label className="text-sm md:col-span-2">
+              <span className="mb-1 block text-grey">Field engineer resource</span>
+              <Select name="fieldResource" defaultValue="">
+                <option value="">Not a field engineer</option>
+                {resources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>{resource.name.replace(/^FIXTURE — /, "")}</option>
+                ))}
+              </Select>
+            </label>
+            <p className="text-sm text-grey md:col-span-4">A new person is linked once they have a login. You can also set this on their card.</p>
+          </>
+        ) : null}
         <div className="md:col-span-4">
           <Button type="submit">Send invite</Button>
         </div>
@@ -62,7 +80,7 @@ export default async function WorkspaceUsersPage() {
       {people.length === 0 ? <EmptyState title="No users yet" description="Send an invite with a Jordan Fitness email to add the first person." /> : null}
       <ul className="space-y-4">
         {people.map((person) => (
-          <WorkspaceUserCard key={person.id} person={person} teams={teams} />
+          <WorkspaceUserCard key={person.id} person={person} teams={teams} resources={resources ?? undefined} />
         ))}
       </ul>
     </div>

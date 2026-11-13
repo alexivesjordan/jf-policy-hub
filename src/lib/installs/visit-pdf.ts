@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { prepareSignaturePng } from "@/lib/installs/signature-image";
 import { FORM_NOTICES, type SheetDraft } from "@/lib/installs/visit-form";
 
 const A4 = [595.28, 841.89] as const;
@@ -175,7 +176,7 @@ export async function buildVisitPdf(input: VisitPdfInput) {
   pdf.text("Products", { bold: true, size: 12 });
   const lines = sheet.lines.filter((line) => line.code || line.description || line.reportedJob);
   if (lines.length === 0) pdf.text("Code    Description    Reported job");
-  for (const line of lines) pdf.text(`${line.code || "-"}    ${line.description || "-"}    ${line.reportedJob || "-"}`);
+  for (const line of lines) pdf.text(`${line.code || "-"}    ${line.description || "-"}    ${line.qty || "-"}    ${line.reportedJob || "-"}`);
   pdf.gap(6);
   pdf.text("Work carried out", { bold: true, size: 12 });
   pdf.text(sheet.workCarriedOut || "-");
@@ -199,8 +200,8 @@ export async function buildVisitPdf(input: VisitPdfInput) {
   pdf.pair("Engineer", sheet.engineerName || "-");
   pdf.pair("Vehicle reg", sheet.vehicleReg || "-");
   pdf.pair("Customer name", sheet.customerName || "-");
-  if (input.engineerSignature) await pdf.image(input.engineerSignature, "Engineer signature");
-  if (input.customerSignature) await pdf.image(input.customerSignature, "Customer signature");
+  if (input.engineerSignature) await pdf.image(await prepareSignaturePng(input.engineerSignature), "Engineer signature");
+  if (input.customerSignature) await pdf.image(await prepareSignaturePng(input.customerSignature), "Customer signature");
   pdf.gap(8);
   pdf.text("Risk assessment", { bold: true, size: 12 });
   if (input.riskLines.length === 0) pdf.text("Not recorded.");

@@ -5,6 +5,7 @@ import { deliverPulseEmail } from "@/lib/email/deliver";
 import { messageFromError } from "@/lib/errors";
 import { DOCUMENT_FILENAMES, documentsForOrder, selectStoredDocuments, type OrderLine, type VisitDocumentKey } from "@/lib/installs/product-lines";
 import { RISK_ITEMS, sheetPayload, validateRisk, validateSheet, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { prepareSignaturePng } from "@/lib/installs/signature-image";
 import { buildVisitPdf } from "@/lib/installs/visit-pdf";
 import { storePulseFile } from "@/lib/pulse/files";
 import { downloadStorageObject } from "@/lib/pulse/signed-upload";
@@ -50,6 +51,17 @@ export async function loadVisit(installId: string, token: string | null) {
   const visit = asVisitContext(data);
   if (!visit || visit.job.id !== installId) throw new Error("You cannot open that job.");
   return visit;
+}
+
+const PHOTO_KINDS = new Set(["concern", "equipment"]);
+
+export async function gateVisitUpload(installId: string, token: string | null, kind: string) {
+  if (!PHOTO_KINDS.has(kind)) throw new Error("That photo is not allowed.");
+  await callRpc(token, "install_visit_upload_gate", {
+    p_install: installId,
+    p_token_hash: presentedToken(token),
+    p_kind: kind,
+  });
 }
 
 export async function saveRiskForVisit(input: { installId: string; token: string | null; answers: RiskAnswers; concernFileIds: string[] }) {
@@ -121,10 +133,10 @@ export async function commitVisit(input: {
   let engineerFileId = input.engineerSignatureFileId;
   let engineerBytes: Uint8Array | null = null;
   if (input.engineerSignature) {
-    engineerBytes = new Uint8Array(await input.engineerSignature.arrayBuffer());
+    engineerBytes = await prepareSignaturePng(new Uint8Array(await input.engineerSignature.arrayBuffer()));
     const stored = await storePulseFile({
       bucket: "job-sheets",
-      mimeType: input.engineerSignature.type || "image/png",
+      mimeType: "image/png",
       bytes: Buffer.from(engineerBytes),
       uploadedBy: input.uploadedBy,
       entitySchema: "ops",
@@ -143,16 +155,18 @@ export async function commitVisit(input: {
     const mine = await supabase.rpc("install_my_signature");
     const row = mine.data as { fileId?: string; bucket?: string; path?: string } | null;
     if (mine.error || row?.fileId !== engineerFileId || !row.bucket || !row.path) throw new Error("Draw your signature.");
-    engineerBytes = await downloadStorageObject(row.bucket, row.path);
+    const saved = await downloadStorageObject(row.bucket, row.path);
+    if (!saved) throw new Error("Draw your signature.");
+    engineerBytes = await prepareSignaturePng(saved);
   } else {
     throw new Error("Draw your signature.");
   }
   if (!engineerFileId || !engineerBytes) throw new Error("Draw your signature.");
 
-  const customerBytes = new Uint8Array(await input.customerSignature.arrayBuffer());
+  const customerBytes = await prepareSignaturePng(new Uint8Array(await input.customerSignature.arrayBuffer()));
   const customer = await storePulseFile({
     bucket: "job-sheets",
-    mimeType: input.customerSignature.type || "image/png",
+    mimeType: "image/png",
     bytes: Buffer.from(customerBytes),
     uploadedBy: input.uploadedBy,
     entitySchema: "ops",
