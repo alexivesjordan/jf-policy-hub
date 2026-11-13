@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fixtureSubcontractorRpc } from "@/lib/subcontractors/fixture-board";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 let fixtureServiceQuote: { id: string; prices: unknown } | null = null;
@@ -202,6 +203,8 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
+  const subcontractor = fixtureSubcontractorRpc(fn, args);
+  if (subcontractor.handled) return subcontractor.data;
   if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead";
   if (fn === "workspace_can") {
     const moduleName = String(args?.p_module ?? "");
@@ -457,7 +460,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       const source = row as Record<string, unknown>;
       const sales: Record<string, unknown> = {};
-      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
+      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "stage", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
         sales[key] = source[key];
       }
       return sales;
@@ -651,7 +654,11 @@ export function createFixtureClient() {
       return new FixtureQuery(table);
     },
     async rpc(fn: string, args?: Record<string, unknown>) {
-      return { data: rpcData(fn, args), error: null };
+      try {
+        return { data: rpcData(fn, args), error: null };
+      } catch (error) {
+        return { data: null, error: { message: error instanceof Error ? error.message : "app: Could not do that." } };
+      }
     },
     storage: {
       from(bucket: string) {

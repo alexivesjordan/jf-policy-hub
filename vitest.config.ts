@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: [
+      "src/**/*.vitest.ts",
       "src/lib/installs/product-lines.test.ts",
       "src/lib/installs/permissions.test.ts",
       "src/lib/installs/visit-pdf.test.ts",

@@ -24,6 +24,9 @@ import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
 import type { ExtractedQuote } from "@/lib/quotes/types";
 import { getOfficeContext } from "@/features/operations/queries";
+import { listSubcontractorRecords } from "@/features/subcontractors/queries";
+import { jobTypesForKit, rankSubcontractors, type QuoteChoice } from "@/lib/subcontractors/capability";
+import { buildSubcontractorDraft } from "@/lib/subcontractors/draft";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { messageFromError } from "@/lib/errors";
@@ -662,7 +665,18 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
   }
 }
 
-export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ReturnType<typeof salesOrderActionResult>> {
+type SubcontractorOffer = {
+  savedQuoteId: string;
+  quoteNumber: string;
+  customerName: string;
+  postcode: string;
+  jobTypes: string[];
+  subject: string;
+  draft: string;
+  choices: QuoteChoice[];
+};
+
+export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ReturnType<typeof salesOrderActionResult> & { subcontractor?: SubcontractorOffer }> {
   await requireSalesUser();
   await fixturePause();
   try {
@@ -706,7 +720,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
-    return salesOrderActionResult({
+    const priced = salesOrderActionResult({
       ok: !result.blockedReason,
       needsSegment: false,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
@@ -717,6 +731,39 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       savedQuoteId: savedQuoteId ?? undefined,
       service,
     });
+    if (String(formData.get("mode") ?? "") !== "subcontractor") return priced;
+    if (!priced.ok || !savedQuoteId) {
+      return { ...priced, ok: false, message: priced.message || "Price the order before asking subcontractors." };
+    }
+    const kit = draft.lines.map((line) => ({ qty: line.qty, description: line.description }));
+    const jobTypes = jobTypesForKit(draft.lines.map((line) => ({ category: line.category, description: line.description })));
+    const rows = await listSubcontractorRecords();
+    const email = buildSubcontractorDraft({
+      orderNumber: view.quoteNumber,
+      customerName: view.customerName,
+      postcode: view.postcode,
+      lines: kit,
+      dates: [],
+    });
+    return {
+      ...priced,
+      message: "Subcontractor quote ready.",
+      subcontractor: {
+        savedQuoteId,
+        quoteNumber: view.quoteNumber,
+        customerName: view.customerName,
+        postcode: view.postcode,
+        jobTypes,
+        subject: email.subject,
+        draft: email.text,
+        choices: rankSubcontractors(rows, {
+          postcode: view.postcode,
+          jobTypes,
+          crew: result.requirements?.installers ?? null,
+          today: new Date().toISOString().slice(0, 10),
+        }),
+      },
+    };
   } catch (error) {
     return salesOrderActionResult({
       ok: false,

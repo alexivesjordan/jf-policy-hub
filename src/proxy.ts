@@ -5,6 +5,8 @@ import { passwordLinkHandoff } from "@/lib/auth-link";
 const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/visit", "/api/access/media", "/api/amendments", "/api/policies"];
 /** Cron calls this with no session. The route itself rejects a missing Bearer CRON_SECRET. */
 const CRON_PATHS = ["/api/orbit/sync-products", "/api/orbit/access-reminders"];
+/** Resend inbound. The route verifies the Svix signature and does not use a session. */
+const WEBHOOK_PATHS = ["/api/orbit/inbound-email"];
 
 function continueRequest(request: NextRequest) {
   const headers = new Headers(request.headers);
@@ -45,7 +47,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const path = request.nextUrl.pathname;
-  const isPublic = CRON_PATHS.includes(path) || PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
+  const isPublic = CRON_PATHS.includes(path) || WEBHOOK_PATHS.includes(path) || PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
 
   if (!user && !isPublic) {
     const handoff = passwordLinkHandoff(path, request.nextUrl.searchParams);

@@ -76,6 +76,7 @@ export const pulseModules: PulseModule[] = [
       { href: "/field", label: "My jobs" },
       { href: "/operations/installs", label: "Installs" },
       { href: "/operations/jobs", label: "Jobs" },
+      { href: "/operations/subcontractors", label: "Subcontractors" },
       { href: "/operations/calendar", label: "Resource Availability" },
       { href: "/operations/documents", label: "Visit documents" },
       { href: "/operations/tasks", label: "Tasks" },

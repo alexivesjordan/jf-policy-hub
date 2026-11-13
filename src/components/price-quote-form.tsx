@@ -9,6 +9,7 @@ const BookInstallDialog = dynamic(
   () => import("@/components/book-install-dialog").then((mod) => mod.BookInstallDialog),
   { ssr: false },
 );
+import { SubcontractorQuote } from "@/components/subcontractor-quote";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -59,7 +60,8 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
 
   return (
     <div className="space-y-6">
-      <form action={sellOrder} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_auto] md:items-end">
+      <form action={sellOrder} className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] md:items-end">
         <Field label="Order number">
           <Input
             name="quoteNumber"
@@ -85,9 +87,15 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
             ))}
           </Select>
         </Field>
-        <Button type="submit" disabled={selling || !ready}>
-          {selling && !readingPdf ? "Calculating…" : "Load quote"}
-        </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" name="mode" value="jordan" disabled={selling || !ready}>
+            {selling && !readingPdf ? "Calculating…" : "Jordan quote"}
+          </Button>
+          <Button type="submit" name="mode" value="subcontractor" variant="secondary" disabled={selling || !ready}>
+            Subcontractor quote
+          </Button>
+        </div>
         <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
       </form>
       <form id="quote-pdf" ref={pdfForm} action={sellOrder}>
@@ -113,14 +121,15 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
         </div>
       ) : null}
       {failure ? <Banner tone="error">{failure}</Banner> : null}
-      {quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
-      {includeService && quote?.service ? (
+      {sold?.subcontractor ? <SubcontractorQuote offer={sold.subcontractor} /> : null}
+      {!sold?.subcontractor && quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
+      {!sold?.subcontractor && includeService && quote?.service ? (
         <>
           <ServiceQuoteResult service={quote.service} />
           <ProposalButton quoteId={quote.service.id} />
         </>
       ) : null}
-      {quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
+      {!sold?.subcontractor && quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ const WARRANTY: Record<string, string> = {
 };
 
 const STATUS: Record<string, string> = {
+  quoting: "Quoting",
   booked: "Booked",
   scheduled: "Scheduled",
   in_progress: "In progress",
@@ -47,7 +48,7 @@ export function InstallSalesView({
         <p className="text-sm text-grey">Order {String(row.orderNumber ?? "—")}</p>
         <h1 className="font-display mt-1 text-3xl">{String(row.customerName ?? "Install")}</h1>
         <p className="mt-2 text-sm text-grey">
-          Booked for {ukDate(row.startOn)} – {ukDate(row.endOn)}
+          {String(row.stage) === "quoting" ? "Quoting" : `Booked for ${ukDate(row.startOn)} – ${ukDate(row.endOn)}`}
         </p>
         <dl className="mt-4 divide-y divide-border text-sm">
           <Row label="Order value" value={money(row.goodsNet)} />
