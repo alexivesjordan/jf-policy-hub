@@ -52,7 +52,7 @@ export type OrderLineView = {
 export const FORM_NOTICES = {
   signing: "By signing this document you are agreeing to all of the content detailed above.",
   hours:
-    "Extra man hours resulting from inaccurate information will be a charge at £25 (+ vat) per hour per man. Normal installation hours are between 0800 and 1700. Jordan Fitness accept no responsibility for the suitability of floors or walls.",
+    "Extra man hours resulting from inaccurate information will be a charge at £25 (+ vat) per hour per man. Normal installation hours are between 0800 and 1700.",
 } as const;
 
 export function emptyRisk(): RiskAnswers {

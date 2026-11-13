@@ -114,6 +114,6 @@ describe("job sheet save matches the form", () => {
     const text = await pdfBytesToLayoutText(await buildVisitPdf({ sheet, riskLines: RISK_ITEMS.map((item) => ({ label: item.label, answer: "Yes" })), riskNotes: "" }));
     expect(text).toContain("All kit installed as ordered");
     expect(text).toContain("Installed the kit and levelled it.");
-    expect(text).not.toMatch(/ladder|call out|overnight|fixing to wall|fixing to floor|receipts/i);
+    expect(text).not.toMatch(/ladder|call out|overnight|fixing to wall|fixing to floor|receipts|suitability of floors|Equipment \d/i);
   });
 });

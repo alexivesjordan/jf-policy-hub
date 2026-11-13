@@ -51,7 +51,7 @@ describe("visit PDF pack", () => {
     });
     expect(Buffer.from(bytes.subarray(0, 5)).toString("utf8")).toBe("%PDF-");
     const loaded = await PDFDocument.load(bytes);
-    expect(loaded.getPageCount()).toBeGreaterThanOrEqual(4);
+    expect(loaded.getPageCount()).toBeLessThanOrEqual(2);
     expect(loaded.getTitle()).toContain("SO-100");
     const text = await pdfBytesToLayoutText(bytes);
     expect(text).toContain("INSTALLATION / SERVICE FORM");
@@ -63,11 +63,17 @@ describe("visit PDF pack", () => {
     expect(text).toContain("Risk assessment");
     expect(text).toContain("Cable tray is low");
     expect(text).toContain("Lewis");
+    expect(text).toContain("By signing this document");
+    expect(text).toContain("Extra man hours");
+    expect(text).toContain("AB12 CDE");
+    expect(text).not.toContain("Elite lat pulldown");
+    expect(text).not.toContain("Equipment");
     expect(text).not.toContain("Call out charge");
     expect(text).not.toContain("Overnight stay");
     expect(text).not.toContain("All receipts must be attached");
     expect(text).not.toContain("fixing to wall");
     expect(text).not.toContain("fixing to floor");
+    expect(text).not.toContain("suitability of floors");
     expect(text).not.toContain("Ladder");
   });
 

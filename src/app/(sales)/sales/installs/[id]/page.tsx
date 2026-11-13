@@ -5,7 +5,8 @@ import { InstallAccessPanel } from "@/components/install-access-panel";
 import { InstallSalesView } from "@/components/install-sales-view";
 import { SubcontractorInstallSection } from "@/components/subcontractor-install-section";
 import { PageSkeleton } from "@/components/pulse/states";
-import { installProposalUrl, readInstall } from "@/features/sales/install-actions";
+import { InstallVisitPhotos } from "@/components/install-visit-photos";
+import { installProposalUrl, listVisitPhotos, readInstall } from "@/features/sales/install-actions";
 import { requireSalesUser } from "@/lib/auth";
 import { canCancelInstall } from "@/lib/installs/access-auth";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +29,7 @@ async function SalesInstall({ params }: { params: Promise<{ id: string }> }) {
     return <p>{loaded.message || "That install was not found."}</p>;
   }
   const proposalUrl = await installProposalUrl(loaded.install.proposalPath);
+  const photos = await listVisitPhotos(id);
   const supabase = await createClient();
   const office = await supabase.rpc("orbit_office_context");
   const engineer = (office.data as { ops_role?: string } | null)?.ops_role === "installer";
@@ -47,6 +49,7 @@ async function SalesInstall({ params }: { params: Promise<{ id: string }> }) {
         cancel={canCancel ? <CancelBookingButton installId={id} /> : null}
       />
       <InstallAccessPanel install={loaded.install} />
+      <InstallVisitPhotos photos={photos} />
       <SubcontractorInstallSection profile={profile} install={loaded.install} />
     </div>
   );

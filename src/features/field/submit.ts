@@ -181,21 +181,8 @@ export async function commitVisit(input: {
     kind: "customer_signature",
   });
 
-  const photos: { label: string; bytes: Uint8Array }[] = [];
   const owned = await filesFor(input.token, input.installId, photoIds);
   if (owned.length !== photoIds.length) throw new Error("That photo is not on this job.");
-  for (const [index, file] of owned.entries()) {
-    const bytes = await downloadStorageObject(file.bucket, file.path);
-    if (bytes) photos.push({ label: `Equipment ${index + 1}`, bytes });
-  }
-  const concerns = (await callRpc(input.token, "install_concern_files", {
-    p_install: input.installId,
-    p_token_hash: presentedToken(input.token),
-  })) as FileRef[] | null;
-  for (const [index, file] of (concerns ?? []).entries()) {
-    const bytes = await downloadStorageObject(file.bucket, file.path);
-    if (bytes) photos.push({ label: `Concern ${index + 1}`, bytes });
-  }
 
   const pdf = await buildVisitPdf({
     sheet: input.sheet,
@@ -206,7 +193,6 @@ export async function commitVisit(input: {
     riskNotes: visit.risk?.notes ?? "",
     engineerSignature: engineerBytes,
     customerSignature: customerBytes,
-    photos,
   });
   const pdfFile = await storePulseFile({
     bucket: "job-sheets",

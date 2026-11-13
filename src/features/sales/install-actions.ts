@@ -241,6 +241,31 @@ export async function cancelInstall(installId: string, reason: string): Promise<
   return { ok: true, message: "Install cancelled.", install: (cancelled.data ?? null) as Record<string, unknown> | null };
 }
 
+export async function listVisitPhotos(installId: string): Promise<{ id: string; kind: string; url: string | null }[]> {
+  await requireInstallReader();
+  if (!ID.test(installId)) return [];
+  const supabase = await createClient();
+  const listed = await supabase.rpc("install_visit_photos", { p_install: installId });
+  if (listed.error || !Array.isArray(listed.data)) return [];
+  const admin = (await import("@/lib/supabase/admin")).createAdminClient();
+  const rows = listed.data as { id?: string; kind?: string; bucket?: string; path?: string }[];
+  return Promise.all(rows.flatMap((row) => {
+    const id = String(row.id ?? "");
+    if (!id) return [];
+    return [{
+      id,
+      kind: String(row.kind ?? "equipment"),
+      url: null as string | null,
+      bucket: row.bucket,
+      path: row.path,
+    }];
+  }).map(async (row) => {
+    if (!admin || !row.bucket || !row.path) return { id: row.id, kind: row.kind, url: null };
+    const signed = await admin.storage.from(row.bucket).createSignedUrl(row.path, 60 * 10);
+    return { id: row.id, kind: row.kind, url: signed.data?.signedUrl ?? null };
+  }));
+}
+
 export async function listArchivedInstalls(query: string): Promise<InstallActionResult> {
   await requireInstallReader();
   const supabase = await createClient();

@@ -492,6 +492,12 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return archived.filter((row) => query === "" || row.orderNumber.toLowerCase().includes(query) || row.customerName.toLowerCase().includes(query));
   }
   if (fn === "install_restore") return true;
+  if (fn === "install_visit_photos") {
+    return [
+      { id: "44444444-4444-4444-8444-444444444444", kind: "concern", bucket: "job-sheets", path: "ops/visit/concern.jpg", createdAt: "2026-11-13T09:00:00Z" },
+      { id: "55555555-5555-4555-8555-555555555555", kind: "equipment", bucket: "job-sheets", path: "ops/visit/equipment.jpg", createdAt: "2026-11-13T15:00:00Z" },
+    ];
+  }
   if (fn === "install_access_preview") {
     const hash = String(args?.p_token_hash ?? "");
     const submitted = hash === "910e32b68f763654876df78b27a8bebe721aa6520b9784264eafe32397a6e0f0";
@@ -743,7 +749,7 @@ export function createFixtureClient() {
             return { data: { path: "proposal.docx" }, error: null };
           },
           async createSignedUrl(path: string) {
-            if (bucket === "access-media" || bucket === "insurance") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
+            if (bucket === "access-media" || bucket === "insurance" || bucket === "job-sheets") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
             return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
           },
           async createSignedUploadUrl(path: string) {
