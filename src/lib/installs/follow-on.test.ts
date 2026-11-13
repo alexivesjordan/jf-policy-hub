@@ -4,7 +4,7 @@ import { sendPulseEmail, type EmailLogRow } from "../email/send";
 import { canManageInstall } from "./access-auth";
 import { installStage } from "./stage";
 import { accessReminderDue, type AccessReminderCadence } from "./reminders";
-import { ACCESS_VIDEO_MAX_BYTES, planAccessMediaUpload } from "../pulse/access-upload";
+import { ACCESS_VIDEO_MAX_BYTES, planAccessMediaUpload, storedAccessMediaOk } from "../pulse/access-upload";
 import type { Profile } from "../types";
 
 const cadence: AccessReminderCadence = { weekly: true, finalDaysBeforeStart: 7 };
@@ -59,6 +59,10 @@ describe("install follow-on", () => {
     assert.equal(planAccessMediaUpload("video/mp4", ACCESS_VIDEO_MAX_BYTES).ok, true);
     assert.equal(planAccessMediaUpload("video/quicktime", ACCESS_VIDEO_MAX_BYTES + 1).ok, false);
     assert.equal(planAccessMediaUpload("image/jpeg", 1024).ok, true);
+    assert.equal(planAccessMediaUpload("image/heic", 1024).ok, true);
+    const stored = storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "image/jpeg", 1024);
+    assert.equal(stored.ok, true);
+    assert.equal(storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "video/mp4", 1024).ok, false);
   });
 
   it("logs email without sending when the Resend key is missing", async () => {

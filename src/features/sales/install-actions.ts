@@ -157,20 +157,13 @@ export async function resendInstallAccess(installId: string): Promise<InstallAct
 export async function copyInstallAccessLink(installId: string): Promise<InstallActionResult> {
   const managed = await managedInstall(installId);
   if (!managed.ok) return managed;
-  try {
-    const access = await issueInstallAccess(
-      {
-        id: installId,
-        contactEmail: managed.row.contactEmail,
-        endOn: String(managed.row.endOn ?? "").slice(0, 10) || null,
-      },
-      { rotate: true },
-    );
-    if (!access.path) return { ok: false, message: "Could not create an access link." };
-    return { ok: true, message: "Link ready. It is shown once.", path: access.path };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : "Could not create an access link." };
-  }
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, message: "Supabase is not configured." };
+  const existing = await admin.rpc("install_latest_access_path", { p_install: installId });
+  const path = typeof existing.data === "string" ? existing.data : "";
+  if (existing.error || !path) return { ok: false, message: "There is no access link to copy yet." };
+  return { ok: true, message: "Current access link.", path };
 }
 
 export async function listInstalls(from: string, to: string, mine = false): Promise<InstallActionResult> {

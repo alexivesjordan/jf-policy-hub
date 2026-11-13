@@ -9,12 +9,13 @@ const VIDEO: Record<string, string> = {
 const IMAGE: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
+  "image/heic": "heic",
   "image/webp": "webp",
   "image/gif": "gif",
 };
 
 export function planAccessMediaUpload(mimeType: string, byteSize: number) {
-  const mime = mimeType.trim().toLowerCase();
+  const mime = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
   const video = VIDEO[mime];
   if (video) {
     if (byteSize <= 0 || byteSize > ACCESS_VIDEO_MAX_BYTES) {
@@ -33,5 +34,15 @@ export function planAccessMediaUpload(mimeType: string, byteSize: number) {
 }
 
 export function accessMediaPathOk(installId: string, path: string) {
-  return new RegExp(`^ops/${installId}/[0-9a-f-]{36}\\.(mp4|mov|jpg|png|webp|gif)$`, "i").test(path);
+  return new RegExp(`^ops/${installId}/[0-9a-f-]{36}\\.(mp4|mov|jpg|png|heic|webp|gif)$`, "i").test(path);
+}
+
+/** The stored object's type and size, not the values the browser claimed. */
+export function storedAccessMediaOk(path: string, mimeType: string, byteSize: number) {
+  const plan = planAccessMediaUpload(mimeType, byteSize);
+  if (!plan.ok) return plan;
+  if (!path.toLowerCase().endsWith(`.${plan.extension}`)) {
+    return { ok: false as const, message: "That file type is not allowed." };
+  }
+  return plan;
 }

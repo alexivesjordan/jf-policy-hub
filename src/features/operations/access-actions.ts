@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { getOfficeContext } from "@/features/operations/queries";
-import { accessMediaPathOk, planAccessMediaUpload } from "@/lib/pulse/access-upload";
+import { accessMediaPathOk, planAccessMediaUpload, storedAccessMediaOk } from "@/lib/pulse/access-upload";
 import { storePulseFile } from "@/lib/pulse/files";
 import { pulseStoragePath } from "@/lib/pulse/prepare-upload";
 import { hashPulseToken } from "@/lib/pulse/token-hash";
@@ -154,27 +154,28 @@ export async function prepareAccessMediaUpload(token: string, mimeType: string, 
   };
 }
 
-export async function finishAccessMediaUpload(token: string, path: string, mimeType: string, byteSize: number) {
+export async function finishAccessMediaUpload(token: string, path: string) {
   const hash = hashPulseToken(token);
   if (!hash) return { ok: false as const, message: "That link is not valid." };
-  const plan = planAccessMediaUpload(mimeType, byteSize);
-  if (!plan.ok) return plan;
   const admin = createAdminClient();
   if (!admin) return { ok: false as const, message: "Supabase is not configured." };
   const preview = await admin.rpc("install_access_preview", { p_token_hash: hash });
   const installId = (preview.data as { install_id?: string } | null)?.install_id;
   if (!installId || !accessMediaPathOk(installId, path)) return { ok: false as const, message: "That file path is not allowed." };
-  const folder = path.split("/").slice(0, -1).join("/");
-  const name = path.split("/").pop() ?? "";
-  const listed = await admin.storage.from("access-media").list(folder, { search: name, limit: 10 });
-  if (!listed.data?.some((item) => item.name === name)) {
+  const info = await admin.storage.from("access-media").info(path);
+  if (info.error || info.data?.size == null || !info.data.contentType) {
     return { ok: false as const, message: "Upload the file before saving it." };
+  }
+  const plan = storedAccessMediaOk(path, info.data.contentType, info.data.size);
+  if (!plan.ok) {
+    await admin.storage.from("access-media").remove([path]);
+    return plan;
   }
   const registered = await admin.rpc("orbit_register_file", {
     p_bucket: "access-media",
     p_storage_path: path,
-    p_mime_type: mimeType,
-    p_byte_size: byteSize,
+    p_mime_type: info.data.contentType.split(";")[0]?.trim().toLowerCase() ?? info.data.contentType,
+    p_byte_size: info.data.size,
     p_checksum: null,
     p_uploaded_by: null,
     p_entity_schema: "ops",
