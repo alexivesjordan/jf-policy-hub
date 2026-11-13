@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { inboundDomain, parseInboundEvent, replyAddress, verifyResendSignature } from "@/lib/subcontractors/inbound";
+import { fetchReceivedText, inboundDomain, parseInboundEvent, replyAddress, verifyResendSignature } from "@/lib/subcontractors/inbound";
 
 const rawSecret = "pulse-test-secret";
 const secret = `whsec_${Buffer.from(rawSecret).toString("base64")}`;
@@ -36,5 +36,28 @@ describe("inbound webhook", () => {
     if (parsed.kind === "email") expect(parsed.token).toBe("abc123abc123abc123abc123");
     expect(replyAddress("abc123abc123abc123abc123", "replies.jordanfitness.com")).toBe("q-abc123abc123abc123abc123@replies.jordanfitness.com");
     expect(parseInboundEvent(JSON.stringify({ type: "email.sent" }), "replies.jordanfitness.com").kind).toBe("ignore");
+    const withBody = parseInboundEvent(JSON.stringify({ type: "email.received", data: { text: "Price £10", to: ["q-abc123abc123abc123abc123@replies.jordanfitness.com"] } }), "replies.jordanfitness.com");
+    if (withBody.kind === "email") expect(withBody.text).toBe("Price £10");
+  });
+
+  it("does not use the sending key to read a received body", async () => {
+    let called = false;
+    const missing = await fetchReceivedText("email-1", {
+      env: { RESEND_API_KEY: "re_send_only" },
+      fetch: async () => {
+        called = true;
+        return new Response("{}");
+      },
+    });
+    expect(missing.unavailable).toBe(true);
+    expect(called).toBe(false);
+    const fetched = await fetchReceivedText("email-1", {
+      env: { RESEND_INBOUND_API_KEY: "re_inbound" },
+      fetch: async (_url, init) => {
+        expect(String((init?.headers as Record<string, string>).authorization)).toContain("re_inbound");
+        return new Response(JSON.stringify({ text: "£900" }), { status: 200 });
+      },
+    });
+    expect(fetched).toEqual({ text: "£900", unavailable: false });
   });
 });

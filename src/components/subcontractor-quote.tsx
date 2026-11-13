@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Banner, Button, Field, Input, TextArea } from "@/components/pulse/ui";
 import { sendSubcontractorQuote } from "@/features/subcontractors/quote-actions";
 import type { QuoteChoice } from "@/lib/subcontractors/capability";
-import { buildSubcontractorDraft, formatUkDate, isWeekday } from "@/lib/subcontractors/draft";
+import { formatUkDate, isWeekday, replaceDateBlock } from "@/lib/subcontractors/draft";
 
 export function SubcontractorQuote({
   offer,
@@ -28,14 +28,7 @@ export function SubcontractorQuote({
 
   function setNextDates(next: string[]) {
     setDates(next);
-    const rebuilt = buildSubcontractorDraft({
-      orderNumber: offer.quoteNumber,
-      customerName: offer.customerName,
-      postcode: offer.postcode,
-      lines: kitLines(offer.draft),
-      dates: next,
-    });
-    setBody(rebuilt.text);
+    setBody((current) => replaceDateBlock(current, next));
   }
 
   function addDate() {
@@ -97,14 +90,6 @@ export function SubcontractorQuote({
       <Button type="submit" disabled={pending || dates.length === 0}>{pending ? "Sending…" : "Send separate emails"}</Button>
     </form>
   );
-}
-
-function kitLines(draft: string) {
-  const kit = draft.split("Kit:\n")[1]?.split("\n\n")[0] ?? "";
-  return kit.split("\n").flatMap((line) => {
-    const match = /^- (\d+)× (.*)$/.exec(line.trim());
-    return match ? [{ qty: Number(match[1]), description: match[2] }] : [];
-  });
 }
 
 function statusLabel(status: string) {

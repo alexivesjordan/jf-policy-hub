@@ -27,12 +27,18 @@ export function asSubcontractor(value: unknown): SubcontractorRecord | null {
   };
 }
 
-export async function listSubcontractorRecords() {
+export async function listSubcontractorRecords(signDocuments = false) {
   const supabase = await createClient();
   const listed = await supabase.rpc("subcontractor_list");
   if (listed.error) throw new Error(messageFromError(listed.error, "Could not load subcontractors."));
   const rows = Array.isArray(listed.data) ? listed.data : [];
   const records = rows.map(asSubcontractor).filter((row): row is SubcontractorRecord => row != null);
+  if (!signDocuments) {
+    return records.map((record) => ({
+      ...record,
+      insurance: record.insurance.map((doc) => ({ id: doc.id, fileId: doc.fileId, expiresOn: doc.expiresOn, label: doc.label })),
+    }));
+  }
   return signInsurance(records);
 }
 

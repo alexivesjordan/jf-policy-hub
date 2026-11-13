@@ -17,7 +17,7 @@ export default async function SubcontractorsPage() {
   let rows: Awaited<ReturnType<typeof listSubcontractorRecords>> = [];
   let error = "";
   try {
-    rows = await listSubcontractorRecords();
+    rows = await listSubcontractorRecords(true);
   } catch (caught) {
     error = caught instanceof Error ? caught.message : "Could not load subcontractors.";
   }

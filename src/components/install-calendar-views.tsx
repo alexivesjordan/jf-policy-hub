@@ -115,7 +115,7 @@ export function InstallKanban({ installs, basePath }: { installs: CalendarInstal
                     <p className="text-sm text-grey">{card.orderNumber}</p>
                     {chip ? <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold">{chip}</span> : null}
                     <p className="mt-2 text-sm">{ukDate(card.startOn)}</p>
-                    <p className="text-sm font-semibold">{money(card.installPrice)}</p>
+                    <p className="text-sm font-semibold">{card.stage === "quoting" || card.installPrice == null ? "—" : money(card.installPrice)}</p>
                   </Link>
                 </li>
                 );

@@ -48,13 +48,20 @@ export function insuranceInDate(documents: { expiresOn: string }[], today: strin
   return documents.some((doc) => /^\d{4}-\d{2}-\d{2}/.test(doc.expiresOn) && doc.expiresOn.slice(0, 10) >= today);
 }
 
+export function addressNeedsCheck(email: string) {
+  const value = email.trim().toLowerCase();
+  if (!value) return false;
+  if ((CHECK_EMAILS as readonly string[]).includes(value)) return true;
+  return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 export function emailNeedsCheck(emails: readonly string[]) {
-  return emails.some((email) => {
-    const value = email.trim().toLowerCase();
-    if (!value) return false;
-    if ((CHECK_EMAILS as readonly string[]).includes(value)) return true;
-    return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  });
+  return emails.some((email) => addressNeedsCheck(email));
+}
+
+/** Addresses that can be mailed. A flagged address stays out until it is edited. */
+export function deliverableEmails(emails: readonly string[]) {
+  return emails.map((email) => email.trim()).filter((email) => email && !addressNeedsCheck(email));
 }
 
 /** A blank region list means the sheet stated no limit, so UK postcodes match and Ireland does not. */
@@ -86,7 +93,9 @@ export function jobTypesForKit(lines: { category?: string | null; description?: 
 export function selectionGate(row: Pick<SubcontractorRecord, "status" | "emails" | "insurance">, today: string) {
   if (row.status === "inactive") return { ok: false as const, reason: "Inactive" };
   if (!insuranceInDate(row.insurance, today)) return { ok: false as const, reason: "No in-date insurance" };
-  if (row.emails.every((email) => !email.trim())) return { ok: false as const, reason: "No email" };
+  if (deliverableEmails(row.emails).length === 0) {
+    return { ok: false as const, reason: emailNeedsCheck(row.emails) ? "Check email" : "No email" };
+  }
   return { ok: true as const, reason: null };
 }
 

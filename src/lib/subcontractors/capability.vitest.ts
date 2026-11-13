@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { coversJobTypes, coversRegion, emailNeedsCheck, insuranceInDate, jobTypesForKit, rankSubcontractors, selectionGate, type SubcontractorRecord } from "@/lib/subcontractors/capability";
-import { buildSubcontractorDraft, isWeekday } from "@/lib/subcontractors/draft";
+import { buildSubcontractorDraft, isWeekday, replaceDateBlock } from "@/lib/subcontractors/draft";
 import { CHECK_EMAILS, SEEDED_SUBCONTRACTORS } from "@/lib/subcontractors/seed-data";
 import { INSURANCE_MAX_BYTES, insuranceBytesMatch, insurancePathOk, planInsuranceUpload } from "@/lib/pulse/access-upload";
 
@@ -53,6 +53,7 @@ describe("capability filter", () => {
   it("pre-ticks an insured preferred company that covers the region and the job", () => {
     const choices = rankSubcontractors([
       row({ name: "Amazon Leisure", emails: ["sarah@amazon-leisure"], jobTypes: ["install", "flooring"] }),
+      row({ name: "Local Fit", emails: ["jobs@localfit.example"], jobTypes: ["install", "flooring"] }),
       row({ name: "GRS", jobTypes: ["install"] }),
       row({ name: "Eamon", regions: ["Ireland"], status: "on_hold" }),
       row({ name: "Globalise", regions: ["West Country"], status: "on_hold" }),
@@ -60,7 +61,10 @@ describe("capability filter", () => {
       row({ name: "Taylor Made", maxCrew: 4, status: "active" }),
     ], { postcode: "LS1 4DY", jobTypes: ["install", "flooring"], crew: 2, today });
     const byName = Object.fromEntries(choices.map((choice) => [choice.name, choice]));
-    expect(byName["Amazon Leisure"].preselected).toBe(true);
+    expect(byName["Local Fit"].preselected).toBe(true);
+    expect(byName["Amazon Leisure"].preselected).toBe(false);
+    expect(byName["Amazon Leisure"].selectable).toBe(false);
+    expect(byName["Amazon Leisure"].reason).toBe("Check email");
     expect(byName["Amazon Leisure"].checkEmail).toBe(true);
     expect(byName.GRS.selectable).toBe(true);
     expect(byName.GRS.preselected).toBe(false);
@@ -111,5 +115,10 @@ describe("seed and draft", () => {
     expect(draft.text).not.toContain("21/11/2026");
     expect(draft.text).not.toMatch(/£/);
     expect(isWeekday("2026-11-21")).toBe(false);
+    const edited = draft.text.replace("Hello,", "Hello Chris,");
+    const next = replaceDateBlock(edited, ["2026-11-18"]);
+    expect(next.startsWith("Hello Chris,")).toBe(true);
+    expect(next).toContain("18/11/2026");
+    expect(next).not.toContain("16/11/2026");
   });
 });

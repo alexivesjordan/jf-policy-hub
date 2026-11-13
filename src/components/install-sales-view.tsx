@@ -52,7 +52,7 @@ export function InstallSalesView({
         </p>
         <dl className="mt-4 divide-y divide-border text-sm">
           <Row label="Order value" value={money(row.goodsNet)} />
-          <Row label="Install price" value={money(row.installPrice)} />
+          <Row label="Install price" value={String(row.stage) === "quoting" || row.installPrice == null ? "—" : money(row.installPrice)} />
           <Row label="Warranty and maintenance" value={warranty} />
           <Row label="Warranty and maintenance price" value={row.warrantyPrice == null ? "—" : money(row.warrantyPrice)} />
           <Row label="Status" value={STATUS[String(row.status)] ?? String(row.status ?? "—")} />

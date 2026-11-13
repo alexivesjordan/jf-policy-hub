@@ -12,7 +12,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
   await connection();
   await requireOperationsUser();
   const { id } = await params;
-  const rows = await listSubcontractorRecords().catch(() => []);
+  const rows = await listSubcontractorRecords(true).catch(() => []);
   const record = rows.find((row) => row.id === id);
   if (!record) notFound();
   return (

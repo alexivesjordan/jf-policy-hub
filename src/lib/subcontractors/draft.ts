@@ -41,6 +41,16 @@ export function buildSubcontractorDraft(input: {
   return { subject, text };
 }
 
+/** Replaces only the suggested-dates block so the rest of an edited draft stays. */
+export function replaceDateBlock(text: string, dates: string[]) {
+  const lines = dates.filter(isWeekday).map((day) => `- ${formatUkDate(day)}`);
+  const block = ["Suggested dates:", ...(lines.length ? lines : ["- Not set"])].join("\n");
+  if (/Suggested dates:\n(?:- .*(?:\n|$))*/.test(text)) {
+    return text.replace(/Suggested dates:\n(?:- .*(?:\n|$))*/, `${block}\n`);
+  }
+  return `${text.trim()}\n\n${block}\n`;
+}
+
 export function draftHtml(text: string) {
   return text
     .split("\n")

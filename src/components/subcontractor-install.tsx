@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
-import { awardSubcontractor, confirmSubcontractorPrice, resendJobSheet } from "@/features/subcontractors/quote-actions";
+import { awardSubcontractor, confirmSubcontractorPrice, resendFailedQuote, resendJobSheet } from "@/features/subcontractors/quote-actions";
 import { isWeekday } from "@/lib/subcontractors/draft";
 
-type Message = { id: string; direction: string; from: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null };
+type Message = { id: string; direction: string; from: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null; bodyUnavailable?: boolean };
 type Thread = { id: string; subcontractorId: string; name: string; status: string; suggestedPrice: number | null; confirmedPrice: number | null; messages: Message[] };
 
 export function SubcontractorInstall({ installId, stage, subcontractorName, threads, canAward }: { installId: string; stage: string; subcontractorName: string | null; threads: Thread[]; canAward: boolean }) {
@@ -34,12 +34,22 @@ function ThreadCard({ installId, thread, canAward }: { installId: string; thread
   return (
     <article className="space-y-3 rounded-2xl border border-line px-3 py-3 text-sm">
       <p className="font-semibold">{thread.name} · {threadLabel(thread.status)}</p>
+      {thread.status === "failed" ? (
+        <Button type="button" variant="secondary" disabled={pending} onClick={async () => {
+          setPending(true);
+          const result = await resendFailedQuote(thread.id);
+          setMessage(result?.message ?? "Could not resend that quote.");
+          setPending(false);
+          if (result?.ok) router.refresh();
+        }}>Resend</Button>
+      ) : null}
       {suggestion != null ? <p>Suggested price {money(suggestion)}. Confirm it before awarding.</p> : <p className="text-grey">No suggested price yet.</p>}
       {thread.confirmedPrice != null ? <p>Confirmed {money(thread.confirmedPrice)}</p> : null}
       <ul className="space-y-2">
         {thread.messages.map((item) => (
           <li key={item.id} className="rounded-xl bg-muted px-3 py-2">
             <p className="text-grey">{item.direction === "in" ? "Reply" : "Sent"}{item.delivery ? ` · ${item.delivery}` : ""}{item.from ? ` · ${item.from}` : ""}</p>
+            {item.bodyUnavailable ? <p className="mt-1 font-semibold">Body unavailable</p> : null}
             {item.body ? <p className="mt-1 whitespace-pre-wrap">{item.body}</p> : null}
           </li>
         ))}

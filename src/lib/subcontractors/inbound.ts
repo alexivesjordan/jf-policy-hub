@@ -36,7 +36,7 @@ export function replyTokenFromAddress(address: string, domain: string) {
   return match?.[1] ?? null;
 }
 
-export function parseInboundEvent(payload: string, domain: string): { kind: "ignore" } | { kind: "email"; emailId: string; from: string; subject: string; token: string | null; recipients: string[] } {
+export function parseInboundEvent(payload: string, domain: string): { kind: "ignore" } | { kind: "email"; emailId: string; from: string; subject: string; token: string | null; recipients: string[]; text: string } {
   const event = JSON.parse(payload) as {
     type?: string;
     data?: {
@@ -47,6 +47,8 @@ export function parseInboundEvent(payload: string, domain: string): { kind: "ign
       bcc?: string[];
       received_for?: string[];
       subject?: string;
+      text?: string | null;
+      html?: string | null;
     };
   };
   if (event.type !== "email.received") return { kind: "ignore" };
@@ -60,21 +62,29 @@ export function parseInboundEvent(payload: string, domain: string): { kind: "ign
     subject: String(data.subject ?? ""),
     token,
     recipients,
+    text: String(data.text ?? data.html ?? "").trim(),
   };
 }
 
+/** Receiving API only. A sending key is not used here. */
 export async function fetchReceivedText(
   emailId: string,
   io: { env: Record<string, string | undefined>; fetch: typeof fetch },
-) {
-  const key = io.env.RESEND_API_KEY?.trim() ?? "";
-  if (!key || !emailId) return "";
-  const response = await io.fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`, {
-    headers: { authorization: `Bearer ${key}`, accept: "application/json" },
-  });
-  if (!response.ok) return "";
-  const body = (await response.json()) as { text?: string | null; html?: string | null };
-  return String(body.text ?? body.html ?? "");
+): Promise<{ text: string; unavailable: boolean }> {
+  const key = io.env.RESEND_INBOUND_API_KEY?.trim() ?? "";
+  if (!key || !emailId) return { text: "", unavailable: true };
+  try {
+    const response = await io.fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`, {
+      headers: { authorization: `Bearer ${key}`, accept: "application/json" },
+    });
+    if (!response.ok) return { text: "", unavailable: true };
+    const body = (await response.json()) as { text?: string | null; html?: string | null };
+    const text = String(body.text ?? body.html ?? "").trim();
+    if (!text) return { text: "", unavailable: true };
+    return { text, unavailable: false };
+  } catch {
+    return { text: "", unavailable: true };
+  }
 }
 
 export function inboundDomain(env: Record<string, string | undefined>) {

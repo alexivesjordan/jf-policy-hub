@@ -24,7 +24,13 @@ export async function POST(request: Request) {
   if (parsed.kind === "ignore") return Response.json({ ok: true, ignored: true });
   if (!parsed.token) return Response.json({ ok: true, matched: false });
 
-  const text = await fetchReceivedText(parsed.emailId, { env: process.env, fetch: globalThis.fetch });
+  let text = parsed.text;
+  let unavailable = false;
+  if (!text) {
+    const fetched = await fetchReceivedText(parsed.emailId, { env: process.env, fetch: globalThis.fetch });
+    text = fetched.text;
+    unavailable = fetched.unavailable;
+  }
   const suggestion = await suggestQuotedPrice(text, { env: process.env, fetch: globalThis.fetch });
   const admin = createAdminClient();
   if (!admin) return Response.json({ ok: false }, { status: 500 });
@@ -33,9 +39,10 @@ export async function POST(request: Request) {
     p_from: parsed.from,
     p_to: parsed.recipients[0] ?? "",
     p_subject: parsed.subject,
-    p_body: text,
+    p_body: unavailable ? null : text,
     p_provider: parsed.emailId || null,
-    p_suggested: suggestion.amount,
+    p_suggested: unavailable ? null : suggestion.amount,
+    p_body_unavailable: unavailable,
   });
   if (saved.error) return Response.json({ ok: false }, { status: 500 });
   return Response.json({ ok: true, matched: Boolean((saved.data as { matched?: boolean } | null)?.matched) });

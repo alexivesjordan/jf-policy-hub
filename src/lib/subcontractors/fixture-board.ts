@@ -115,7 +115,7 @@ function dropDoc(id: string) {
 function openQuote(args: Record<string, unknown>) {
   const dates = Array.isArray(args.p_dates) ? args.p_dates.map(String) : [];
   if (dates.length === 0 || dates.some((day) => !isWeekday(day))) throw new Error("app: Suggested dates have to be weekdays.");
-  const sends = Array.isArray(args.p_sends) ? args.p_sends as { subcontractorId: string; replyToken: string; subject?: string; to?: string }[] : [];
+  const sends = Array.isArray(args.p_sends) ? args.p_sends as { subcontractorId: string; replyToken: string; subject?: string; to?: string | string[] }[] : [];
   const today = new Date().toISOString().slice(0, 10);
   if (!quoting) {
     quoting = {
@@ -144,10 +144,13 @@ function openQuote(args: Record<string, unknown>) {
   }
   const created = sends.map((send) => {
     const row = rows.find((item) => item.id === send.subcontractorId);
-    if (!row || !selectionGate(row, today).ok) throw new Error("app: That subcontractor has no in-date insurance.");
+    if (!row) throw new Error("app: That subcontractor cannot be emailed.");
+    const gate = selectionGate(row, today);
+    if (!gate.ok) throw new Error(`app: ${gate.reason ?? "That subcontractor cannot be emailed."}`);
     const thread: Thread = { id: randomUUID(), installId: String(quoting?.id), subcontractorId: row.id, replyToken: send.replyToken, subject: send.subject ?? "Install quote", status: "queued", suggestedPrice: null, confirmedPrice: null, messages: [] };
     threads.push(thread);
-    return { id: thread.id, subcontractorId: row.id, replyToken: thread.replyToken, email: send.to ?? row.emails[0] ?? "" };
+    const emails = Array.isArray(send.to) ? send.to.map(String) : [String(send.to ?? row.emails[0] ?? "")].filter(Boolean);
+    return { id: thread.id, subcontractorId: row.id, replyToken: thread.replyToken, emails };
   });
   return { installId: quoting?.id, threads: created };
 }
@@ -156,7 +159,9 @@ function logMessage(args: Record<string, unknown>) {
   const thread = threads.find((item) => item.id === String(args.p_thread ?? ""));
   if (!thread) throw new Error("app: That reply was not found.");
   thread.messages.push({ id: randomUUID(), direction: String(args.p_direction ?? "out"), from: String(args.p_from ?? ""), to: String(args.p_to ?? ""), subject: String(args.p_subject ?? ""), body: String(args.p_body ?? ""), delivery: String(args.p_delivery ?? "") || null, suggestedPrice: null, createdAt: new Date().toISOString() });
-  if (args.p_direction === "out") thread.status = "sent";
+  if (args.p_direction === "in") throw new Error("app: Inbound mail is recorded by the webhook.");
+  if (args.p_delivery === "failed") thread.status = "failed";
+  else if (args.p_direction === "out") thread.status = "sent";
   return thread.id;
 }
 

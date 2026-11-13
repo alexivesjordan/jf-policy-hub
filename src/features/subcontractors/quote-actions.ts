@@ -10,7 +10,7 @@ import { messageFromError } from "@/lib/errors";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
 import { draftHtml, isWeekday } from "@/lib/subcontractors/draft";
 import { inboundDomain, newReplyToken, replyAddress } from "@/lib/subcontractors/inbound";
-import { selectionGate } from "@/lib/subcontractors/capability";
+import { deliverableEmails, selectionGate } from "@/lib/subcontractors/capability";
 import { createTokenLink } from "@/lib/pulse/tokens";
 import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
@@ -42,38 +42,70 @@ export async function sendSubcontractorQuote(_state: ActionState, formData: Form
     subcontractorId: row.id,
     replyToken: newReplyToken(),
     subject,
-    to: row.emails[0],
+    to: deliverableEmails(row.emails),
   }));
+  if (sends.some((send) => send.to.length === 0)) return { ok: false, message: "Check email before sending." };
   const supabase = await createClient();
   const opened = await supabase.rpc("subcontractor_open", { p_quote_id: quoteId, p_dates: dates, p_sends: sends });
   if (opened.error || !opened.data) return { ok: false, message: messageFromError(opened.error, "Could not open that quote.") };
-  const result = opened.data as { installId: string; threads: { id: string; replyToken: string; email: string }[] };
-  const html = draftHtml(body);
-  for (const thread of result.threads ?? []) {
-    const sent = await deliverPulseEmail({
-      to: thread.email,
-      subject,
-      template: "subcontractor_quote",
-      text: body,
-      html,
-      installId: result.installId,
-      replyTo: replyAddress(thread.replyToken, domain),
-    });
-    await supabase.rpc("subcontractor_log_message", {
-      p_thread: thread.id,
-      p_direction: "out",
-      p_from: "pulse@jordanfitness.com",
-      p_to: thread.email,
-      p_subject: subject,
-      p_body: body,
-      p_provider: sent.providerId,
-      p_delivery: sent.status,
-      p_suggested: null,
-    });
-  }
+  const result = opened.data as { installId: string; threads: { id: string; replyToken: string; emails: string[] }[] };
+  await mailThreads(supabase, result.installId, subject, body, domain, result.threads ?? []);
   revalidatePath("/sales/installs");
   revalidatePath("/operations/installs");
   redirect(`/sales/installs/${result.installId}`);
+}
+
+export async function resendFailedQuote(threadId: string): Promise<ActionState> {
+  const profile = await requireQuoteEditor();
+  if (!profile) return { ok: false, message: "You cannot send that quote." };
+  if (!ID.test(threadId)) return { ok: false, message: "That thread was not found." };
+  const supabase = await createClient();
+  const prepared = await supabase.rpc("subcontractor_resend", { p_thread: threadId });
+  if (prepared.error || !prepared.data) return { ok: false, message: messageFromError(prepared.error, "Could not resend that quote.") };
+  const row = prepared.data as { installId: string; replyToken: string; subject: string; body: string; emails: string[] };
+  await mailThreads(supabase, row.installId, row.subject, row.body, inboundDomain(process.env), [{
+    id: threadId,
+    replyToken: row.replyToken,
+    emails: row.emails ?? [],
+  }]);
+  revalidatePath(`/sales/installs/${row.installId}`);
+  revalidatePath(`/operations/installs/${row.installId}`);
+  return { ok: true, message: "Quote resent." };
+}
+
+async function mailThreads(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  installId: string,
+  subject: string,
+  body: string,
+  domain: string,
+  threads: { id: string; replyToken: string; emails: string[] }[],
+) {
+  const html = draftHtml(body);
+  for (const thread of threads) {
+    for (const email of thread.emails) {
+      const sent = await deliverPulseEmail({
+        to: email,
+        subject,
+        template: "subcontractor_quote",
+        text: body,
+        html,
+        installId,
+        replyTo: replyAddress(thread.replyToken, domain),
+      });
+      await supabase.rpc("subcontractor_log_message", {
+        p_thread: thread.id,
+        p_direction: "out",
+        p_from: "pulse@jordanfitness.com",
+        p_to: email,
+        p_subject: subject,
+        p_body: body,
+        p_provider: sent.providerId,
+        p_delivery: sent.status,
+        p_suggested: null,
+      });
+    }
+  }
 }
 
 export async function confirmSubcontractorPrice(threadId: string, price: string): Promise<ActionState> {
@@ -165,7 +197,7 @@ export async function readSubcontractorBoard(installId: string) {
     subject: string;
     suggestedPrice: number | null;
     confirmedPrice: number | null;
-    messages: { id: string; direction: string; from: string | null; to: string | null; subject: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null; createdAt: string }[];
+    messages: { id: string; direction: string; from: string | null; to: string | null; subject: string | null; body: string | null; delivery: string | null; suggestedPrice: number | null; bodyUnavailable?: boolean; createdAt: string }[];
   }[];
 }
 
