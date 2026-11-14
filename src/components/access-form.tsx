@@ -91,7 +91,7 @@ export function AccessForm({
         </Field>
       </div>
       <MediaPicker token={token} />
-      <Terms lines={lines} versionLabel={versionLabel} onReady={() => setScrolled(true)} />
+      <Terms lines={lines} onReady={() => setScrolled(true)} />
       {!scrolled ? <p className="text-sm text-grey">Scroll to the end of this list before you can accept.</p> : null}
       <label className="flex min-h-11 items-start gap-3 text-sm leading-6">
         <input type="checkbox" name="accept" value="yes" disabled={!scrolled} className="mt-1 size-5 accent-[#ce0037]" />
@@ -112,11 +112,9 @@ export function AccessForm({
 
 function Terms({
   lines,
-  versionLabel,
   onReady,
 }: {
   lines: Line[];
-  versionLabel: string;
   onReady: () => void;
 }) {
   return (
@@ -130,7 +128,7 @@ function Terms({
         if (termsBoxReady(node.scrollHeight, node.clientHeight, node.scrollTop + node.clientHeight >= node.scrollHeight - 12)) onReady();
       }}
     >
-      <p className="font-semibold text-ink">Additional charges, version {versionLabel}, ex VAT</p>
+      <p className="font-semibold text-ink">Additional charges (ex VAT)</p>
       <ul className="mt-3 space-y-3">
         {lines.map((line) => (
           <li key={line.label}>
