@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
-import { ChevronsUpDown, Menu } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronRight, ChevronsUpDown, Menu } from "lucide-react";
 import { NotificationBell, type BellItem } from "@/components/notification-bell";
 import { ModuleGlyph } from "@/components/module-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -11,7 +11,7 @@ import { UserMenu } from "@/components/user-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { canManageWorkspace } from "@/lib/access";
-import { visibleNav } from "@/lib/shell-nav";
+import { navItemActive, visibleNav } from "@/lib/shell-nav";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -157,7 +157,7 @@ export function MobileNav({
   profile,
   currentId,
 }: {
-  items: { href: string; label: string; count?: "pending" | "unread"; disabled?: boolean }[];
+  items: ModuleNavItem[];
   counts: { pending: number; unread: number };
   title: string;
   profile: Profile;
@@ -207,7 +207,7 @@ function SideNav({
   counts,
   onNavigate,
 }: {
-  items: { href: string; label: string; count?: "pending" | "unread"; disabled?: boolean }[];
+  items: ModuleNavItem[];
   counts: { pending: number; unread: number };
   onNavigate?: () => void;
 }) {
@@ -216,33 +216,78 @@ function SideNav({
   return (
     <nav className="flex flex-col gap-1 px-3 pb-4" aria-label="Module">
       {items.map((item) => {
-        const exact = item.href === "/dashboard" || item.href === "/operations" || item.href === "/sales" || item.href === "/workspace";
-        if (item.disabled) {
-          return (
-            <span key={item.href} className="flex min-h-11 items-center rounded-2xl px-3 text-sm font-semibold text-grey" aria-disabled="true">
-              {item.label}
-              <span className="ml-2 text-[11px] uppercase tracking-wide">Soon</span>
-            </span>
-          );
+        if (item.children && item.children.length > 0) {
+          return <NavGroup key={item.label} item={item} path={path} onNavigate={onNavigate} />;
         }
-        const active = exact ? path === item.href : path === item.href || path.startsWith(`${item.href}/`);
-        const count = item.count ? counts[item.count] : 0;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            onClick={onNavigate}
-            className={cn(
-              "flex min-h-11 items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-              active ? "bg-red text-white" : "text-ink hover:bg-ink/5",
-            )}
-          >
-            <span>{item.label}</span>
-            {count ? <span className="font-mono text-xs tabular-nums">{count}</span> : null}
-          </Link>
-        );
+        return <NavLink key={item.href} item={item} path={path} counts={counts} onNavigate={onNavigate} />;
       })}
     </nav>
+  );
+}
+
+function NavGroup({ item, path, onNavigate }: { item: ModuleNavItem; path: string; onNavigate?: () => void }) {
+  const children = item.children ?? [];
+  const childActive = children.some((child) => navItemActive(child.href, path));
+  const [open, setOpen] = useState(childActive);
+  useEffect(() => {
+    if (childActive) setOpen(true);
+  }, [childActive]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold text-ink outline-none hover:bg-ink/5 focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <span>{item.label}</span>
+        <ChevronRight className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="ml-3 flex flex-col gap-1 border-l border-line pl-2">
+          {children.map((child) => (
+            <NavLink key={child.href} item={child} path={path} counts={{ pending: 0, unread: 0 }} onNavigate={onNavigate} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NavLink({
+  item,
+  path,
+  counts,
+  onNavigate,
+}: {
+  item: ModuleNavItem;
+  path: string;
+  counts: { pending: number; unread: number };
+  onNavigate?: () => void;
+}) {
+  if (item.disabled) {
+    return (
+      <span className="flex min-h-11 items-center rounded-2xl px-3 text-sm font-semibold text-grey" aria-disabled="true">
+        {item.label}
+        <span className="ml-2 text-[11px] uppercase tracking-wide">Soon</span>
+      </span>
+    );
+  }
+  const active = navItemActive(item.href, path);
+  const count = item.count ? counts[item.count] : 0;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      onClick={onNavigate}
+      className={cn(
+        "flex min-h-11 items-center justify-between gap-3 rounded-2xl px-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        active ? "bg-red text-white" : "text-ink hover:bg-ink/5",
+      )}
+    >
+      <span>{item.label}</span>
+      {count ? <span className="font-mono text-xs tabular-nums">{count}</span> : null}
+    </Link>
   );
 }

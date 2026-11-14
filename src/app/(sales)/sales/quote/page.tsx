@@ -8,6 +8,7 @@ import type { PricingSettings } from "@/features/operations/types";
 import { canEditQuoteSettings, requireSalesUser } from "@/lib/auth";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { connection } from "next/server";
+import { oneParam } from "@/lib/utils";
 
 export const metadata = { title: "Install quoting" };
 
@@ -30,9 +31,14 @@ const SEEDED_PRICING: PricingSettings = {
   created_at: "",
 };
 
-export default async function SalesQuotePage() {
+export default async function SalesQuotePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await connection();
   await requireSalesUser();
+  const order = oneParam((await searchParams).order)?.trim() ?? "";
   const [canEdit, pricing, categories] = await Promise.all([
     canEditQuoteSettings(),
     readOwnerSettings().catch(() => null),
@@ -81,7 +87,7 @@ export default async function SalesQuotePage() {
           </QuoteSettingsButton>
         }
       />
-      <PriceQuoteForm cin7Connected={cin7IsConnected()} />
+      <PriceQuoteForm cin7Connected={cin7IsConnected()} initialOrder={order} />
     </div>
   );
 }

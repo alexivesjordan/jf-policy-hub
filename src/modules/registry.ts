@@ -9,6 +9,8 @@ export type ModuleNavItem = {
   adminOnly?: boolean;
   ownerOnly?: boolean;
   disabled?: boolean;
+  /** Collapsible group. The parent is a toggle; the children are the links. */
+  children?: ModuleNavItem[];
 };
 
 export type PulseModule = {
@@ -95,9 +97,15 @@ export const pulseModules: PulseModule[] = [
     paths: ["/sales"],
     nav: [
       { href: "/sales", label: "Overview" },
-      { href: "/sales/quote", label: "Install quoting" },
       { href: "/sales/installs", label: "Installs" },
-      { href: "/sales/service", label: "Warranties and Servicing" },
+      {
+        href: "/sales/quote",
+        label: "Quotes",
+        children: [
+          { href: "/sales/quote", label: "Install quoting" },
+          { href: "/sales/service", label: "Warranties & servicing" },
+        ],
+      },
     ],
   },
   {

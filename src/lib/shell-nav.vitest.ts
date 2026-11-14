@@ -1,0 +1,34 @@
+import { describe, expect, it } from "vitest";
+import { navItemActive, visibleNav } from "@/lib/shell-nav";
+import type { Profile } from "@/lib/types";
+import { pulseModules } from "@/modules/registry";
+
+const profile = {
+  id: "1",
+  email: "a@jordanfitness.com",
+  full_name: "A",
+  role: "staff",
+  is_active: true,
+  access_granted: true,
+  last_sign_in_at: null,
+  created_at: "",
+  updated_at: "",
+} as Profile;
+
+describe("module nav", () => {
+  it("treats overview routes as exact", () => {
+    expect(navItemActive("/sales", "/sales")).toBe(true);
+    expect(navItemActive("/sales", "/sales/installs")).toBe(false);
+    expect(navItemActive("/sales/installs", "/sales/installs/abc")).toBe(true);
+    expect(navItemActive("/sales/quote", "/sales/quote")).toBe(true);
+  });
+
+  it("keeps Quotes as a parent over the existing quote pages", () => {
+    const sales = visibleNav(pulseModules.find((module) => module.id === "sales")?.nav ?? [], profile, false);
+    expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Quotes"]);
+    expect(sales.find((item) => item.label === "Quotes")?.children?.map((item) => item.label)).toEqual([
+      "Install quoting",
+      "Warranties & servicing",
+    ]);
+  });
+});

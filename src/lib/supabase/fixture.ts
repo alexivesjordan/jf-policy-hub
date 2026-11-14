@@ -247,6 +247,33 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     };
   }
   if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "sales_pulse") {
+    const rep = typeof args?.p_rep === "string" ? args.p_rep : null;
+    const admin = process.env.PULSE_FIXTURE_ROLE !== "rep";
+    const mine = !rep || rep === USER_ID;
+    return {
+      admin,
+      repId: admin ? rep : USER_ID,
+      reps: admin
+        ? [
+            { id: USER_ID, name: "Alex Ives" },
+            { id: "00000000-0000-4000-8000-000000000003", name: "Riley Hart" },
+          ]
+        : [],
+      waiting: mine
+        ? [{ id: "22222222-2222-4222-8222-222222222221", kind: "quote", orderNumber: "SO-2201", customerName: "Docklands Gym" }]
+        : [],
+      replies: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111b2", kind: "install", orderNumber: "SO-1002", customerName: "Northside Fitness", awaiting: 1 }]
+        : [],
+      access: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }]
+        : [],
+      week: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }]
+        : [],
+    };
+  }
   if (fn === "install_visit_context") {
     const id = String(args?.p_install ?? "");
     const submitted = id.endsWith("2222");
