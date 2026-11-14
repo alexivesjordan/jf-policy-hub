@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 
-export const PULSE_BUCKETS = ["access-media", "job-sheets", "qc", "insurance", "terms"] as const;
+export const PULSE_BUCKETS = ["access-media", "job-sheets", "qc", "insurance", "terms", "documents"] as const;
 export type PulseBucket = (typeof PULSE_BUCKETS)[number];
 
 /** App routes share the 12 MB proxy limit. Buckets themselves allow more for a later direct upload. */
@@ -14,6 +14,7 @@ const ALLOWED: Record<PulseBucket, readonly string[]> = {
   qc: ["image/jpeg", "image/png", "image/webp"],
   insurance: ["application/pdf", "image/jpeg", "image/png"],
   terms: ["application/pdf"],
+  documents: ["application/pdf"],
 };
 
 export class PulseFileError extends Error {

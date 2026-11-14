@@ -15,6 +15,29 @@ function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const RESOURCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type WorkspaceFormState = { message: string } | null;
+
+function nameProblem(formData: FormData) {
+  const first = clean(formData.get("firstName"));
+  const last = clean(formData.get("lastName"));
+  if (!first && !last) return "Enter a first and last name.";
+  if (!first) return "Enter a first name.";
+  if (!last) return "Enter a last name.";
+  if (first.length > 80 || last.length > 80) return "Enter a shorter name.";
+  return null;
+}
+
+function installsChoiceProblem(formData: FormData) {
+  const installsTeamId = clean(formData.get("installsTeamId"));
+  const selected = formData.getAll("teamId").map(String).filter(Boolean);
+  if (!installsTeamId || !selected.includes(installsTeamId)) return null;
+  const choice = clean(formData.get("fieldResource"));
+  if (choice === "office" || RESOURCE_ID.test(choice)) return null;
+  return "Choose a field engineer resource, or mark them as office staff.";
+}
+
 export async function saveWorkspaceTeam(formData: FormData) {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
@@ -34,8 +57,12 @@ export async function deleteWorkspaceTeam(formData: FormData) {
   revalidatePath("/workspace/teams");
 }
 
-export async function saveWorkspaceUser(formData: FormData) {
+export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
   await requireWorkspaceAdmin();
+  const problem = nameProblem(formData) ?? installsChoiceProblem(formData);
+  if (problem) return { message: problem };
+  const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
+  if (!names) return { message: "Enter a first and last name." };
   const custom: Record<string, string> = {};
   for (const moduleId of PULSE_MODULE_IDS) {
     custom[moduleId] = clean(formData.get(`level-${moduleId}`)) || "none";
@@ -49,24 +76,31 @@ export async function saveWorkspaceUser(formData: FormData) {
     p_custom: custom,
     p_active: formData.get("isActive") === "yes",
   });
-  if (error) throw new Error(messageFromError(error, "Could not save that user."));
-  const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
-  if (names) {
-    const named = await supabase.rpc("save_person_name", {
+  if (error) return { message: messageFromError(error, "Could not save that user.") };
+  const named = await supabase.rpc("save_person_name", {
+    p_profile: clean(formData.get("userId")),
+    p_first_name: names.firstName,
+    p_last_name: names.lastName,
+  });
+  if (named.error) return { message: messageFromError(named.error, "Could not save that name.") };
+  if (formData.has("fieldResource")) {
+    const linked = await supabase.rpc("install_set_field_resource", {
       p_profile: clean(formData.get("userId")),
-      p_first_name: names.firstName,
-      p_last_name: names.lastName,
+      p_choice: clean(formData.get("fieldResource")),
     });
-    if (named.error) throw new Error(messageFromError(named.error, "Could not save that name."));
+    if (linked.error) return { message: messageFromError(linked.error, "Could not link that engineer.") };
   }
   revalidatePath("/workspace/users");
+  return null;
 }
 
-export async function inviteWorkspaceUser(formData: FormData) {
+export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
   await requireWorkspaceAdmin();
+  const problem = nameProblem(formData) ?? installsChoiceProblem(formData);
+  if (problem) return { message: problem };
   const email = clean(formData.get("email"));
   const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
-  if (!names) throw new Error("Enter a first and last name.");
+  if (!names) return { message: "Enter a first and last name." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("workspace_prepare_invite", {
     p_email: email,
@@ -74,21 +108,28 @@ export async function inviteWorkspaceUser(formData: FormData) {
     p_last_name: names.lastName,
     p_workspace_role: clean(formData.get("workspaceRole")),
   });
-  if (error) throw new Error(messageFromError(error, "We could not save that invite."));
-  const prepared = (data ?? {}) as { already_registered?: boolean };
+  if (error) return { message: messageFromError(error, "We could not save that invite.") };
+  const prepared = (data ?? {}) as { already_registered?: boolean; user_id?: string | null };
+  const applied = await supabase.rpc("install_apply_invite", {
+    p_email: email,
+    p_team_ids: formData.getAll("teamId").map(String).filter(Boolean),
+    p_choice: clean(formData.get("fieldResource")),
+  });
+  if (applied.error) return { message: messageFromError(applied.error, "Could not link that engineer.") };
   if (!prepared.already_registered) {
-    if (!hasServiceRole()) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
+    if (!hasServiceRole()) return { message: "Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server." };
     const service = createAdminClient();
-    if (!service) throw new Error("Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server.");
+    if (!service) return { message: "Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server." };
     const { error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
       data: { first_name: names.firstName, last_name: names.lastName, full_name: `${names.firstName} ${names.lastName}` },
       redirectTo: authConfirmRedirect(passwordSetupPath()),
     });
     if (inviteError && !inviteError.message.toLowerCase().includes("already")) {
-      throw new Error("Their access is saved, but the invite email was not sent. Try again in a moment.");
+      return { message: "Their access is saved, but the invite email was not sent. Try again in a moment." };
     }
   }
   revalidatePath("/workspace/users");
+  return null;
 }
 
 export async function resendWorkspaceInvite(formData: FormData) {
