@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useActionState, useState } from "react";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { CHARGES_HEADING, TermsAcceptBox } from "@/components/terms-accept";
 import { submitAccessForm } from "@/features/operations/access-actions";
-import { basisText, orderedAnswers, termsScrolledToEnd } from "@/lib/installs/access-ui";
+import { basisText, orderedAnswers } from "@/lib/installs/access-ui";
 
 type Line = { label?: string; rate?: number; unit?: string; basis?: string; mileage?: number };
 type SavedMedia = { id: string; url?: string | null; mime?: string | null; kind?: string | null };
@@ -28,8 +28,6 @@ export function AccessForm({
   saved?: Saved | null;
 }) {
   const [state, action, pending] = useActionState(submitAccessForm, null);
-  const [scrolled, setScrolled] = useState(false);
-  const markReady = useCallback(() => setScrolled(true), []);
   const [sent, setSent] = useState<Saved | null>(saved);
   const done = submitted || state?.ok;
 
@@ -93,13 +91,12 @@ export function AccessForm({
         </Field>
       </div>
       <MediaPicker token={token} />
-      <Terms lines={lines} onReady={markReady} />
-      {!scrolled ? <p className="text-sm text-grey">Scroll to the end of this list before you can accept.</p> : null}
-      <TermsAcceptBox ready={scrolled} versionLabel={versionLabel} />
+      <Terms lines={lines} />
+      <TermsAcceptBox versionLabel={versionLabel} />
       <Field label="Your name">
         <Input name="acceptedName" required autoComplete="name" />
       </Field>
-      <Button type="submit" disabled={pending || !scrolled} className="w-full">
+      <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Sending..." : "Send access details"}
       </Button>
       {state && !state.ok ? <Banner tone="error">{state.message}</Banner> : null}
@@ -107,55 +104,11 @@ export function AccessForm({
   );
 }
 
-function Terms({
-  lines,
-  onReady,
-}: {
-  lines: Line[];
-  onReady: () => void;
-}) {
-  const scroller = useRef<HTMLDivElement>(null);
-  const end = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const root = scroller.current;
-    const target = end.current;
-    if (!root || !target) return;
-    const reveal = () => {
-      if (termsScrolledToEnd(root.scrollHeight, root.clientHeight, root.scrollTop)) onReady();
-    };
-    reveal();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onReady();
-      },
-      { root, threshold: 1 },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [onReady, lines]);
-
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const node = event.currentTarget;
-    if (event.key === "End") node.scrollTop = node.scrollHeight;
-    else if (event.key === "PageDown" || event.key === "ArrowDown" || event.key === " ") node.scrollTop += event.key === "ArrowDown" ? 48 : node.clientHeight;
-    else return;
-    event.preventDefault();
-    if (termsScrolledToEnd(node.scrollHeight, node.clientHeight, node.scrollTop)) onReady();
-  }
-
+function Terms({ lines }: { lines: Line[] }) {
   return (
     <div
-      ref={scroller}
-      tabIndex={0}
-      role="region"
+      className="rounded-3xl border border-line bg-field p-4 text-sm leading-6"
       aria-label={CHARGES_HEADING}
-      onKeyDown={onKeyDown}
-      onScroll={(event) => {
-        const node = event.currentTarget;
-        if (termsScrolledToEnd(node.scrollHeight, node.clientHeight, node.scrollTop)) onReady();
-      }}
-      className="max-h-64 touch-pan-y overflow-y-auto overscroll-contain rounded-3xl border border-line bg-field p-4 text-sm leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <p className="font-semibold text-ink">{CHARGES_HEADING}</p>
       <ul className="mt-3 space-y-3">
@@ -170,7 +123,6 @@ function Terms({
           </li>
         ))}
       </ul>
-      <div ref={end} className="h-px" aria-hidden="true" />
     </div>
   );
 }
