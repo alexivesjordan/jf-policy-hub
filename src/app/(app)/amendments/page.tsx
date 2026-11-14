@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
-export default function AmendmentsPage() {
+export const instant = false;
+
+export default async function AmendmentsPage() {
+  await connection();
   redirect("/policies");
 }

@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
-export default function VansPage() {
+export const instant = false;
+
+export default async function VansPage() {
+  await connection();
   redirect("/operations/fleet");
 }
