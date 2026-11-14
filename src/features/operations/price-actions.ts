@@ -753,6 +753,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       customerPrice: view.customerPrice,
       savedQuoteId: savedQuoteId ?? undefined,
       contactEmail: saved?.contactEmail ?? null,
+      missingCin7Email: draft.source === "cin7" && !saved?.contactEmail,
       service,
     });
     if (String(formData.get("mode") ?? "") !== "subcontractor") return priced;

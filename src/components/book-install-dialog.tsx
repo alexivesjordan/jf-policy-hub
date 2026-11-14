@@ -51,10 +51,12 @@ export function BookInstallDialog({
   quoteId,
   warranty,
   contactEmail,
+  missingCin7Email = false,
 }: {
   quoteId: string;
   warranty: WarrantyPrices | null;
   contactEmail: string | null;
+  missingCin7Email?: boolean;
 }) {
   const wide = useWideScreen();
   const [open, setOpen] = useState(false);
@@ -134,7 +136,7 @@ export function BookInstallDialog({
             </div>
             {contactEmail ? null : (
               <div className="mx-auto w-full max-w-xl space-y-2">
-                <p className="text-sm">Cin7 has no customer email on this order. Add one so the access form can be sent.</p>
+                <p className="text-sm">{missingCin7Email ? "Cin7 has no customer email on this order. Add one so the access form can be sent." : "Add the customer's email so the access form can be sent."}</p>
                 <Field label="Customer email">
                   <Input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
                 </Field>

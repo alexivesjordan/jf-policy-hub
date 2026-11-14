@@ -140,10 +140,10 @@ export function PriceQuoteForm({ cin7Connected, initialOrder = "" }: { cin7Conne
         </>
       ) : null}
       {!sold?.subcontractor && quote?.customerPrice != null && !quote.contactEmail ? (
-        <p className="text-sm">Cin7 has no customer email on this order. Add one before booking.</p>
+        <p className="text-sm">{quote.missingCin7Email ? "Cin7 has no customer email on this order. Add one before booking." : "Add the customer's email before booking."}</p>
       ) : null}
       {!sold?.subcontractor && quote?.savedQuoteId ? (
-        <BookInstallDialog quoteId={quote.savedQuoteId} contactEmail={quote.contactEmail ?? null} warranty={includeService ? warrantyPrices(quote.service) : null} />
+        <BookInstallDialog quoteId={quote.savedQuoteId} contactEmail={quote.contactEmail ?? null} missingCin7Email={quote.missingCin7Email} warranty={includeService ? warrantyPrices(quote.service) : null} />
       ) : null}
     </div>
   );
