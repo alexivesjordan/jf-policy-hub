@@ -74,16 +74,20 @@ export const pulseModules: PulseModule[] = [
     paths: ["/operations"],
     nav: [
       { href: "/operations", label: "Overview" },
-      { href: "/field", label: "My jobs" },
+      { href: "/operations/schedule", label: "Schedule" },
       { href: "/operations/installs", label: "Installs" },
-      { href: "/operations/jobs", label: "Jobs" },
-      { href: "/operations/subcontractors", label: "Subcontractors" },
-      { href: "/operations/calendar", label: "Resource Availability" },
-      { href: "/operations/documents", label: "Visit documents" },
-      { href: "/operations/vans", label: "Vans" },
+      { href: "/operations/fleet", label: "Fleet" },
       { href: "/operations/tasks", label: "Tasks" },
-      { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
-      { href: "/operations/settings", label: "Effort table", ownerOnly: true },
+      {
+        href: "/operations/subcontractors",
+        label: "Setup",
+        children: [
+          { href: "/operations/subcontractors", label: "Subcontractors" },
+          { href: "/operations/settings", label: "Effort tables", ownerOnly: true },
+          { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
+          { href: "/operations/documents", label: "Visit documents" },
+        ],
+      },
     ],
   },
   {

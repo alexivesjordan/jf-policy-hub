@@ -23,6 +23,17 @@ describe("module nav", () => {
     expect(navItemActive("/sales/quote", "/sales/quote")).toBe(true);
   });
 
+  it("groups office setup and drops the old jobs links", () => {
+    const operations = visibleNav(pulseModules.find((module) => module.id === "operations")?.nav ?? [], profile, true);
+    expect(operations.map((item) => item.label)).toEqual(["Overview", "Schedule", "Installs", "Fleet", "Tasks", "Setup"]);
+    expect(operations.find((item) => item.label === "Setup")?.children?.map((item) => item.label)).toEqual([
+      "Subcontractors",
+      "Effort tables",
+      "Gate overrides",
+      "Visit documents",
+    ]);
+  });
+
   it("sends People to Overview, Calendar, and Policies", () => {
     const people = visibleNav(pulseModules.find((module) => module.id === "people")?.nav ?? [], profile, true);
     expect(people.map((item) => item.label)).toEqual(["Overview", "Calendar", "Policies"]);

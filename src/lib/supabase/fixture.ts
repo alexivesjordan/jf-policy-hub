@@ -266,7 +266,45 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       officeIds: [],
     };
   }
-  if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "install_list_vans") return [{ registration: "AB12 CDE", name: "Transit" }];
+  if (fn === "install_manage_vans") {
+    return [{
+      id: "van-1",
+      registration: "AB12 CDE",
+      name: "Transit",
+      makeModel: "Ford Transit",
+      motDue: "2026-12-01",
+      taxDue: "2026-11-20",
+      insuranceDue: "2027-01-15",
+      serviceDue: "2026-11-30",
+      notes: null,
+      active: true,
+    }];
+  }
+  if (fn === "ops_schedule") {
+    const from = String(args?.p_from ?? "2026-11-16").slice(0, 10);
+    return {
+      engineers: [{ id: "f3000000-0000-4000-8000-000000000001", name: "Lewis", profileId: null }],
+      vans: [{ id: "van-1", registration: "AB12 CDE", makeModel: "Ford Transit" }],
+      events: [
+        { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "job", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+        { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "absence", label: "leave", href: null },
+        { rowKind: "van", rowId: "van-1", day: from, kind: "booking", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+      ],
+    };
+  }
+  if (fn === "ops_pulse") {
+    return {
+      installsToday: [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }],
+      installsWeek: [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }],
+      servicesToday: [],
+      servicesWeek: [],
+      off: [{ name: "Lewis", label: "sickness", startsOn: "2026-11-12", endsOn: "2026-11-13" }],
+      vansOut: [{ id: "11111111-1111-4111-8111-1111111111a1", registration: "AB12 CDE", orderNumber: "EXAMPLE-00490" }],
+      overdue: [{ id: "task-1", title: "Chase access form", dueAt: "2026-11-01T09:00:00Z", assignee: "Sam Cole" }],
+      warnings: [{ label: "AB12 CDE", detail: "Tax 2026-11-20", href: "/operations/fleet" }],
+    };
+  }
   if (fn === "people_resource_absence") {
     return [
       { id: "unavail-1", name: "Lewis", startsOn: "2026-11-12", endsOn: "2026-11-13", reason: "sickness", notes: null },

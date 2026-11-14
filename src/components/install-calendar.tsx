@@ -67,6 +67,7 @@ export async function InstallCalendarPage({
         {view === "kanban" ? null : <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "week" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "week")}>Week</Link>}
         <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view === "kanban" ? "board" : view === "week" ? "week" : "month", !mine)}>{mine ? "All installs" : "My installs"}</Link>
         <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={`${basePath}/archive`}>Archive</Link>
+        {basePath.startsWith("/operations") && view !== "kanban" ? <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href="/operations/schedule">Schedule</Link> : null}
       </div>
       {view === "kanban" ? <InstallKanban installs={installs} basePath={basePath} /> : null}
       {view === "month" ? <InstallMonthGrid days={days.map(iso)} installs={installs} basePath={basePath} /> : null}

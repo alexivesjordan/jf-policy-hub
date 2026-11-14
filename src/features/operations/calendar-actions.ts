@@ -17,6 +17,7 @@ export async function recordUnavailability(_state: ActionState, formData: FormDa
   });
   if (error) return { ok: false, message: messageFromError(error, "Could not save unavailability.") };
   revalidatePath("/operations/calendar");
+  revalidatePath("/operations/schedule");
   return { ok: true, message: "Unavailability saved." };
 }
 
