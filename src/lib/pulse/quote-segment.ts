@@ -73,6 +73,7 @@ export function salesOrderActionResult(input: {
   postcode: string;
   customerPrice: number | null;
   savedQuoteId?: string;
+  contactEmail?: string | null;
   service?: {
     id: string | null;
     quoteNumber: string;
@@ -113,6 +114,7 @@ export function salesOrderActionResult(input: {
           customerName: input.customerName,
           postcode: input.postcode,
           savedQuoteId: input.savedQuoteId,
+          contactEmail: input.contactEmail?.trim() || null,
           service,
         },
   };

@@ -77,6 +77,45 @@ function addressLines(address: Record<string, unknown> | null) {
   return parts.length ? parts.join(", ") : null;
 }
 
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+/**
+ * Customer email for the access form, first match wins:
+ * 1. Sale.Email — the customer contact email stored on this order.
+ * 2. Customer.Email — only when a payload has a top-level customer email.
+ * 3. The customer Contacts row whose Name matches sale.Contact, when that row has an email.
+ * 4. The customer's default contact email (Contacts.Default).
+ * On SO-00650, Sale.Email was blank and the contact named on the sale had no email,
+ * so none of these fields held the address. The rep enters it before booking.
+ */
+export function orderContactEmail(sale: Record<string, unknown>, customer: Record<string, unknown> | null) {
+  return (
+    emailValue(sale.Email) ??
+    emailValue(customer?.Email) ??
+    namedContactEmail(customer, text(sale.Contact)) ??
+    defaultContactEmail(customer)
+  );
+}
+
+function emailValue(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const match = raw.match(EMAIL);
+  return match ? match[0] : null;
+}
+
+function namedContactEmail(customer: Record<string, unknown> | null, name: string | null) {
+  if (!name) return null;
+  const wanted = name.toLowerCase();
+  const match = list(customer?.Contacts).find((contact) => text(contact.Name)?.toLowerCase() === wanted);
+  return emailValue(match?.Email);
+}
+
+function defaultContactEmail(customer: Record<string, unknown> | null) {
+  const preferred = list(customer?.Contacts).find((contact) => contact.Default === true);
+  return emailValue(preferred?.Email);
+}
+
 function orderDocument(sale: Record<string, unknown>) {
   const order = record(sale.Order);
   const orderLines = list(order?.Lines);
@@ -219,7 +258,7 @@ export async function readCin7BookingDetails(orderNumberOrId: string, get: Cin7G
   return {
     siteAddress: addressLines(deliveryAddress(customer, sale)),
     contactName: text(sale.Contact) ?? text(customer?.Name),
-    contactEmail: text(sale.Email) ?? text(customer?.Email),
+    contactEmail: orderContactEmail(sale, customer),
     contactPhone: text(sale.Phone) ?? text(customer?.Phone),
   };
 }

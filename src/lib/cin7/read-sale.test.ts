@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { readCin7BookingDetails, readCin7Sale, type Cin7Getter } from "./read-sale";
+import { orderContactEmail, readCin7BookingDetails, readCin7Sale, type Cin7Getter } from "./read-sale";
 
 const saleId = "11111111-1111-4111-8111-111111111111";
 const customerId = "22222222-2222-4222-8222-222222222222";
@@ -136,6 +136,26 @@ describe("Cin7 sale read", () => {
     assert.equal(quote?.postcode, null);
     const details = await readCin7BookingDetails("SO-00490", wrapped);
     assert.equal(details?.siteAddress, null);
+  });
+
+  it("reads the sale email, then a named contact, then the default contact", () => {
+    const sale = { Email: "", Contact: "Alex" };
+    const customer = {
+      Contacts: [
+        { Name: "Alex", Email: null, Default: true },
+        { Name: "Sam", Email: "sam.example@example.com", Default: false },
+      ],
+    };
+    assert.equal(orderContactEmail(sale, customer), null);
+    assert.equal(orderContactEmail({ Email: "alex.ives@jordanfitness.com", Contact: "Alex" }, customer), "alex.ives@jordanfitness.com");
+    assert.equal(orderContactEmail({ Email: "", Contact: "Sam" }, customer), "sam.example@example.com");
+    assert.equal(
+      orderContactEmail({ Email: "", Contact: "Nobody" }, {
+        Contacts: [{ Name: "Office", Email: "office.example@example.com", Default: true }],
+      }),
+      "office.example@example.com",
+    );
+    assert.equal(orderContactEmail({ Email: "" }, { Email: "card.example@example.com", Contacts: [] }), "card.example@example.com");
   });
 
   it("ignores a weight that is not in kilograms", async () => {
