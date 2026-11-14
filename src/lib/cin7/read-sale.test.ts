@@ -71,7 +71,7 @@ describe("Cin7 sale read", () => {
     assert.ok(quote);
     assert.equal(quote.number, "SO-00490");
     assert.equal(quote.customerName, "Sample Fitness Club");
-    assert.equal(quote.postcode, "IP1 4NJ");
+    assert.equal(quote.postcode, "PE30 4JJ");
     assert.equal(quote.segment, null);
     assert.equal(quote.lines[0].sku, "JF-C2SE-2");
     assert.equal(quote.lines[0].qty, 2);
@@ -93,9 +93,49 @@ describe("Cin7 sale read", () => {
     assert.equal(dumped.includes("Anonymised Road"), false);
     assert.equal(dumped.includes("Accounts lane"), false);
     const details = await readCin7BookingDetails("SO-00490", get);
-    assert.equal(details?.siteAddress?.includes("1 Anonymised Road"), true);
+    assert.equal(details?.siteAddress, "1 Secret Road, Ipswich, PE30 4JJ");
+    assert.equal(details?.siteAddress?.includes("1 Anonymised Road"), false);
     assert.equal(details?.contactEmail, "hidden@example.com");
     assert.equal(JSON.stringify(quote).includes("1 Anonymised Road"), false);
+  });
+
+  it("uses the customer default shipping address only when the sale has no delivery address", async () => {
+    const { get } = fixtureGet();
+    const wrapped: Cin7Getter = async (pathName, query) => {
+      const body = await get(pathName, query);
+      if (pathName !== "sale" || !body || typeof body !== "object") return body;
+      return { ...(body as Record<string, unknown>), ShippingAddress: { Line1: "", Postcode: "" } };
+    };
+    const quote = await readCin7Sale("SO-00490", wrapped);
+    assert.equal(quote?.postcode, "IP1 4NJ");
+    const details = await readCin7BookingDetails("SO-00490", wrapped);
+    assert.equal(details?.siteAddress, "1 Anonymised Road, IP1 4NJ");
+  });
+
+  it("does not use a non-default customer shipping address when the sale has no delivery address", async () => {
+    const { get } = fixtureGet();
+    const wrapped: Cin7Getter = async (pathName, query) => {
+      const body = await get(pathName, query);
+      if (pathName === "sale" && body && typeof body === "object") {
+        return { ...(body as Record<string, unknown>), ShippingAddress: {} };
+      }
+      if (pathName === "customer" && body && typeof body === "object") {
+        const listed = (body as { CustomerList: Record<string, unknown>[] }).CustomerList;
+        listed[0] = {
+          ...listed[0],
+          Addresses: [
+            { Type: "Billing", DefaultForType: true, Line1: "Accounts lane", Postcode: "PE30 4JJ" },
+            { Type: "Shipping", DefaultForType: false, Line1: "22 Jersey Medow", City: "Kentford", Postcode: "CB8 7GJ" },
+          ],
+        };
+        return { CustomerList: listed };
+      }
+      return body;
+    };
+    const quote = await readCin7Sale("SO-00490", wrapped);
+    assert.equal(quote?.postcode, null);
+    const details = await readCin7BookingDetails("SO-00490", wrapped);
+    assert.equal(details?.siteAddress, null);
   });
 
   it("ignores a weight that is not in kilograms", async () => {
