@@ -25,6 +25,16 @@ export function termsBoxReady(scrollHeight: number, clientHeight: number, scroll
   return scrolled;
 }
 
+/**
+ * True when the end of the charges list is on screen.
+ * A list that fits is already read. A longer list is read once the remaining
+ * distance is within a few pixels, which is where keyboard End lands.
+ */
+export function termsScrolledToEnd(scrollHeight: number, clientHeight: number, scrollTop: number) {
+  if (scrollHeight <= clientHeight + 8) return true;
+  return scrollHeight - scrollTop - clientHeight <= 8;
+}
+
 export function kanbanColumn(stage: unknown) {
   const value = String(stage ?? "");
   return KANBAN_COLUMNS.some(([id]) => id === value) ? value : "booked";
