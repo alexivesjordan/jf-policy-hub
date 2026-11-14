@@ -134,8 +134,8 @@ async function effortTableFor(lines: { sku: string }[]) {
     suggestion_rule?: string | null;
     status?: string | null;
     effort_unit?: "each" | "tile" | "m2" | null;
-  }[]).map((row) =>
-    effortRowForSku({
+  }[]).map((row) => ({
+    ...effortRowForSku({
       sku: row.sku,
       productName: row.product_name,
       category: row.cin7_category,
@@ -150,7 +150,8 @@ async function effortTableFor(lines: { sku: string }[]) {
       workPhase: row.suggestion_rule === "sled-track" ? "sled" : row.effort_unit === "tile" || row.effort_unit === "m2" ? "floor" : "job",
       needsReview: row.status === "suggested" || Boolean(row.suggestion_rule),
     }),
-  );
+    status: row.status === "confirmed" ? "confirmed" as const : "suggested" as const,
+  }));
   return [...rows, ...bundled];
 }
 
