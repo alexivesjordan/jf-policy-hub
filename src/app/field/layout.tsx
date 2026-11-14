@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from "react";
-import { FieldMenuProvider } from "@/components/field/menu";
+import { AppShell } from "@/components/app-shell";
 import { fieldRole } from "@/features/field/queries";
 import { getOfficeContext } from "@/features/operations/queries";
 import { canUseOperations, canUseSales } from "@/lib/access";
@@ -13,7 +13,7 @@ export const instant = false;
 export default function FieldLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={children}>
-      <FieldMenuShell>{children}</FieldMenuShell>
+      <FieldShell>{children}</FieldShell>
     </Suspense>
   );
 }
@@ -23,13 +23,13 @@ function moduleNav(id: string) {
 }
 
 function navForField(profile: NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>, role: string, isOwner: boolean) {
-  if (role === "engineer") return { items: ENGINEER_NAV, currentId: "operations" };
-  if (canUseOperations(profile)) return { items: visibleNav(moduleNav("operations"), profile, isOwner), currentId: "operations" };
-  if (canUseSales(profile)) return { items: visibleNav(moduleNav("sales"), profile, isOwner), currentId: "sales" };
-  return { items: visibleNav(moduleNav("people"), profile, isOwner), currentId: "people" };
+  if (role === "engineer") return ENGINEER_NAV;
+  if (canUseOperations(profile)) return visibleNav(moduleNav("operations"), profile, isOwner);
+  if (canUseSales(profile)) return visibleNav(moduleNav("sales"), profile, isOwner);
+  return visibleNav(moduleNav("people"), profile, isOwner);
 }
 
-async function FieldMenuShell({ children }: { children: ReactNode }) {
+async function FieldShell({ children }: { children: ReactNode }) {
   if (!isSupabaseConfigured() && !isFixtureMode()) return children;
   const profile = await getCurrentProfile();
   if (!profile?.access_granted || !profile.is_active) return children;
@@ -45,10 +45,9 @@ async function FieldMenuShell({ children }: { children: ReactNode }) {
   } catch {
     isOwner = profile.workspace_role === "owner";
   }
-  const menu = navForField(profile, role, isOwner);
   return (
-    <FieldMenuProvider value={{ profile, items: menu.items, currentId: menu.currentId }}>
+    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)}>
       {children}
-    </FieldMenuProvider>
+    </AppShell>
   );
 }

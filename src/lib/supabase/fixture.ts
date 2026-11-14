@@ -199,6 +199,26 @@ function tables(): Record<string, Record<string, unknown>[]> {
     policy_versions: [],
     amendments: [],
     notifications: [],
+    calendar_entries: [
+      {
+        id: "cal-leave",
+        entry_type: "annual_leave",
+        profile_id: USER_ID,
+        starts_on: "2026-11-16",
+        ends_on: "2026-11-18",
+        notes: "Annual leave",
+        request_status: "confirmed",
+      },
+      {
+        id: "cal-event",
+        entry_type: "company_event",
+        profile_id: null,
+        starts_on: "2026-11-20",
+        ends_on: "2026-11-20",
+        notes: "All-hands",
+        request_status: "confirmed",
+      },
+    ],
     audit_log: [],
     module_access: [
       { module_id: "people", enabled: true, profile_id: USER_ID },
@@ -246,7 +266,77 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       officeIds: [],
     };
   }
-  if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "install_list_vans") return [{ registration: "AB12 CDE", name: "Transit" }];
+  if (fn === "install_manage_vans") {
+    return [{
+      id: "van-1",
+      registration: "AB12 CDE",
+      name: "Transit",
+      makeModel: "Ford Transit",
+      motDue: "2026-12-01",
+      taxDue: "2026-11-20",
+      insuranceDue: "2027-01-15",
+      serviceDue: "2026-11-30",
+      notes: null,
+      active: true,
+    }];
+  }
+  if (fn === "ops_schedule") {
+    const from = String(args?.p_from ?? "2026-11-16").slice(0, 10);
+    return {
+      engineers: [{ id: "f3000000-0000-4000-8000-000000000001", name: "Lewis", profileId: null }],
+      vans: [{ id: "van-1", registration: "AB12 CDE", makeModel: "Ford Transit" }],
+      events: [
+        { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "job", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+        { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "absence", label: "leave", href: null },
+        { rowKind: "van", rowId: "van-1", day: from, kind: "booking", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+      ],
+    };
+  }
+  if (fn === "ops_pulse") {
+    return {
+      installsToday: [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }],
+      installsWeek: [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }],
+      servicesToday: [],
+      servicesWeek: [],
+      off: [{ name: "Lewis", label: "sickness", startsOn: "2026-11-12", endsOn: "2026-11-13" }],
+      vansOut: [{ id: "11111111-1111-4111-8111-1111111111a1", registration: "AB12 CDE", orderNumber: "EXAMPLE-00490" }],
+      overdue: [{ id: "task-1", title: "Chase access form", dueAt: "2026-11-01T09:00:00Z", assignee: "Sam Cole" }],
+      warnings: [{ label: "AB12 CDE", detail: "Tax 2026-11-20", href: "/operations/fleet" }],
+    };
+  }
+  if (fn === "people_resource_absence") {
+    return [
+      { id: "unavail-1", name: "Lewis", startsOn: "2026-11-12", endsOn: "2026-11-13", reason: "sickness", notes: null },
+    ];
+  }
+  if (fn === "sales_pulse") {
+    const rep = typeof args?.p_rep === "string" ? args.p_rep : null;
+    const admin = process.env.PULSE_FIXTURE_ROLE !== "rep";
+    const mine = !rep || rep === USER_ID;
+    return {
+      admin,
+      repId: admin ? rep : USER_ID,
+      reps: admin
+        ? [
+            { id: USER_ID, name: "Alex Ives" },
+            { id: "00000000-0000-4000-8000-000000000003", name: "Riley Hart" },
+          ]
+        : [],
+      waiting: mine
+        ? [{ id: "22222222-2222-4222-8222-222222222221", kind: "quote", orderNumber: "SO-2201", customerName: "Docklands Gym" }]
+        : [],
+      replies: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111b2", kind: "install", orderNumber: "SO-1002", customerName: "Northside Fitness", awaiting: 1 }]
+        : [],
+      access: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }]
+        : [],
+      week: mine
+        ? [{ id: "11111111-1111-4111-8111-1111111111a1", kind: "install", orderNumber: "EXAMPLE-00490", customerName: "Example Sports Centre", startOn: "2026-11-16" }]
+        : [],
+    };
+  }
   if (fn === "install_visit_context") {
     const id = String(args?.p_install ?? "");
     const submitted = id.endsWith("2222");

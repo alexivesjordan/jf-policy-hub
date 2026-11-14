@@ -275,6 +275,21 @@ export async function pendingCount() {
   return count ?? 0;
 }
 
+export async function listPolicyAmendments(policyId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("amendments")
+    .select("id, policy_id, summary, status, severity, created_at")
+    .eq("policy_id", policyId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    console.error(error);
+    throw new Error("Could not load suggestions");
+  }
+  return (data ?? []) as { id: string; policy_id: string; summary: string; status: string; severity: string; created_at: string }[];
+}
+
 export async function listAmendments(status?: string) {
   const supabase = await createClient();
   let query = supabase

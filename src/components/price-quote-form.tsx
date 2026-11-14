@@ -23,9 +23,9 @@ const SEGMENTS = [
   ["big_corporate", "Big corporate"],
 ] as const;
 
-export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
+export function PriceQuoteForm({ cin7Connected, initialOrder = "" }: { cin7Connected: boolean; initialOrder?: string }) {
   const [sold, sellOrder, selling] = useActionState(priceSalesOrder, null);
-  const [orderNumber, setOrderNumber] = useState("");
+  const [orderNumber, setOrderNumber] = useState(initialOrder);
   const [segment, setSegment] = useState("");
   const [includeService, setIncludeService] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);

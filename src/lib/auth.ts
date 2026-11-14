@@ -64,7 +64,7 @@ export async function requireOperationsUser() {
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseOperations(profile)) {
-    redirect(canUsePeople(profile) ? "/dashboard" : "/no-access");
+    redirect(canUsePeople(profile) ? "/people" : "/no-access");
   }
   return profile;
 }
@@ -91,7 +91,7 @@ export async function requireSalesUser() {
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseSales(profile)) {
-    redirect(canUsePeople(profile) || canUseOperations(profile) ? "/dashboard" : "/no-access");
+    redirect(canUsePeople(profile) ? "/people" : canUseOperations(profile) ? "/operations" : "/no-access");
   }
   return profile;
 }
@@ -102,14 +102,14 @@ export async function requirePeopleEditor() {
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
   if (!moduleAllows(profile, "people", "edit")) {
-    redirect(canUsePeople(profile) ? "/dashboard" : "/no-access");
+    redirect(canUsePeople(profile) ? "/people" : "/no-access");
   }
   return profile;
 }
 
 export async function requireRole(roles: Role[]) {
   const profile = await requireUser();
-  if (!roles.includes(profile.role)) redirect("/dashboard");
+  if (!roles.includes(profile.role)) redirect("/people");
   return profile;
 }
 

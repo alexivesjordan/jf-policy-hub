@@ -94,7 +94,7 @@ export async function savePolicyForm(_prev: ActionState, formData: FormData): Pr
 }
 
 function refreshPolicy(id: string) {
-  revalidatePath("/dashboard");
+  revalidatePath("/people");
   revalidatePath("/policies");
   revalidatePath("/policies/upload");
   revalidatePath(`/policies/${id}`);

@@ -9,6 +9,8 @@ export type ModuleNavItem = {
   adminOnly?: boolean;
   ownerOnly?: boolean;
   disabled?: boolean;
+  /** Collapsible group. The parent is a toggle; the children are the links. */
+  children?: ModuleNavItem[];
 };
 
 export type PulseModule = {
@@ -32,15 +34,14 @@ export const pulseModules: PulseModule[] = [
     id: "people",
     name: "Pulse People",
     tagline: "HR & compliance",
-    href: "/dashboard",
+    href: "/people",
     status: "active",
     icon: "people",
-    paths: ["/dashboard", "/policies", "/amendments", "/notifications", "/admin"],
+    paths: ["/people", "/dashboard", "/policies", "/amendments", "/notifications", "/admin"],
     nav: [
-      { href: "/dashboard", label: "Overview" },
+      { href: "/people", label: "Overview" },
+      { href: "/people/calendar", label: "Calendar" },
       { href: "/policies", label: "Policies" },
-      { href: "/amendments", label: "Review queue", count: "pending" },
-      { href: "/admin/categories", label: "Categories", adminOnly: true },
     ],
   },
   {
@@ -70,19 +71,23 @@ export const pulseModules: PulseModule[] = [
     href: "/operations",
     status: "active",
     icon: "operations",
-    paths: ["/operations"],
+    paths: ["/operations", "/field"],
     nav: [
       { href: "/operations", label: "Overview" },
-      { href: "/field", label: "My jobs" },
+      { href: "/operations/schedule", label: "Schedule" },
       { href: "/operations/installs", label: "Installs" },
-      { href: "/operations/jobs", label: "Jobs" },
-      { href: "/operations/subcontractors", label: "Subcontractors" },
-      { href: "/operations/calendar", label: "Resource Availability" },
-      { href: "/operations/documents", label: "Visit documents" },
-      { href: "/operations/vans", label: "Vans" },
+      { href: "/operations/fleet", label: "Fleet" },
       { href: "/operations/tasks", label: "Tasks" },
-      { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
-      { href: "/operations/settings", label: "Effort table", ownerOnly: true },
+      {
+        href: "/operations/subcontractors",
+        label: "Setup",
+        children: [
+          { href: "/operations/subcontractors", label: "Subcontractors" },
+          { href: "/operations/settings", label: "Effort tables", ownerOnly: true },
+          { href: "/operations/overrides", label: "Gate overrides", ownerOnly: true },
+          { href: "/operations/documents", label: "Visit documents" },
+        ],
+      },
     ],
   },
   {
@@ -95,9 +100,15 @@ export const pulseModules: PulseModule[] = [
     paths: ["/sales"],
     nav: [
       { href: "/sales", label: "Overview" },
-      { href: "/sales/quote", label: "Install quoting" },
       { href: "/sales/installs", label: "Installs" },
-      { href: "/sales/service", label: "Warranties and Servicing" },
+      {
+        href: "/sales/quote",
+        label: "Quotes",
+        children: [
+          { href: "/sales/quote", label: "Install quoting" },
+          { href: "/sales/service", label: "Warranties & servicing" },
+        ],
+      },
     ],
   },
   {

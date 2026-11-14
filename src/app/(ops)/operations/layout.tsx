@@ -6,7 +6,6 @@ import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
 import { Cin7Notice } from "@/components/cin7-notice";
-import { canManageWorkspace } from "@/lib/access";
 import { fieldRole } from "@/features/field/queries";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
@@ -86,9 +85,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
     isOwner = false;
   }
 
-  const officeNav = (pulseModules.find((module) => module.id === "operations")?.nav ?? []).filter(
-    (item) => (item.href !== "/operations/vans" || canManageWorkspace(profile)) && (!item.ownerOnly || isOwner),
-  );
+  const officeNav = pulseModules.find((module) => module.id === "operations")?.nav ?? [];
   const nav = role === "engineer" ? ENGINEER_NAV : officeNav;
 
   return (
