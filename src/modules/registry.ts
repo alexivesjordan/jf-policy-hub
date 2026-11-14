@@ -71,7 +71,7 @@ export const pulseModules: PulseModule[] = [
     href: "/operations",
     status: "active",
     icon: "operations",
-    paths: ["/operations"],
+    paths: ["/operations", "/field"],
     nav: [
       { href: "/operations", label: "Overview" },
       { href: "/operations/schedule", label: "Schedule" },

@@ -45,17 +45,16 @@ async function FieldHome() {
     { title: "Next", jobs: home.jobs.filter((job) => !job.today && job.startOn > today) },
     { title: "Earlier", jobs: home.jobs.filter((job) => !job.today && job.startOn <= today) },
   ];
+  const office = home.role === "admin" || home.role === "ops";
   return (
-    <FieldFrame title="My jobs">
-      <div className="mb-4 flex justify-end">
-        <div className="flex gap-4">
-          <Link href="/operations/documents" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
-            Visit documents
-          </Link>
-          <Link href="/field/signature" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
-            My signature
-          </Link>
-        </div>
+    <FieldFrame title="My jobs" back={office ? { href: "/operations", label: "Operations" } : undefined}>
+      <div className="mb-4 flex justify-end gap-4">
+        <Link href="/operations/documents" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
+          Visit documents
+        </Link>
+        <Link href="/field/signature" className="inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
+          My signature
+        </Link>
       </div>
       {home.needsLink ? <p className="text-base">Ask an admin to link your login.</p> : null}
       {!home.needsLink && home.jobs.length === 0 ? <p className="text-base">No jobs assigned.</p> : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { navItemActive, visibleNav } from "@/lib/shell-nav";
+import { ENGINEER_NAV, navItemActive, visibleNav } from "@/lib/shell-nav";
 import type { Profile } from "@/lib/types";
 import { pulseModules } from "@/modules/registry";
 
@@ -16,6 +16,13 @@ const profile = {
 } as Profile;
 
 describe("module nav", () => {
+  it("keeps My jobs exact so tasks and the calendar are separate", () => {
+    expect(navItemActive("/field", "/field")).toBe(true);
+    expect(navItemActive("/field", "/field/tasks")).toBe(false);
+    expect(navItemActive("/field/tasks", "/field/tasks")).toBe(true);
+    expect(ENGINEER_NAV.map((item) => item.label)).toEqual(["My jobs", "My tasks", "Calendar"]);
+  });
+
   it("treats overview routes as exact", () => {
     expect(navItemActive("/sales", "/sales")).toBe(true);
     expect(navItemActive("/sales", "/sales/installs")).toBe(false);

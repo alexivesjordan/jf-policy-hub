@@ -5,10 +5,11 @@ import type { ModuleNavItem } from "@/modules/registry";
 /** The side nav a field engineer sees. Office and admin keep the full module list. */
 export const ENGINEER_NAV: ModuleNavItem[] = [
   { href: "/field", label: "My jobs" },
-  { href: "/operations/documents", label: "Visit documents" },
+  { href: "/field/tasks", label: "My tasks" },
+  { href: "/field/calendar", label: "Calendar" },
 ];
 
-const EXACT_NAV = new Set(["/dashboard", "/operations", "/sales", "/workspace", "/people"]);
+const EXACT_NAV = new Set(["/dashboard", "/operations", "/sales", "/workspace", "/people", "/field"]);
 
 export function navItemActive(href: string, path: string) {
   if (EXACT_NAV.has(href)) return path === href;
