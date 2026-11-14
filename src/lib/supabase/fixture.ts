@@ -604,8 +604,12 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         version_label: "v1-original",
         lines: [
           { label: "Additional installer time, within agreed hours", rate: 30, unit: "per installer per hour" },
+          { label: "Additional installer time, outside agreed hours", rate: 45, unit: "per installer per hour" },
+          { label: "Site survey (where required)", rate: 250, mileage: 0.5, unit: "flat plus per mile" },
           { label: "Materials and consumables", basis: "cost_plus_25" },
+          { label: "Abortive visit (site not ready, access refused, no signatory)", rate: 300, mileage: 0.5, unit: "per crew day plus per mile" },
           { label: "Equipment movement beyond the agreed floor plan", basis: "additional_installer_time" },
+          { label: "Waste removal beyond packaging", rate: 45, unit: "per collection" },
           { label: "Parking, permits, congestion fees (clause 8)", basis: "at_cost" },
         ],
       },
