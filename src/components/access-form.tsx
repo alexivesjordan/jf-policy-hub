@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
+import { CHARGES_HEADING, TermsAcceptBox } from "@/components/terms-accept";
 import { submitAccessForm } from "@/features/operations/access-actions";
-import { basisText, orderedAnswers, termsBoxReady } from "@/lib/installs/access-ui";
+import { basisText, orderedAnswers, termsScrolledToEnd } from "@/lib/installs/access-ui";
 
 type Line = { label?: string; rate?: number; unit?: string; basis?: string; mileage?: number };
 type SavedMedia = { id: string; url?: string | null; mime?: string | null; kind?: string | null };
@@ -28,6 +29,7 @@ export function AccessForm({
 }) {
   const [state, action, pending] = useActionState(submitAccessForm, null);
   const [scrolled, setScrolled] = useState(false);
+  const markReady = useCallback(() => setScrolled(true), []);
   const [sent, setSent] = useState<Saved | null>(saved);
   const done = submitted || state?.ok;
 
@@ -91,14 +93,9 @@ export function AccessForm({
         </Field>
       </div>
       <MediaPicker token={token} />
-      <Terms lines={lines} versionLabel={versionLabel} onReady={() => setScrolled(true)} />
+      <Terms lines={lines} onReady={markReady} />
       {!scrolled ? <p className="text-sm text-grey">Scroll to the end of this list before you can accept.</p> : null}
-      <label className="flex min-h-11 items-start gap-3 text-sm leading-6">
-        <input type="checkbox" name="accept" value="yes" disabled={!scrolled} className="mt-1 size-5 accent-[#ce0037]" />
-        <span>
-          By ticking this box you accept the Jordan Fitness Installation Terms and Conditions (version {versionLabel}), including the additional charges below.
-        </span>
-      </label>
+      <TermsAcceptBox ready={scrolled} versionLabel={versionLabel} />
       <Field label="Your name">
         <Input name="acceptedName" required autoComplete="name" />
       </Field>
@@ -112,25 +109,55 @@ export function AccessForm({
 
 function Terms({
   lines,
-  versionLabel,
   onReady,
 }: {
   lines: Line[];
-  versionLabel: string;
   onReady: () => void;
 }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = scroller.current;
+    const target = end.current;
+    if (!root || !target) return;
+    const reveal = () => {
+      if (termsScrolledToEnd(root.scrollHeight, root.clientHeight, root.scrollTop)) onReady();
+    };
+    reveal();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onReady();
+      },
+      { root, threshold: 1 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [onReady, lines]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const node = event.currentTarget;
+    if (event.key === "End") node.scrollTop = node.scrollHeight;
+    else if (event.key === "PageDown" || event.key === "ArrowDown" || event.key === " ") node.scrollTop += event.key === "ArrowDown" ? 48 : node.clientHeight;
+    else return;
+    event.preventDefault();
+    if (termsScrolledToEnd(node.scrollHeight, node.clientHeight, node.scrollTop)) onReady();
+  }
+
   return (
     <div
-      ref={(node) => {
-        if (node && termsBoxReady(node.scrollHeight, node.clientHeight, false)) onReady();
-      }}
-      className="max-h-64 overflow-y-auto rounded-3xl border border-line bg-field p-4 text-sm leading-6"
+      ref={scroller}
+      tabIndex={0}
+      role="region"
+      aria-label={CHARGES_HEADING}
+      onKeyDown={onKeyDown}
       onScroll={(event) => {
         const node = event.currentTarget;
-        if (termsBoxReady(node.scrollHeight, node.clientHeight, node.scrollTop + node.clientHeight >= node.scrollHeight - 12)) onReady();
+        if (termsScrolledToEnd(node.scrollHeight, node.clientHeight, node.scrollTop)) onReady();
       }}
+      className="max-h-64 touch-pan-y overflow-y-auto overscroll-contain rounded-3xl border border-line bg-field p-4 text-sm leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-      <p className="font-semibold text-ink">Additional charges, version {versionLabel}, ex VAT</p>
+      <p className="font-semibold text-ink">{CHARGES_HEADING}</p>
       <ul className="mt-3 space-y-3">
         {lines.map((line) => (
           <li key={line.label}>
@@ -143,6 +170,7 @@ function Terms({
           </li>
         ))}
       </ul>
+      <div ref={end} className="h-px" aria-hidden="true" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { accessChip, answerText, basisText, firstFilledKanban, installCoversDay, kanbanAccessChip, kanbanColumn, orderedAnswers, termsBoxReady } from "./access-ui";
+import { accessChip, answerText, basisText, firstFilledKanban, installCoversDay, kanbanAccessChip, kanbanColumn, orderedAnswers, termsBoxReady, termsScrolledToEnd } from "./access-ui";
 
 describe("install access UI", () => {
   it("names the access chip from what has been sent", () => {
@@ -14,6 +14,14 @@ describe("install access UI", () => {
     assert.equal(termsBoxReady(80, 256, false), true);
     assert.equal(termsBoxReady(800, 256, false), false);
     assert.equal(termsBoxReady(800, 256, true), true);
+  });
+
+  it("enables the terms tick once the end is in view, including after keyboard End", () => {
+    assert.equal(termsScrolledToEnd(80, 256, 0), true);
+    assert.equal(termsScrolledToEnd(800, 256, 0), false);
+    const atEnd = 800 - 256;
+    assert.equal(termsScrolledToEnd(800, 256, atEnd), true);
+    assert.equal(termsScrolledToEnd(800, 256, atEnd - 40), false);
   });
 
   it("puts an unknown stage in Booked and keeps quoting for later", () => {
