@@ -31,13 +31,25 @@ function blockLines(lines: string[], start: number, end: number): string[] {
   return lines.slice(start, end).map((line) => line.trim()).filter(Boolean);
 }
 
+const POSTCODE_IN_LINE = /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i;
+
+function postcodeFrom(lines: string[]) {
+  for (const line of lines) {
+    if (looksLikeUkPostcode(line)) return normaliseUkPostcode(line);
+    const match = line.match(POSTCODE_IN_LINE);
+    if (match?.[1]) return normaliseUkPostcode(match[1]);
+  }
+  return null;
+}
+
 function party(lines: string[]) {
-  const postcodeLine = [...lines].reverse().find((line) => looksLikeUkPostcode(line));
-  const name = lines.find((line) => line !== postcodeLine) ?? null;
-  return {
-    name,
-    postcode: postcodeLine ? normaliseUkPostcode(postcodeLine) : null,
-  };
+  const postcode = postcodeFrom(lines);
+  const name = lines.find((line) => !looksLikeUkPostcode(line) && !POSTCODE_IN_LINE.test(line) && !/^\d/.test(line)) ?? null;
+  return { name, postcode };
+}
+
+function headerAt(lines: string[], pattern: RegExp) {
+  return lines.findIndex((line) => pattern.test(line));
 }
 
 function takeNumbers(line: string): { head: string; numeric: string[] } | null {
@@ -132,9 +144,9 @@ export function parseCin7CoreQuote(text: string): ExtractedQuote {
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !isFurniture(line));
 
-  const quoteMatch = text.match(/Quote No:\s*([A-Z0-9-]+)/i);
-  const customerAt = lines.findIndex((line) => line.toLowerCase() === "customer");
-  const deliveryAt = lines.findIndex((line) => line.toLowerCase() === "delivery address");
+  const quoteMatch = text.match(/(?:Quote No|Sales Order|Sale Order)\s*:?\s*(SO-\d+)/i) ?? text.match(/\b(SO-\d+)\b/i);
+  const customerAt = headerAt(lines, /^(customer|bill to|invoice to)$/i);
+  const deliveryAt = headerAt(lines, /^(delivery address|shipping address|ship to|deliver to)$/i);
   const salesAt = lines.findIndex((line) => line.toLowerCase() === "sales contact");
   const orderAt = lines.findIndex((line) => line.toLowerCase() === "order no");
 
@@ -172,6 +184,9 @@ export function parseCin7CoreQuote(text: string): ExtractedQuote {
     warnings.push(`Line totals sum to ${lineSum.toFixed(2)} but Goods Net is ${goodsNet.toFixed(2)}.`);
   }
 
+  const weightMatch = text.match(/total weight\s*:?\s*([\d,]+(?:\.\d+)?)\s*kg/i);
+  const totalWeightKg = weightMatch ? Number((weightMatch[1] ?? "").replace(/,/g, "")) : null;
+
   return {
     quoteNumber: quoteMatch?.[1] ?? values[0] ?? null,
     customerName: customer.name,
@@ -190,6 +205,7 @@ export function parseCin7CoreQuote(text: string): ExtractedQuote {
     totalOrderNet,
     vat,
     total,
+    totalWeightKg: totalWeightKg != null && Number.isFinite(totalWeightKg) && totalWeightKg > 0 ? totalWeightKg : null,
     warnings,
   };
 }

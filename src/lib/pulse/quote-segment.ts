@@ -13,8 +13,23 @@ export function resolveQuoteSegment(chosen: string) {
   return { segment, needsChoice: false, remember: true };
 }
 
-export function canLoadQuote(orderNumber: string, segment: string) {
-  return orderNumber.trim().length > 0 && isSalesSegment(segment);
+export function canLoadQuote(orderNumber: string, segment: string, hasQuotePdf = false) {
+  if (!isSalesSegment(segment)) return false;
+  return hasQuotePdf || orderNumber.trim().length > 0;
+}
+
+/** Both quote buttons use the same gate. A PDF stands in for a typed order number. */
+export function quoteButtons(input: {
+  orderNumber: string;
+  segment: string;
+  hasPdf: boolean;
+  pending: "jordan" | "subcontractor" | null;
+}) {
+  const enabled = input.pending == null && canLoadQuote(input.orderNumber, input.segment, input.hasPdf);
+  return {
+    jordan: { enabled, label: input.pending === "jordan" ? "Calculating…" : "Jordan quote" },
+    subcontractor: { enabled, label: input.pending === "subcontractor" ? "Drafting" : "Subcontractor quote" },
+  };
 }
 
 /** Real failures only. Asking for a segment is a control, not an error. */

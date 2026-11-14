@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
 import { fieldHome, type FieldJob } from "@/features/field/queries";
 import { getCurrentProfile } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { formatDate, londonToday } from "@/lib/format";
 
 export const instant = false;
@@ -21,7 +21,7 @@ export default function FieldHomePage() {
 
 async function FieldHome() {
   await connection();
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return <FieldFrame title="My jobs"><p>Add the Supabase keys, then open My jobs again.</p></FieldFrame>;
   }
   const profile = await getCurrentProfile();

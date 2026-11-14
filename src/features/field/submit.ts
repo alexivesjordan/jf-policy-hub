@@ -4,7 +4,7 @@ import { asVisitContext, type VisitContext } from "@/features/field/queries";
 import { deliverPulseEmail } from "@/lib/email/deliver";
 import { messageFromError } from "@/lib/errors";
 import { DOCUMENT_FILENAMES, documentsForOrder, selectStoredDocuments, type OrderLine, type VisitDocumentKey } from "@/lib/installs/product-lines";
-import { RISK_ITEMS, sheetPayload, validateRisk, validateSheet, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { RISK_ITEMS, sheetPayload, validateRisk, validateSheet, vehicleChoiceProblem, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { prepareSignaturePng } from "@/lib/installs/signature-image";
 import { buildVisitPdf } from "@/lib/installs/visit-pdf";
 import { storePulseFile } from "@/lib/pulse/files";
@@ -121,6 +121,12 @@ export async function commitVisit(input: {
 }) {
   const problem = validateSheet(input.sheet);
   if (problem) throw new Error(problem);
+  const vans = (await callRpc(input.token, "install_list_vans", {})) as { registration?: string }[] | null;
+  const vehicle = vehicleChoiceProblem(
+    input.sheet.vehicleReg.trim(),
+    Array.isArray(vans) ? vans.flatMap((van) => (van?.registration ? [{ registration: van.registration }] : [])) : [],
+  );
+  if (vehicle) throw new Error(vehicle);
   if (input.sheet.parkingFee.trim() && !/^[0-9]+(\.[0-9]{1,2})?$/.test(input.sheet.parkingFee.trim())) {
     throw new Error("Enter the parking fee in pounds.");
   }
@@ -175,21 +181,8 @@ export async function commitVisit(input: {
     kind: "customer_signature",
   });
 
-  const photos: { label: string; bytes: Uint8Array }[] = [];
   const owned = await filesFor(input.token, input.installId, photoIds);
   if (owned.length !== photoIds.length) throw new Error("That photo is not on this job.");
-  for (const [index, file] of owned.entries()) {
-    const bytes = await downloadStorageObject(file.bucket, file.path);
-    if (bytes) photos.push({ label: `Equipment ${index + 1}`, bytes });
-  }
-  const concerns = (await callRpc(input.token, "install_concern_files", {
-    p_install: input.installId,
-    p_token_hash: presentedToken(input.token),
-  })) as FileRef[] | null;
-  for (const [index, file] of (concerns ?? []).entries()) {
-    const bytes = await downloadStorageObject(file.bucket, file.path);
-    if (bytes) photos.push({ label: `Concern ${index + 1}`, bytes });
-  }
 
   const pdf = await buildVisitPdf({
     sheet: input.sheet,
@@ -200,7 +193,6 @@ export async function commitVisit(input: {
     riskNotes: visit.risk?.notes ?? "",
     engineerSignature: engineerBytes,
     customerSignature: customerBytes,
-    photos,
   });
   const pdfFile = await storePulseFile({
     bucket: "job-sheets",

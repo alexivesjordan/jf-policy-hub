@@ -1,12 +1,14 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
-import { prepareSignaturePng, prepareVisitPhoto } from "@/lib/installs/signature-image";
+import { prepareSignaturePng } from "@/lib/installs/signature-image";
 import { FORM_NOTICES, type SheetDraft } from "@/lib/installs/visit-form";
 
 const A4 = [595.28, 841.89] as const;
 const MARGIN = 36;
-const BLACK = rgb(0.07, 0.07, 0.07);
+const BLACK = rgb(0.1, 0.1, 0.1);
 const RED = rgb(0.81, 0, 0.22);
-const GREY = rgb(0.32, 0.32, 0.32);
+const GREY = rgb(0.35, 0.35, 0.35);
+const LINE = rgb(0.75, 0.75, 0.75);
+const WASH = rgb(0.96, 0.96, 0.96);
 
 export type VisitPdfPhoto = { label: string; bytes: Uint8Array };
 
@@ -16,6 +18,7 @@ export type VisitPdfInput = {
   riskNotes: string;
   engineerSignature?: Uint8Array | null;
   customerSignature?: Uint8Array | null;
+  /** Kept so older callers still type-check. Photos stay on the install, not in this pack. */
   photos?: VisitPdfPhoto[];
 };
 
@@ -91,52 +94,129 @@ class SheetPdf {
     if (this.y - height < MARGIN) this.newPage();
   }
 
+  private width() {
+    return A4[0] - MARGIN * 2;
+  }
+
   text(value: string, options?: { size?: number; bold?: boolean; color?: ReturnType<typeof rgb>; gap?: number }) {
-    const size = options?.size ?? 10;
+    const size = options?.size ?? 9;
     const font = options?.bold ? this.bold : this.font;
     const color = options?.color ?? BLACK;
-    for (const line of wrap(value, font, size, A4[0] - MARGIN * 2)) {
-      this.ensure(size + 4);
+    for (const line of wrap(value, font, size, this.width())) {
+      this.ensure(size + 3);
       this.page.drawText(line, { x: MARGIN, y: this.y - size, size, font, color });
-      this.y -= size + (options?.gap ?? 3);
+      this.y -= size + (options?.gap ?? 2);
     }
   }
 
-  rule() {
-    this.ensure(8);
-    this.page.drawRectangle({ x: MARGIN, y: this.y - 2, width: A4[0] - MARGIN * 2, height: 2, color: RED });
-    this.y -= 12;
-  }
-
-  pair(left: string, right: string) {
-    this.ensure(14);
-    const size = 10;
-    this.page.drawText(winAnsi(left).slice(0, 80), { x: MARGIN, y: this.y - size, size, font: this.font, color: BLACK });
-    this.page.drawText(winAnsi(right).slice(0, 40), { x: A4[0] - MARGIN - 90, y: this.y - size, size, font: this.bold, color: BLACK });
-    this.y -= size + 4;
-  }
-
-  gap(amount = 8) {
+  gap(amount = 6) {
     this.y -= amount;
   }
 
-  async image(bytes: Uint8Array, label: string) {
-    let picture: PDFImage;
-    try {
-      picture = isPng(bytes) ? await this.doc.embedPng(bytes) : await this.doc.embedJpg(bytes);
-    } catch {
-      this.text(`${label}: the photo could not be printed.`);
-      return;
+  heading(value: string) {
+    this.gap(8);
+    this.text(value, { bold: true, size: 11 });
+    this.gap(3);
+  }
+
+  /** Two facts per row, or one when the value needs the full width. */
+  grid(entries: [string, string][], columns: 1 | 2) {
+    const labelW = columns === 1 ? 188 : 108;
+    const pairW = this.width() / columns;
+    for (let index = 0; index < entries.length; index += columns) {
+      const slice = entries.slice(index, index + columns);
+      const span = slice.length < columns;
+      const cells = slice.map(([label, value]) => {
+        const box = span ? this.width() : pairW;
+        return {
+          box,
+          label: wrap(label, this.bold, 8, labelW - 8),
+          value: wrap(value || "-", this.font, 8, box - labelW - 8),
+        };
+      });
+      const lines = Math.max(1, ...cells.flatMap((cell) => [cell.label.length, cell.value.length]));
+      const height = lines * 10 + 8;
+      this.ensure(height);
+      const top = this.y;
+      let x = MARGIN;
+      cells.forEach((cell) => {
+        const box = cell.box;
+        this.page.drawRectangle({ x, y: top - height, width: labelW, height, color: WASH, borderColor: LINE, borderWidth: 0.6 });
+        this.page.drawRectangle({ x: x + labelW, y: top - height, width: box - labelW, height, borderColor: LINE, borderWidth: 0.6 });
+        cell.label.forEach((line, lineIndex) => {
+          this.page.drawText(line, { x: x + 4, y: top - 12 - lineIndex * 10, size: 8, font: this.bold, color: GREY });
+        });
+        cell.value.forEach((line, lineIndex) => {
+          this.page.drawText(line, { x: x + labelW + 4, y: top - 12 - lineIndex * 10, size: 8, font: this.font, color: BLACK });
+        });
+        x += box;
+      });
+      this.y = top - height;
     }
-    this.newPage();
-    this.text(label, { bold: true, size: 12 });
-    const maxWidth = A4[0] - MARGIN * 2;
-    const maxHeight = this.y - MARGIN;
-    const scale = Math.min(maxWidth / picture.width, maxHeight / picture.height, 1);
-    const width = picture.width * scale;
-    const height = picture.height * scale;
-    this.page.drawImage(picture, { x: MARGIN, y: this.y - height, width, height });
-    this.y -= height + 8;
+  }
+
+  box(value: string) {
+    const lines = wrap(value || "-", this.font, 8, this.width() - 12);
+    const height = lines.length * 10 + 8;
+    this.ensure(height);
+    const top = this.y;
+    this.page.drawRectangle({ x: MARGIN, y: top - height, width: this.width(), height, borderColor: LINE, borderWidth: 0.6 });
+    lines.forEach((line, index) => {
+      this.page.drawText(line, { x: MARGIN + 6, y: top - 12 - index * 10, size: 8, font: this.font, color: BLACK });
+    });
+    this.y = top - height;
+  }
+
+  async signatures(input: {
+    date: string;
+    vehicle: string;
+    engineerName: string;
+    customerName: string;
+    engineer?: Uint8Array | null;
+    customer?: Uint8Array | null;
+  }) {
+    const terms = [FORM_NOTICES.signing, FORM_NOTICES.hours].flatMap((line) => wrap(line, this.font, 8, this.width()));
+    const boxW = (this.width() - 10) / 2;
+    const sigH = 58;
+    const height = 6 + terms.length * 10 + 8 + 22 + 16 + sigH + 8;
+    if (this.y - height < MARGIN) this.newPage();
+    this.gap(8);
+    for (const line of terms) {
+      this.page.drawText(line, { x: MARGIN, y: this.y - 8, size: 8, font: line === terms[0] ? this.bold : this.font, color: line === terms[0] ? BLACK : GREY });
+      this.y -= 10;
+    }
+    this.gap(6);
+    this.grid([
+      ["Date", input.date || "-"],
+      ["Vehicle reg", input.vehicle || "-"],
+    ], 2);
+    this.gap(6);
+    const top = this.y;
+    const engineer = await this.embed(input.engineer);
+    const customer = await this.embed(input.customer);
+    this.signBox(MARGIN, top, boxW, sigH, `Engineer · ${input.engineerName || "-"}`, engineer);
+    this.signBox(MARGIN + boxW + 10, top, boxW, sigH, `Customer · ${input.customerName || "-"}`, customer);
+    this.y = top - (16 + sigH);
+  }
+
+  private signBox(x: number, top: number, width: number, sigH: number, caption: string, image: PDFImage | null) {
+    this.page.drawText(winAnsi(caption).slice(0, 48), { x, y: top - 9, size: 8, font: this.bold, color: BLACK });
+    this.page.drawRectangle({ x, y: top - 16 - sigH, width, height: sigH, borderColor: LINE, borderWidth: 0.6 });
+    if (!image) return;
+    const scale = Math.min((width - 12) / image.width, (sigH - 10) / image.height, 1);
+    const w = image.width * scale;
+    const h = image.height * scale;
+    this.page.drawImage(image, { x: x + (width - w) / 2, y: top - 16 - sigH + (sigH - h) / 2, width: w, height: h });
+  }
+
+  private async embed(bytes: Uint8Array | null | undefined) {
+    if (!bytes || bytes.length < 8) return null;
+    try {
+      const prepared = await prepareSignaturePng(bytes);
+      return isPng(prepared) ? await this.doc.embedPng(prepared) : await this.doc.embedJpg(prepared);
+    } catch {
+      return null;
+    }
   }
 
   async bytes() {
@@ -147,72 +227,57 @@ class SheetPdf {
 export async function buildVisitPdf(input: VisitPdfInput) {
   const sheet = input.sheet;
   const pdf = await SheetPdf.create(`Installation / Service Form ${sheet.orderNo || sheet.jobNo || ""}`.trim(), sheet.customerName || "Jordan Fitness");
-  pdf.text("JORDAN FITNESS", { bold: true, size: 14, color: RED });
-  pdf.text("INSTALLATION / SERVICE FORM", { bold: true, size: 16 });
-  pdf.rule();
-  pdf.text("Jordan HQ, 56 Oldmedow Road, Hardwick Industrial Estate, King's Lynn, PE30 4PP", { size: 9, color: GREY });
-  pdf.text("+44 (0)1553 763285    sales@jordanfitness.co.uk    www.jordanfitness.com", { size: 9, color: GREY });
+  pdf.text("JORDAN FITNESS", { bold: true, size: 13, color: RED });
+  pdf.text("INSTALLATION / SERVICE FORM", { bold: true, size: 12 });
+  pdf.gap(2);
+  pdf.text("Jordan HQ, 56 Oldmedow Road, Hardwick Industrial Estate, King's Lynn, PE30 4PP", { size: 8, color: GREY });
+  pdf.text("+44 (0)1553 763285    sales@jordanfitness.co.uk    www.jordanfitness.com", { size: 8, color: GREY });
   pdf.gap(8);
-  pdf.pair("Visit", sheet.visitType === "service" ? "Service" : "Install");
-  pdf.pair("Date", sheet.sheetOn || "-");
-  pdf.pair("Date returned", sheet.returnedOn || "-");
-  pdf.pair("Contact name", sheet.contactName || "-");
-  pdf.pair("Order no.", sheet.orderNo || "-");
-  pdf.pair("Job no.", sheet.jobNo || "-");
-  pdf.text(`Address: ${sheet.address || "-"}`);
-  pdf.pair("Telephone", sheet.phone || "-");
-  pdf.pair("Service contract", yesNo(sheet.serviceContract));
-  pdf.pair("Call out charge", yesNo(sheet.callOutCharge));
-  pdf.pair("Time on site", sheet.timeOn || "-");
-  pdf.pair("Time off site", sheet.timeOff || "-");
-  pdf.pair("Overnight stay", yesNo(sheet.overnightStay));
-  pdf.pair("Parking fee", sheet.parkingFee ? `GBP ${sheet.parkingFee}` : "-");
-  pdf.pair("Service", yesNo(sheet.service));
-  pdf.pair("Delivery", yesNo(sheet.delivery));
-  pdf.pair("Installation", yesNo(sheet.installation));
-  pdf.pair("Warranty", yesNo(sheet.warranty));
-  pdf.pair("Ladder / hop-up check", sheet.ladderCheck ? "Yes" : "No");
-  pdf.gap(6);
-  pdf.text("Products", { bold: true, size: 12 });
-  const lines = sheet.lines.filter((line) => line.code || line.description || line.reportedJob);
-  if (lines.length === 0) pdf.text("Code    Description    Reported job");
-  for (const line of lines) pdf.text(`${line.code || "-"}    ${line.description || "-"}    ${line.qty || "-"}    ${line.reportedJob || "-"}`);
-  pdf.gap(6);
-  pdf.text("Work carried out", { bold: true, size: 12 });
-  pdf.text(sheet.workCarriedOut || "-");
-  pdf.gap(6);
-  pdf.text("Parts used", { bold: true, size: 12 });
+  pdf.grid([
+    ["Visit type", sheet.visitType === "service" ? "Service" : "Install"],
+    ["Date", sheet.sheetOn || "-"],
+    ["Contact", sheet.contactName || "-"],
+    ["Order no.", sheet.orderNo || "-"],
+    ["Telephone", sheet.phone || "-"],
+    ["Job no.", sheet.jobNo || "-"],
+    ["Service contract", yesNo(sheet.serviceContract)],
+    ["Date returned", sheet.returnedOn || "-"],
+    ["Time on site", sheet.timeOn || "-"],
+    ["Time off site", sheet.timeOff || "-"],
+    ["Parking fee", sheet.parkingFee ? `GBP ${sheet.parkingFee}` : "-"],
+  ], 2);
+  pdf.grid([["Address", sheet.address || "-"]], 1);
+  pdf.heading("Checks");
+  pdf.grid([
+    ["Service", yesNo(sheet.service)],
+    ["Delivery", yesNo(sheet.delivery)],
+    ["Installation", yesNo(sheet.installation)],
+    ["Warranty", yesNo(sheet.warranty)],
+    ["Location satisfactory", yesNo(sheet.locationOk)],
+    ["Customer satisfied", yesNo(sheet.workOk)],
+    ["Site left satisfactory", yesNo(sheet.siteOk)],
+  ], 2);
+  pdf.grid([["All kit installed as ordered", sheet.kitAsOrdered ? "Yes" : "No"]], 1);
+  pdf.grid([["Anything missing or damaged", sheet.kitNotes.trim() || "None"]], 1);
+  pdf.heading("Work carried out");
+  pdf.box(sheet.workCarriedOut || "-");
   const parts = sheet.parts.filter((part) => part.code || part.description);
-  if (parts.length === 0) pdf.text("None recorded.");
-  for (const part of parts) pdf.text(`${part.code || "-"}    ${part.description || "-"}    Qty ${part.qty || "1"}`);
-  pdf.gap(6);
-  pdf.pair("Satisfied with rig / product location", yesNo(sheet.locationOk));
-  pdf.pair("Customer requested fixing to wall", yesNo(sheet.fixingWall));
-  pdf.pair("Customer requested fixing to floor", yesNo(sheet.fixingFloor));
-  pdf.pair("Customer satisfied with work", yesNo(sheet.workOk));
-  pdf.pair("Site left in satisfactory condition", yesNo(sheet.siteOk));
-  pdf.gap(6);
-  pdf.text(FORM_NOTICES.fixings, { size: 8, color: GREY });
-  pdf.text(FORM_NOTICES.signing, { size: 8, bold: true });
-  pdf.text(FORM_NOTICES.receipts, { size: 8, color: GREY });
-  pdf.text(FORM_NOTICES.hours, { size: 8, color: GREY });
-  pdf.gap(6);
-  pdf.pair("Engineer", sheet.engineerName || "-");
-  pdf.pair("Vehicle reg", sheet.vehicleReg || "-");
-  pdf.pair("Customer name", sheet.customerName || "-");
-  if (input.engineerSignature) await pdf.image(await prepareSignaturePng(input.engineerSignature), "Engineer signature");
-  if (input.customerSignature) await pdf.image(await prepareSignaturePng(input.customerSignature), "Customer signature");
-  pdf.gap(8);
-  pdf.text("Risk assessment", { bold: true, size: 12 });
-  if (input.riskLines.length === 0) pdf.text("Not recorded.");
-  for (const row of input.riskLines) pdf.pair(row.label, row.answer);
-  if (input.riskNotes.trim()) pdf.text(`Notes: ${input.riskNotes.trim()}`);
-  for (const photo of input.photos ?? []) {
-    try {
-      await pdf.image(await prepareVisitPhoto(photo.bytes), photo.label);
-    } catch {
-      pdf.text(`${photo.label}: the photo could not be printed.`);
-    }
+  pdf.heading("Parts used");
+  if (parts.length === 0) pdf.box("None recorded.");
+  else {
+    pdf.grid(parts.map((part) => [`${part.code || "-"} · ${part.description || "-"}`, `Qty ${part.qty || "1"}`]), 1);
   }
+  pdf.heading("Risk assessment");
+  if (input.riskLines.length === 0) pdf.box("Not recorded.");
+  else pdf.grid(input.riskLines.map((row) => [row.label, row.answer || "-"]), 1);
+  if (input.riskNotes.trim()) pdf.grid([["Notes", input.riskNotes.trim()]], 1);
+  await pdf.signatures({
+    date: sheet.sheetOn || "-",
+    vehicle: sheet.vehicleReg || "-",
+    engineerName: sheet.engineerName,
+    customerName: sheet.customerName,
+    engineer: input.engineerSignature,
+    customer: input.customerSignature,
+  });
   return pdf.bytes();
 }

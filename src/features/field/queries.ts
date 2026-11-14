@@ -119,6 +119,16 @@ export async function fieldHome() {
   };
 }
 
+export async function listActiveVans() {
+  try {
+    const data = await userRpc<{ registration?: string; name?: string | null }[]>("install_list_vans");
+    if (!Array.isArray(data)) return [];
+    return data.flatMap((van) => (van?.registration ? [{ registration: van.registration, name: van.name ?? null }] : []));
+  } catch {
+    return [];
+  }
+}
+
 export async function visitContext(installId: string) {
   return asVisitContext(await userRpc("install_visit_context", { p_install: installId }));
 }

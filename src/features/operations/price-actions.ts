@@ -19,11 +19,16 @@ import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import type { InstallPriceNotesData } from "@/components/price-workings";
 import { effortRowForSku, forSales, priceInstall, type CategoryEffortDefault, type PricingConfig, type Segment } from "@/lib/pricer/engine";
 import { tilesFromSale } from "@/lib/pricer/flooring";
+import { orderKeyFromPdf, withUnlinkedOrderNote } from "@/lib/quotes/order-key";
 import { looksLikeUkPostcode, normaliseUkPostcode } from "@/lib/quotes/postcode";
 import { pdfBytesToLayoutText } from "@/lib/quotes/pdf-text";
 import { cin7CoreExtractor } from "@/lib/quotes/parse-cin7-core";
 import type { ExtractedQuote } from "@/lib/quotes/types";
 import { getOfficeContext } from "@/features/operations/queries";
+import { listSubcontractorRecords } from "@/features/subcontractors/queries";
+import { jobTypesForKit, rankSubcontractors, type QuoteChoice } from "@/lib/subcontractors/capability";
+import { buildSubcontractorDraft } from "@/lib/subcontractors/draft";
+import { orderWeightKg, subcontractorKitLines } from "@/lib/subcontractors/quote-kit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { messageFromError } from "@/lib/errors";
@@ -65,6 +70,7 @@ export type QuoteDraft = {
   saleId: string;
   /** Shown to the install lead only. Not a rep-facing error. */
   internalNote: string;
+  totalWeightKg?: number | null;
 };
 
 export type PricedQuote = ReturnType<typeof forSales> & {
@@ -228,7 +234,7 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
       qty: line.qty,
       category: "",
       lineTotal: line.lineTotal,
-      unitWeightKg: null,
+      unitWeightKg: line.unitWeightKg ?? null,
       productId: "",
     })),
     ...serviceFields(serviceReconcileFromExtract(extracted)),
@@ -237,6 +243,7 @@ function draftFromExtract(extracted: ExtractedQuote, source: QuoteDraft["source"
     customerId: "",
     saleId: "",
     internalNote: "",
+    totalWeightKg: extracted.totalWeightKg,
   };
 }
 
@@ -471,6 +478,7 @@ async function rememberInstallQuote(
       goodsNet: draft.goodsNet,
       installPrice: result.customerPrice,
       customerName: draft.customerName,
+      postcode: draft.postcode || null,
       siteAddress: contact?.siteAddress ?? (draft.postcode || null),
       contactName: contact?.contactName ?? null,
       contactEmail: contact?.contactEmail ?? null,
@@ -501,6 +509,7 @@ async function rememberInstallQuote(
         qty: line.qty,
         category: line.category,
         lineNet: line.lineTotal,
+        unitWeightKg: line.unitWeightKg,
       })),
     },
   });
@@ -623,6 +632,16 @@ export async function parseUploadedQuote(_state: ActionState, formData: FormData
     return { ok: false, message: "No quote lines were found in that PDF.", draft: draftFromExtract(extracted, "pdf") };
   }
   const draft = draftFromExtract(extracted, "pdf");
+  const key = orderKeyFromPdf({
+    quoteNumber: extracted.quoteNumber,
+    orderNo: extracted.orderNo,
+    text,
+    typed: String(formData.get("quoteNumber") ?? ""),
+  });
+  draft.quoteNumber = key.orderNumber;
+  if (key.source === "upload") {
+    draft.warnings.push("No SO number was on this quote. It is saved on its own and will not block another order.");
+  }
   draft.warnings.push("No segment is printed on a Cin7 Core quote. Choose one before pricing.");
   return {
     ok: true,
@@ -662,8 +681,19 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
   }
 }
 
-export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ReturnType<typeof salesOrderActionResult>> {
-  await requireSalesUser();
+type SubcontractorOffer = {
+  savedQuoteId: string;
+  quoteNumber: string;
+  customerName: string;
+  postcode: string;
+  jobTypes: string[];
+  subject: string;
+  draft: string;
+  choices: QuoteChoice[];
+};
+
+export async function priceSalesOrder(_state: ActionState, formData: FormData): Promise<ReturnType<typeof salesOrderActionResult> & { subcontractor?: SubcontractorOffer }> {
+  const profile = await requireSalesUser();
   await fixturePause();
   try {
     const file = formData.get("quotePdf");
@@ -706,10 +736,11 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
     const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
-    return salesOrderActionResult({
+    const readyMessage = result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready.");
+    const priced = salesOrderActionResult({
       ok: !result.blockedReason,
       needsSegment: false,
-      message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready."),
+      message: result.blockedReason ? readyMessage : withUnlinkedOrderNote(readyMessage, draft.quoteNumber),
       quoteNumber: view.quoteNumber,
       customerName: view.customerName,
       postcode: view.postcode,
@@ -717,6 +748,38 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       savedQuoteId: savedQuoteId ?? undefined,
       service,
     });
+    if (String(formData.get("mode") ?? "") !== "subcontractor") return priced;
+    if (!priced.ok || !savedQuoteId) {
+      return { ...priced, ok: false, message: priced.message || "Price the order before asking subcontractors." };
+    }
+    const kit = subcontractorKitLines(draft.lines);
+    const jobTypes = jobTypesForKit(draft.lines.map((line) => ({ category: line.category, description: line.description })));
+    const rows = await listSubcontractorRecords();
+    const email = buildSubcontractorDraft({
+      postcode: view.postcode,
+      lines: kit,
+      weightKg: orderWeightKg(draft.lines, draft.totalWeightKg),
+      repFirstName: profile.first_name || profile.full_name?.split(" ")[0] || "",
+    });
+    return {
+      ...priced,
+      message: withUnlinkedOrderNote("Subcontractor quote ready.", draft.quoteNumber),
+      subcontractor: {
+        savedQuoteId,
+        quoteNumber: view.quoteNumber,
+        customerName: view.customerName,
+        postcode: view.postcode,
+        jobTypes,
+        subject: email.subject,
+        draft: email.text,
+        choices: rankSubcontractors(rows, {
+          postcode: view.postcode,
+          jobTypes,
+          crew: result.requirements?.installers ?? null,
+          today: new Date().toISOString().slice(0, 10),
+        }),
+      },
+    };
   } catch (error) {
     return salesOrderActionResult({
       ok: false,

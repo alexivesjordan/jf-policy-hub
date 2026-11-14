@@ -10,6 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { PULSE_MODULE_IDS } from "@/lib/types";
 import { personName } from "@/lib/names";
+import { newEngineerProblem } from "@/lib/installs/new-engineer";
+import { createFieldEngineer, discardFieldEngineer } from "@/features/installs/engineer-resource";
 
 function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -34,8 +36,19 @@ function installsChoiceProblem(formData: FormData) {
   const selected = formData.getAll("teamId").map(String).filter(Boolean);
   if (!installsTeamId || !selected.includes(installsTeamId)) return null;
   const choice = clean(formData.get("fieldResource"));
-  if (choice === "office" || RESOURCE_ID.test(choice)) return null;
+  if (choice === "office" || choice === "new" || RESOURCE_ID.test(choice)) return null;
   return "Choose a field engineer resource, or mark them as office staff.";
+}
+
+async function openNewEngineer(formData: FormData) {
+  const choice = clean(formData.get("fieldResource"));
+  if (choice !== "new") return { choice, createdId: null as string | null };
+  const created = await createFieldEngineer({
+    name: clean(formData.get("engineerName")),
+    role: clean(formData.get("engineerRole")),
+  });
+  if (!created.ok) return { choice, createdId: null as string | null, message: created.message };
+  return { choice: created.id, createdId: created.id };
 }
 
 export async function saveWorkspaceTeam(formData: FormData) {
@@ -59,10 +72,12 @@ export async function deleteWorkspaceTeam(formData: FormData) {
 
 export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
   await requireWorkspaceAdmin();
-  const problem = nameProblem(formData) ?? installsChoiceProblem(formData);
+  const problem = nameProblem(formData) ?? engineerDraftProblem(formData) ?? installsChoiceProblem(formData);
   if (problem) return { message: problem };
   const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
   if (!names) return { message: "Enter a first and last name." };
+  const opened = await openNewEngineer(formData);
+  if (opened.message) return { message: opened.message };
   const custom: Record<string, string> = {};
   for (const moduleId of PULSE_MODULE_IDS) {
     custom[moduleId] = clean(formData.get(`level-${moduleId}`)) || "none";
@@ -76,31 +91,50 @@ export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: For
     p_custom: custom,
     p_active: formData.get("isActive") === "yes",
   });
-  if (error) return { message: messageFromError(error, "Could not save that user.") };
+  if (error) {
+    if (opened.createdId) await discardFieldEngineer(opened.createdId);
+    return { message: messageFromError(error, "Could not save that user.") };
+  }
   const named = await supabase.rpc("save_person_name", {
     p_profile: clean(formData.get("userId")),
     p_first_name: names.firstName,
     p_last_name: names.lastName,
   });
-  if (named.error) return { message: messageFromError(named.error, "Could not save that name.") };
+  if (named.error) {
+    if (opened.createdId) await discardFieldEngineer(opened.createdId);
+    return { message: messageFromError(named.error, "Could not save that name.") };
+  }
   if (formData.has("fieldResource")) {
     const linked = await supabase.rpc("install_set_field_resource", {
       p_profile: clean(formData.get("userId")),
-      p_choice: clean(formData.get("fieldResource")),
+      p_choice: opened.choice,
     });
-    if (linked.error) return { message: messageFromError(linked.error, "Could not link that engineer.") };
+    if (linked.error) {
+      if (opened.createdId) await discardFieldEngineer(opened.createdId);
+      return { message: messageFromError(linked.error, "Could not link that engineer.") };
+    }
   }
   revalidatePath("/workspace/users");
   return null;
 }
 
+function engineerDraftProblem(formData: FormData) {
+  if (clean(formData.get("fieldResource")) !== "new") return null;
+  return newEngineerProblem({
+    name: clean(formData.get("engineerName")),
+    role: clean(formData.get("engineerRole")),
+  }, []);
+}
+
 export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
   await requireWorkspaceAdmin();
-  const problem = nameProblem(formData) ?? installsChoiceProblem(formData);
+  const problem = nameProblem(formData) ?? engineerDraftProblem(formData) ?? installsChoiceProblem(formData);
   if (problem) return { message: problem };
   const email = clean(formData.get("email"));
   const names = personName(clean(formData.get("firstName")), clean(formData.get("lastName")));
   if (!names) return { message: "Enter a first and last name." };
+  const opened = await openNewEngineer(formData);
+  if (opened.message) return { message: opened.message };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("workspace_prepare_invite", {
     p_email: email,
@@ -108,14 +142,20 @@ export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: F
     p_last_name: names.lastName,
     p_workspace_role: clean(formData.get("workspaceRole")),
   });
-  if (error) return { message: messageFromError(error, "We could not save that invite.") };
+  if (error) {
+    if (opened.createdId) await discardFieldEngineer(opened.createdId);
+    return { message: messageFromError(error, "We could not save that invite.") };
+  }
   const prepared = (data ?? {}) as { already_registered?: boolean; user_id?: string | null };
   const applied = await supabase.rpc("install_apply_invite", {
     p_email: email,
     p_team_ids: formData.getAll("teamId").map(String).filter(Boolean),
-    p_choice: clean(formData.get("fieldResource")),
+    p_choice: opened.choice,
   });
-  if (applied.error) return { message: messageFromError(applied.error, "Could not link that engineer.") };
+  if (applied.error) {
+    if (opened.createdId) await discardFieldEngineer(opened.createdId);
+    return { message: messageFromError(applied.error, "Could not link that engineer.") };
+  }
   if (!prepared.already_registered) {
     if (!hasServiceRole()) return { message: "Their access is saved, but sending the invite email needs SUPABASE_SERVICE_ROLE_KEY on the server." };
     const service = createAdminClient();

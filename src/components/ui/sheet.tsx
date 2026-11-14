@@ -32,14 +32,14 @@ function SheetContent({
     <SheetPrimitive.Portal>
       <SheetPrimitive.Backdrop
         data-slot="sheet-overlay"
-        className="fixed inset-0 z-50 bg-black/40 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        className="fixed inset-0 z-50 bg-black/40 transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
       />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex h-full w-[min(100%,20rem)] flex-col bg-popover text-popover-foreground shadow-lg outline-none data-open:animate-in data-closed:animate-out",
-          side === "left" && "inset-y-0 left-0 data-open:slide-in-from-left data-closed:slide-out-to-left",
-          side === "right" && "inset-y-0 right-0 data-open:slide-in-from-right data-closed:slide-out-to-right",
+          "fixed z-50 flex h-full w-[min(100%,20rem)] flex-col bg-popover text-popover-foreground shadow-lg outline-none transition-transform duration-200",
+          side === "left" && "inset-y-0 left-0 data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full",
+          side === "right" && "inset-y-0 right-0 data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full",
           className,
         )}
         {...props}

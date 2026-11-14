@@ -7,7 +7,7 @@ export function installStage(input: {
   accessComplete: boolean;
   quoting?: boolean;
 }): InstallStage {
-  if (input.quoting) return "quoting";
+  if (input.quoting || input.status === "quoting") return "quoting";
   if (input.status === "completed") return "completed";
   if (input.accessComplete) return "ready";
   if (input.accessSent) return "awaiting_access";

@@ -1,0 +1,41 @@
+Sales Order
+SO-00526
+
+Bill To
+Johnson Health Tech UK Ltd
+Unit 4
+Example Park
+Norwich
+
+Ship To
+Harbour Leisure
+12 Quay Street
+Norwich
+NR1 1AA
+
+Order No
+Date
+Terms
+Customer Reference
+Currency
+SO-00526
+13/11/2026
+Prepayment
+HT-26
+GBP
+
+# SKU Product Description Image Qty RSP Discount Price Each Line Total Line VAT
+1 JF-C2SE-2 Concept2 SkiErg - Including PM5 Monitor 1.00 679.17 0.00% 679.17 679.17 135.83
+2 JF-J75-CR-BLK-V3 J75 Cable Rack 1.00 2127.32 0.00% 2127.32 2127.32 425.46
+3 PICK-1 Picking Error Sales Order Totals Notes 1.00 0.00 0.00% 0.00 0.00 0.00
+
+Goods Net 2806.49
+Additional Charges Net 0.00
+Total Order Net 2806.49
+VAT 561.30
+Total 3367.79
+Total weight 86.50 kg
+
+Notes
+Picking Error Sales Order Totals Notes:
+Check the delivery.

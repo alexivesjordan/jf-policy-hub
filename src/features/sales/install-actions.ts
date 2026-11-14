@@ -2,9 +2,10 @@
 
 import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile, requireOperationsUser, requireSalesUser } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
-import { canManageInstall } from "@/lib/installs/access-auth";
+import { canCancelInstall, canManageInstall, closedInstallMessage } from "@/lib/installs/access-auth";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
 import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
@@ -113,10 +114,12 @@ export async function setInstallContactEmail(installId: string, email: string): 
   await requireInstallReader();
   if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
   const supabase = await createClient();
+  const loaded = await supabase.rpc("install_read", { p_id: installId });
+  const row = loaded.data as { endOn?: string; contactEmail?: string; status?: string } | null;
+  const closed = closedInstallMessage(row?.status);
+  if (closed) return { ok: false, message: closed };
   const saved = await supabase.rpc("install_set_contact_email", { p_install: installId, p_email: email });
   if (saved.error) return { ok: false, message: messageFromError(saved.error, "Could not save that email.") };
-  const loaded = await supabase.rpc("install_read", { p_id: installId });
-  const row = loaded.data as { endOn?: string; contactEmail?: string } | null;
   try {
     const access = await issueInstallAccess({ id: installId, contactEmail: email, endOn: String(row?.endOn ?? "").slice(0, 10) || null });
     if (!access.sent) return { ok: true, message: "Email saved. The access form was not emailed. Copy the link from the install.", path: access.path ?? undefined };
@@ -132,7 +135,7 @@ async function managedInstall(installId: string) {
   const supabase = await createClient();
   const loaded = await supabase.rpc("install_read", { p_id: installId });
   if (loaded.error || !loaded.data) return { ok: false as const, message: messageFromError(loaded.error, "That install was not found.") };
-  const row = loaded.data as { bookingRepId?: string | null; contactEmail?: string | null; endOn?: string };
+  const row = loaded.data as { bookingRepId?: string | null; contactEmail?: string | null; endOn?: string; status?: string };
   if (!canManageInstall(profile, row.bookingRepId)) {
     return { ok: false as const, message: "You cannot change that install." };
   }
@@ -142,6 +145,8 @@ async function managedInstall(installId: string) {
 export async function resendInstallAccess(installId: string): Promise<InstallActionResult> {
   const managed = await managedInstall(installId);
   if (!managed.ok) return managed;
+  const closed = closedInstallMessage(managed.row.status);
+  if (closed) return { ok: false, message: closed };
   if (!managed.row.contactEmail) return { ok: false, message: "Add the customer's email first." };
   try {
     const access = await issueInstallAccess({
@@ -209,6 +214,78 @@ export async function installProposalUrl(path: unknown) {
   if (!admin) return null;
   const signed = await admin.storage.from("service-proposals").createSignedUrl(path, 60 * 10);
   return signed.data?.signedUrl ?? null;
+}
+
+export async function cancelInstall(installId: string, reason: string): Promise<InstallActionResult> {
+  const profile = await requireSalesUser();
+  if (!ID.test(installId)) return { ok: false, message: "That install was not found." };
+  const trimmed = reason.trim();
+  if (trimmed.length < 3 || trimmed.length > 500) return { ok: false, message: "Add a reason of 3 to 500 characters." };
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("install_read", { p_id: installId });
+  if (loaded.error || !loaded.data) return { ok: false, message: messageFromError(loaded.error, "That install was not found.") };
+  const row = loaded.data as { bookingRepId?: string | null; status?: string; stage?: string };
+  const office = await supabase.rpc("orbit_office_context");
+  const engineer = (office.data as { ops_role?: string } | null)?.ops_role === "installer";
+  if (!canCancelInstall({
+    profile,
+    bookingRepId: row.bookingRepId,
+    status: String(row.status ?? ""),
+    stage: String(row.stage ?? ""),
+    fieldEngineer: engineer,
+  })) {
+    return { ok: false, message: "You cannot cancel that install." };
+  }
+  const cancelled = await supabase.rpc("install_cancel", { p_id: installId, p_reason: trimmed });
+  if (cancelled.error) return { ok: false, message: messageFromError(cancelled.error, "Could not cancel that install.") };
+  return { ok: true, message: "Install cancelled.", install: (cancelled.data ?? null) as Record<string, unknown> | null };
+}
+
+export async function listVisitPhotos(installId: string): Promise<{ id: string; kind: string; url: string | null }[]> {
+  await requireInstallReader();
+  if (!ID.test(installId)) return [];
+  const supabase = await createClient();
+  const listed = await supabase.rpc("install_visit_photos", { p_install: installId });
+  if (listed.error || !Array.isArray(listed.data)) return [];
+  const admin = (await import("@/lib/supabase/admin")).createAdminClient();
+  const rows = listed.data as { id?: string; kind?: string; bucket?: string; path?: string }[];
+  return Promise.all(rows.flatMap((row) => {
+    const id = String(row.id ?? "");
+    if (!id) return [];
+    return [{
+      id,
+      kind: String(row.kind ?? "equipment"),
+      url: null as string | null,
+      bucket: row.bucket,
+      path: row.path,
+    }];
+  }).map(async (row) => {
+    if (!admin || !row.bucket || !row.path) return { id: row.id, kind: row.kind, url: null };
+    const signed = await admin.storage.from(row.bucket).createSignedUrl(row.path, 60 * 10);
+    return { id: row.id, kind: row.kind, url: signed.data?.signedUrl ?? null };
+  }));
+}
+
+export async function listArchivedInstalls(query: string): Promise<InstallActionResult> {
+  await requireInstallReader();
+  const supabase = await createClient();
+  const listed = await supabase.rpc("install_list_archived", { p_query: query.trim() });
+  if (listed.error) return { ok: false, message: messageFromError(listed.error, "Could not read archived installs."), installs: [] };
+  const rows = Array.isArray(listed.data) ? (listed.data as Record<string, unknown>[]) : [];
+  return { ok: true, message: "", installs: rows };
+}
+
+export async function restoreArchivedInstall(formData: FormData): Promise<void> {
+  await requireInstallReader();
+  const installId = String(formData.get("id") ?? "");
+  if (!ID.test(installId)) return;
+  const supabase = await createClient();
+  const restored = await supabase.rpc("install_restore", { p_id: installId });
+  if (restored.error) return;
+  revalidatePath("/sales/installs");
+  revalidatePath("/sales/installs/archive");
+  revalidatePath("/operations/installs");
+  revalidatePath("/operations/installs/archive");
 }
 
 export async function setInstallStatus(installId: string, status: string): Promise<InstallActionResult> {

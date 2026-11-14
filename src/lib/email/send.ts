@@ -7,6 +7,7 @@ export type PulseEmail = {
   installId?: string | null;
   tokenLinkId?: string | null;
   accessPath?: string | null;
+  replyTo?: string | null;
   attachments?: { filename: string; contentBase64: string }[];
 };
 
@@ -73,6 +74,7 @@ export async function sendPulseEmail(
       body: JSON.stringify({
         from: FROM,
         to: [deliveredTo],
+        reply_to: input.replyTo?.trim() || undefined,
         subject: input.subject,
         html: input.html,
         text: input.text,

@@ -1,4 +1,5 @@
-export const ACCESS_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+/** Prod Supabase rejects anything over 50 MB, so the check stops there. */
+export const ACCESS_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 export const ACCESS_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 
 const VIDEO: Record<string, string> = {
@@ -18,7 +19,7 @@ export function planAccessMediaUpload(mimeType: string, byteSize: number) {
   const video = VIDEO[mime];
   if (video) {
     if (byteSize <= 0 || byteSize > ACCESS_VIDEO_MAX_BYTES) {
-      return { ok: false as const, message: "Videos must be 200 MB or smaller." };
+      return { ok: false as const, message: "Videos up to 50 MB" };
     }
     return { ok: true as const, extension: video, kind: "video" as const };
   }
@@ -100,4 +101,44 @@ export function storedAccessMediaOk(path: string, mimeType: string, byteSize: nu
     return { ok: false as const, message: "That file type is not allowed." };
   }
   return plan;
+}
+
+/** Insurance bucket limit. The bytes go straight to storage, same as access video. */
+export const INSURANCE_MAX_BYTES = 20 * 1024 * 1024;
+
+const INSURANCE: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
+
+export function planInsuranceUpload(mimeType: string, byteSize: number) {
+  const mime = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+  const extension = INSURANCE[mime];
+  if (!extension) return { ok: false as const, message: "Upload a PDF, JPEG, or PNG." };
+  if (byteSize <= 0 || byteSize > INSURANCE_MAX_BYTES) {
+    return { ok: false as const, message: "Insurance documents must be 20 MB or smaller." };
+  }
+  return { ok: true as const, extension, kind: "insurance" as const };
+}
+
+export function insurancePathOk(subcontractorId: string, path: string) {
+  return new RegExp(`^ops/${subcontractorId}/[0-9a-f-]{36}\\.(pdf|jpg|png)$`, "i").test(path);
+}
+
+/** The stored object's type and size, not the values the browser claimed. */
+export function storedInsuranceOk(path: string, mimeType: string, byteSize: number) {
+  const plan = planInsuranceUpload(mimeType, byteSize);
+  if (!plan.ok) return plan;
+  if (!path.toLowerCase().endsWith(`.${plan.extension}`)) {
+    return { ok: false as const, message: "That file type is not allowed." };
+  }
+  return plan;
+}
+
+export function insuranceBytesMatch(mimeType: string, bytes: Uint8Array) {
+  const mime = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (mime === "application/pdf") return bytes.length >= 4 && ascii(bytes, 0, 4) === "%PDF";
+  if (mime === "image/jpeg" || mime === "image/png") return accessMediaBytesMatch(mime, bytes);
+  return false;
 }

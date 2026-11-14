@@ -6,7 +6,7 @@ import { FieldFrame } from "@/components/field/frame";
 import { SignatureForm } from "@/components/field/signature-form";
 import { mySignature } from "@/features/field/queries";
 import { getCurrentProfile } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
 export const instant = false;
 export const metadata = { title: "My signature" };
@@ -21,7 +21,7 @@ export default function SignaturePage() {
 
 async function Signature() {
   await connection();
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() && !isFixtureMode()) {
     return <FieldFrame title="Signature" back={{ href: "/field", label: "Jobs" }}><p>Add the Supabase keys, then save a signature.</p></FieldFrame>;
   }
   const profile = await getCurrentProfile();

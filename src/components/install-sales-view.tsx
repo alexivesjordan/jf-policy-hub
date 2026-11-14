@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { projectInstall, type InstallRecord } from "@/lib/pulse/install-booking";
 
 const WARRANTY: Record<string, string> = {
@@ -9,6 +10,7 @@ const WARRANTY: Record<string, string> = {
 };
 
 const STATUS: Record<string, string> = {
+  quoting: "Quoting",
   booked: "Booked",
   scheduled: "Scheduled",
   in_progress: "In progress",
@@ -35,9 +37,11 @@ export function salesInstall(record: InstallRecord) {
 export function InstallSalesView({
   install,
   proposalUrl,
+  cancel,
 }: {
   install: InstallRecord;
   proposalUrl?: string | null;
+  cancel?: ReactNode;
 }) {
   const row = salesInstall(install);
   const warranty = row.warrantyOption ? WARRANTY[String(row.warrantyOption)] ?? String(row.warrantyOption) : "None";
@@ -47,11 +51,11 @@ export function InstallSalesView({
         <p className="text-sm text-grey">Order {String(row.orderNumber ?? "—")}</p>
         <h1 className="font-display mt-1 text-3xl">{String(row.customerName ?? "Install")}</h1>
         <p className="mt-2 text-sm text-grey">
-          Booked for {ukDate(row.startOn)} – {ukDate(row.endOn)}
+          {String(row.stage) === "quoting" ? "Quoting" : `Booked for ${ukDate(row.startOn)} – ${ukDate(row.endOn)}`}
         </p>
         <dl className="mt-4 divide-y divide-border text-sm">
           <Row label="Order value" value={money(row.goodsNet)} />
-          <Row label="Install price" value={money(row.installPrice)} />
+          <Row label="Install price" value={String(row.stage) === "quoting" || row.installPrice == null ? "—" : money(row.installPrice)} />
           <Row label="Warranty and maintenance" value={warranty} />
           <Row label="Warranty and maintenance price" value={row.warrantyPrice == null ? "—" : money(row.warrantyPrice)} />
           <Row label="Status" value={STATUS[String(row.status)] ?? String(row.status ?? "—")} />
@@ -59,6 +63,7 @@ export function InstallSalesView({
           <Row label="Contact" value={[row.contactName, row.contactEmail, row.contactPhone].filter(Boolean).join(" · ") || "—"} />
           <Row label="Site" value={String(row.siteAddress ?? "—")} />
         </dl>
+        {cancel ? <div className="mt-4">{cancel}</div> : null}
         {proposalUrl ? (
           <p className="mt-4 text-sm">
             <a className="font-semibold underline decoration-primary" href={proposalUrl}>Download the proposal</a>

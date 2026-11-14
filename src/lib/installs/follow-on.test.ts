@@ -55,9 +55,12 @@ describe("install follow-on", () => {
     assert.equal(canManageInstall(profile({ id: "admin-1", role: "admin", workspace_role: "admin" }), null), true);
   });
 
-  it("allows a 200 MB video and refuses a larger one", () => {
+  it("allows a 50 MB video and refuses a larger one", () => {
+    assert.equal(ACCESS_VIDEO_MAX_BYTES, 50 * 1024 * 1024);
     assert.equal(planAccessMediaUpload("video/mp4", ACCESS_VIDEO_MAX_BYTES).ok, true);
-    assert.equal(planAccessMediaUpload("video/quicktime", ACCESS_VIDEO_MAX_BYTES + 1).ok, false);
+    const tooBig = planAccessMediaUpload("video/quicktime", ACCESS_VIDEO_MAX_BYTES + 1);
+    assert.equal(tooBig.ok, false);
+    if (!tooBig.ok) assert.equal(tooBig.message, "Videos up to 50 MB");
     assert.equal(planAccessMediaUpload("image/jpeg", 1024).ok, true);
     assert.equal(planAccessMediaUpload("image/heic", 1024).ok, true);
     assert.equal(planAccessMediaUpload("image/gif", 1024).ok, false);
@@ -72,6 +75,30 @@ describe("install follow-on", () => {
     const stored = storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "image/jpeg", 1024);
     assert.equal(stored.ok, true);
     assert.equal(storedAccessMediaOk("ops/install/11111111-1111-1111-1111-111111111111.jpg", "video/mp4", 1024).ok, false);
+  });
+
+  it("opens the fixture upload route only when the flag is set", async () => {
+    const { PUT } = await import("../../app/api/access/media/fixture-upload/route");
+    const previousFlag = process.env.ACCESS_FIXTURE_UPLOAD;
+    const previousVercel = process.env.VERCEL_ENV;
+    const restore = () => {
+      if (previousFlag === undefined) delete process.env.ACCESS_FIXTURE_UPLOAD;
+      else process.env.ACCESS_FIXTURE_UPLOAD = previousFlag;
+      if (previousVercel === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = previousVercel;
+    };
+    try {
+      delete process.env.ACCESS_FIXTURE_UPLOAD;
+      process.env.VERCEL_ENV = "preview";
+      assert.equal((await PUT()).status, 404);
+      delete process.env.VERCEL_ENV;
+      process.env.VERCEL_ENV = "production";
+      assert.equal((await PUT()).status, 404);
+      process.env.ACCESS_FIXTURE_UPLOAD = "1";
+      assert.equal((await PUT()).status, 200);
+    } finally {
+      restore();
+    }
   });
 
   it("reads a 206 range body without the stream reader", async () => {

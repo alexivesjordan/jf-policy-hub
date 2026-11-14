@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fixtureSubcontractorRpc } from "@/lib/subcontractors/fixture-board";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 let fixtureServiceQuote: { id: string; prices: unknown } | null = null;
@@ -184,9 +185,15 @@ function weekMonday() {
   return monday.toISOString().slice(0, 10);
 }
 
+function sessionProfile() {
+  const marker = process.env.PULSE_FIXTURE_ROLE;
+  if (marker === "rep" || marker === "lead" || marker === "engineer") return { ...profile, role: "staff" };
+  return profile;
+}
+
 function tables(): Record<string, Record<string, unknown>[]> {
   return {
-    profiles: [profile],
+    profiles: [sessionProfile()],
     categories,
     policies,
     policy_versions: [],
@@ -202,10 +209,13 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
-  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead";
+  const subcontractor = fixtureSubcontractorRpc(fn, args);
+  if (subcontractor.handled) return subcontractor.data;
+  if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead" && process.env.PULSE_FIXTURE_ROLE !== "engineer";
   if (fn === "workspace_can") {
     const moduleName = String(args?.p_module ?? "");
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return moduleName === "sales";
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return moduleName === "operations";
     if (process.env.PULSE_FIXTURE_ROLE === "lead") return moduleName === "operations" || moduleName === "sales";
     return true;
   }
@@ -213,10 +223,59 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "none", sales: "edit", finance: "none" };
     }
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") {
+      return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "view", sales: "none", finance: "none" };
+    }
     if (process.env.PULSE_FIXTURE_ROLE === "lead") {
       return { role: "member", mode: "follow", people: "none", service: "none", supply: "none", operations: "edit", sales: "view", finance: "none" };
     }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
+  }
+  if (fn === "install_field_role") {
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return "engineer";
+    if (process.env.PULSE_FIXTURE_ROLE === "lead") return "ops";
+    if (process.env.PULSE_FIXTURE_ROLE === "rep") return "none";
+    return "admin";
+  }
+  if (fn === "install_field_resources") {
+    return {
+      resources: [
+        { id: "f3000000-0000-4000-8000-000000000001", name: "Lewis", profileId: null },
+        { id: "f3000000-0000-4000-8000-000000000003", name: "Ben", profileId: null },
+      ],
+      officeIds: [],
+    };
+  }
+  if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "install_visit_context") {
+    const id = String(args?.p_install ?? "");
+    const submitted = id.endsWith("2222");
+    return {
+      role: "admin",
+      engineerName: "Sam Cole",
+      submitted,
+      risk: { answers: { accessClear: true, floorSuitable: true, powerSafe: true, handlingPlanned: true, peopleBriefed: true, notes: "" } },
+      lines: [
+        { sku: "", description: "Picking error sales order total", productLine: null, category: null, qty: 1 },
+        { sku: "JF-C2SE-2", description: "Concept2 SkiErg", productLine: null, category: null, qty: 1 },
+      ],
+      job: {
+        id,
+        orderNumber: "SO-00526",
+        customerName: "Sample Gym",
+        siteAddress: "1 High Street",
+        contactName: "Alex",
+        contactPhone: "01553 000000",
+        contactEmail: null,
+        startOn: "2026-11-16",
+        endOn: "2026-11-16",
+        status: submitted ? "completed" : "booked",
+      },
+    };
+  }
+  if (fn === "install_field_home") {
+    const role = process.env.PULSE_FIXTURE_ROLE === "engineer" ? "engineer" : process.env.PULSE_FIXTURE_ROLE === "lead" ? "ops" : "admin";
+    return { role, jobs: [], needsLink: false };
   }
   if (fn === "workspace_directory") {
     return [
@@ -299,6 +358,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "service_set_proposal_path" || fn === "save_person_name" || fn === "service_save_rates" || fn === "service_upsert_rule") return true;
   if (fn === "orbit_office_context") {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") return { has_module: true, ops_role: "sales", is_owner: false, operations: "none", sales: "edit" };
+    if (process.env.PULSE_FIXTURE_ROLE === "engineer") return { has_module: true, ops_role: "engineer", is_owner: false, operations: "view", sales: "none" };
     if (process.env.PULSE_FIXTURE_ROLE === "lead") return { has_module: true, ops_role: "install_lead", is_owner: false, operations: "edit", sales: "view" };
     return { has_module: true, ops_role: "admin_owner", is_owner: true, operations: "edit", sales: "edit" };
   }
@@ -414,7 +474,29 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       fixtureInstall("2026-11-18", "none", true, "completed", "ready"),
       fixtureInstall("2026-10-20", "none", false, "completed", "completed"),
     ];
-    return args?.p_mine ? rows.filter((row) => row.bookingRepId === USER_ID) : rows;
+    const visible = rows.filter((row) => row.stage !== "completed");
+    return args?.p_mine ? visible.filter((row) => row.bookingRepId === USER_ID) : visible;
+  }
+  if (fn === "install_archive_due") return 0;
+  if (fn === "install_list_archived") {
+    const query = String(args?.p_query ?? "").trim().toLowerCase();
+    const archived = [{
+      id: "11111111-1111-4111-8111-1111111111d4",
+      orderNumber: "SO-1009",
+      customerName: "Northside Fitness",
+      status: "completed",
+      completedAt: "2026-10-20T12:00:00Z",
+      archivedAt: "2026-10-21T12:00:00Z",
+      startOn: "2026-10-20",
+    }];
+    return archived.filter((row) => query === "" || row.orderNumber.toLowerCase().includes(query) || row.customerName.toLowerCase().includes(query));
+  }
+  if (fn === "install_restore") return true;
+  if (fn === "install_visit_photos") {
+    return [
+      { id: "44444444-4444-4444-8444-444444444444", kind: "concern", bucket: "job-sheets", path: "ops/visit/concern.jpg", createdAt: "2026-11-13T09:00:00Z" },
+      { id: "55555555-5555-4555-8555-555555555555", kind: "equipment", bucket: "job-sheets", path: "ops/visit/equipment.jpg", createdAt: "2026-11-13T15:00:00Z" },
+    ];
   }
   if (fn === "install_access_preview") {
     const hash = String(args?.p_token_hash ?? "");
@@ -457,7 +539,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (process.env.PULSE_FIXTURE_ROLE === "rep") {
       const source = row as Record<string, unknown>;
       const sales: Record<string, unknown> = {};
-      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
+      for (const key of ["id", "orderNumber", "goodsNet", "installPrice", "warrantyOption", "warrantyPrice", "startOn", "endOn", "customerName", "contactName", "contactEmail", "contactPhone", "siteAddress", "status", "stage", "bookingRepId", "bookingRepName", "proposalPath", "serviceQuoteId"]) {
         sales[key] = source[key];
       }
       return sales;
@@ -469,6 +551,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return fixtureInstall(start, "annual", true);
   }
   if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
+  if (fn === "install_cancel") return fixtureInstall("2026-11-16", "annual", true, "cancelled");
   return null;
 }
 
@@ -620,11 +703,13 @@ function fixtureAccessMime(path: string) {
   if (ext === "png") return "image/png";
   if (ext === "webp") return "image/webp";
   if (ext === "heic") return "image/heic";
+  if (ext === "pdf") return "application/pdf";
   return "image/jpeg";
 }
 
 function fixtureAccessBytes(path: string) {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return Uint8Array.from(Buffer.from("%PDF-1.4"));
   if (ext === "png") return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   if (ext === "webp") return Uint8Array.from([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBP")]);
   if (ext === "mp4" || ext === "mov" || ext === "heic") {
@@ -651,7 +736,11 @@ export function createFixtureClient() {
       return new FixtureQuery(table);
     },
     async rpc(fn: string, args?: Record<string, unknown>) {
-      return { data: rpcData(fn, args), error: null };
+      try {
+        return { data: rpcData(fn, args), error: null };
+      } catch (error) {
+        return { data: null, error: { message: error instanceof Error ? error.message : "app: Could not do that." } };
+      }
     },
     storage: {
       from(bucket: string) {
@@ -660,7 +749,7 @@ export function createFixtureClient() {
             return { data: { path: "proposal.docx" }, error: null };
           },
           async createSignedUrl(path: string) {
-            if (bucket === "access-media") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
+            if (bucket === "access-media" || bucket === "insurance" || bucket === "job-sheets") return { data: { signedUrl: fixtureAccessBytesUrl(path) }, error: null };
             return { data: { signedUrl: `https://jqdhkrlopmgbwbjebgxy.supabase.co/storage/v1/object/sign/service-proposals/${path}?token=fixture` }, error: null };
           },
           async createSignedUploadUrl(path: string) {

@@ -40,6 +40,10 @@ async function TokenVisit({ params }: { params: Promise<{ token: string }> }) {
     };
   } | null;
   if (preview.error || !data?.job?.id) return <Invalid />;
+  const vansResult = await admin.rpc("install_list_vans");
+  const vans = Array.isArray(vansResult.data)
+    ? (vansResult.data as { registration?: string; name?: string | null }[]).flatMap((van) => (van?.registration ? [{ registration: van.registration, name: van.name ?? null }] : []))
+    : [];
   const screen: VisitScreen = {
     installId: data.job.id,
     token,
@@ -52,6 +56,7 @@ async function TokenVisit({ params }: { params: Promise<{ token: string }> }) {
     orderNo: data.job.orderNumber,
     startOn: data.job.startOn,
     lines: Array.isArray(data.lines) ? data.lines : [],
+    vans,
     risk: riskFromUnknown(data.risk?.answers),
     submitted: Boolean(data.submitted) || data.job.status === "completed",
     engineerName: "",

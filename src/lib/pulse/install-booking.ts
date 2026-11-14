@@ -22,6 +22,7 @@ export const SALES_INSTALL_FIELDS = [
   "bookingRepName",
   "proposalPath",
   "serviceQuoteId",
+  "stage",
 ] as const;
 
 /** Operations Pulse sees the sales fields plus the working detail. */

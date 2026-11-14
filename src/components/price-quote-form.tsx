@@ -9,11 +9,12 @@ const BookInstallDialog = dynamic(
   () => import("@/components/book-install-dialog").then((mod) => mod.BookInstallDialog),
   { ssr: false },
 );
+import { SubcontractorQuote } from "@/components/subcontractor-quote";
 import { ProposalButton, ServiceQuoteResult } from "@/components/service-quote-result";
 import { Banner, Button, Field, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { priceSalesOrder } from "@/features/operations/price-actions";
-import { canLoadQuote, isSalesSegment, quoteFailureText } from "@/lib/pulse/quote-segment";
+import { quoteButtons, quoteFailureText } from "@/lib/pulse/quote-segment";
 
 const SEGMENTS = [
   ["independent", "Independent"],
@@ -27,18 +28,28 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
   const [orderNumber, setOrderNumber] = useState("");
   const [segment, setSegment] = useState("");
   const [includeService, setIncludeService] = useState(false);
-  const [pdfIntent, setPdfIntent] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const pdfForm = useRef<HTMLFormElement>(null);
-  const ready = canLoadQuote(orderNumber, segment);
+  const [pendingMode, setPendingMode] = useState<"jordan" | "subcontractor" | null>(null);
+  const [failureHidden, setFailureHidden] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const buttons = quoteButtons({
+    orderNumber,
+    segment,
+    hasPdf: pdfFile != null,
+    pending: selling ? pendingMode ?? "jordan" : null,
+  });
 
   useEffect(() => {
-    const input = pdfForm.current?.querySelector<HTMLInputElement>('input[type="file"]');
+    const input = formRef.current?.querySelector<HTMLInputElement>('input[type="file"]');
     if (!input || !pdfFile) return;
     const transfer = new DataTransfer();
     transfer.items.add(pdfFile);
     input.files = transfer.files;
   }, [pdfFile, sold]);
+
+  useEffect(() => {
+    setFailureHidden(false);
+  }, [sold]);
 
   const toastedSale = useRef<string | null>(null);
   useEffect(() => {
@@ -48,23 +59,34 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
   }, [sold]);
 
   const quote = sold?.quote;
-  const readingPdf = pdfIntent && selling;
-  const failure = selling ? null : quoteFailureText(sold);
+  const failure = failureHidden || selling ? null : quoteFailureText(sold);
 
-  function submitPdf(file: File | null, chosen: string) {
-    if (!file || orderNumber.trim() || !isSalesSegment(chosen)) return;
-    setPdfIntent(true);
-    queueMicrotask(() => pdfForm.current?.requestSubmit());
+  function choosePdf(file: File) {
+    setPdfFile(file);
+    setFailureHidden(true);
   }
 
   return (
     <div className="space-y-6">
-      <form action={sellOrder} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_auto] md:items-end">
+      <form
+        ref={formRef}
+        action={sellOrder}
+        className="space-y-4"
+        onSubmit={(event) => {
+          const submitter = (event.nativeEvent as SubmitEvent).submitter;
+          const value = submitter instanceof HTMLButtonElement ? submitter.value : "";
+          setPendingMode(value === "subcontractor" ? "subcontractor" : "jordan");
+        }}
+      >
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] md:items-end">
         <Field label="Order number">
           <Input
             name="quoteNumber"
             value={orderNumber}
-            onChange={(event) => setOrderNumber(event.target.value)}
+            onChange={(event) => {
+              setOrderNumber(event.target.value);
+              setFailureHidden(true);
+            }}
             placeholder={cin7Connected ? "SO-00490" : "FIXTURE-Q-1001"}
           />
         </Field>
@@ -74,9 +96,8 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
             required
             value={segment}
             onChange={(event) => {
-              const next = event.target.value;
-              setSegment(next);
-              submitPdf(pdfFile, next);
+              setSegment(event.target.value);
+              setFailureHidden(true);
             }}
           >
             <option value="" disabled />
@@ -85,51 +106,40 @@ export function PriceQuoteForm({ cin7Connected }: { cin7Connected: boolean }) {
             ))}
           </Select>
         </Field>
-        <Button type="submit" disabled={selling || !ready}>
-          {selling && !readingPdf ? "Calculating…" : "Load quote"}
-        </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" name="mode" value="jordan" disabled={!buttons.jordan.enabled}>
+            {buttons.jordan.label}
+          </Button>
+          <Button type="submit" name="mode" value="subcontractor" variant="secondary" disabled={!buttons.subcontractor.enabled}>
+            {buttons.subcontractor.label}
+          </Button>
+        </div>
         <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
-      </form>
-      <form id="quote-pdf" ref={pdfForm} action={sellOrder}>
-        <input type="hidden" name="alsoService" value={includeService ? "yes" : ""} />
-        <input type="hidden" name="segment" value={segment} />
         <Field label="Or upload the quote PDF">
-          <QuoteFileDrop
-            onReady={(file) => {
-              setPdfFile(file);
-              submitPdf(file, segment);
-            }}
-          />
+          <QuoteFileDrop onReady={choosePdf} />
         </Field>
       </form>
       <label className="flex min-h-11 items-start gap-3 text-sm font-semibold text-ink">
         <Checkbox checked={includeService} onCheckedChange={(checked) => setIncludeService(checked === true)} />
         <span>Also quote proactive maintenance and extended warranty</span>
       </label>
-      {readingPdf ? <ReadingQuote /> : null}
-      {selling && !readingPdf ? (
+      {selling ? (
         <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
-          <p className="font-display text-3xl">Calculating…</p>
+          <p className="font-display text-3xl">{pendingMode === "subcontractor" ? "Drafting" : "Calculating…"}</p>
+          {pdfFile ? <p className="mt-2 text-sm text-grey">The file is not kept.</p> : null}
         </div>
       ) : null}
       {failure ? <Banner tone="error">{failure}</Banner> : null}
-      {quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
-      {includeService && quote?.service ? (
+      {sold?.subcontractor ? <SubcontractorQuote offer={sold.subcontractor} /> : null}
+      {!sold?.subcontractor && quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
+      {!sold?.subcontractor && includeService && quote?.service ? (
         <>
           <ServiceQuoteResult service={quote.service} />
           <ProposalButton quoteId={quote.service.id} />
         </>
       ) : null}
-      {quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
-    </div>
-  );
-}
-
-function ReadingQuote() {
-  return (
-    <div role="status" className="rounded-3xl border border-line bg-card px-6 py-8">
-      <p className="font-display text-3xl">Reading quote…</p>
-      <p className="mt-2 text-sm text-grey">The file is not kept.</p>
+      {!sold?.subcontractor && quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
     </div>
   );
 }

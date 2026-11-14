@@ -4,12 +4,11 @@ export const RISK_ITEMS = [
   { key: "powerSafe", label: "Power is safe to work around" },
   { key: "handlingPlanned", label: "Manual handling is planned" },
   { key: "peopleBriefed", label: "People on site are briefed" },
-  { key: "ladderCheck", label: "Ladders and hop-ups checked" },
 ] as const;
 
 export type RiskKey = (typeof RISK_ITEMS)[number]["key"];
 export type RiskAnswers = Record<RiskKey, boolean | null> & { notes: string };
-export type SheetLine = { code: string; description: string; reportedJob: string; qty?: string };
+export type SheetLine = { code: string; description: string; reportedJob: string; qty?: string; fromOrder?: boolean };
 export type SheetPart = { code: string; description: string; qty: string };
 
 export type SheetDraft = {
@@ -22,22 +21,19 @@ export type SheetDraft = {
   orderNo: string;
   jobNo: string;
   serviceContract: boolean | null;
-  callOutCharge: boolean | null;
   timeOn: string;
   timeOff: string;
-  overnightStay: boolean | null;
   parkingFee: string;
   service: boolean;
   delivery: boolean;
   installation: boolean;
   warranty: boolean;
-  ladderCheck: boolean;
+  kitAsOrdered: boolean;
+  kitNotes: string;
   lines: SheetLine[];
   workCarriedOut: string;
   parts: SheetPart[];
   locationOk: boolean | null;
-  fixingWall: boolean | null;
-  fixingFloor: boolean | null;
   workOk: boolean | null;
   siteOk: boolean | null;
   engineerName: string;
@@ -54,11 +50,9 @@ export type OrderLineView = {
 };
 
 export const FORM_NOTICES = {
-  receipts: "All receipts must be attached to this form and handed to the office on your return.",
-  fixings: "Jordan Fitness will not be responsible for fixings working loose due to unsuitable wall / floor materials.",
   signing: "By signing this document you are agreeing to all of the content detailed above.",
   hours:
-    "Extra man hours resulting from inaccurate information will be a charge at £25 (+ vat) per hour per man. Normal installation hours are between 0800 and 1700. Jordan Fitness accept no responsibility for the suitability of floors or walls.",
+    "Extra man hours resulting from inaccurate information will be a charge at £25 (+ vat) per hour per man. Normal installation hours are between 0800 and 1700.",
 } as const;
 
 export function emptyRisk(): RiskAnswers {
@@ -68,7 +62,6 @@ export function emptyRisk(): RiskAnswers {
     powerSafe: null,
     handlingPlanned: null,
     peopleBriefed: null,
-    ladderCheck: null,
     notes: "",
   };
 }
@@ -103,15 +96,24 @@ export function validateSheet(sheet: SheetDraft) {
   if (!sheet.sheetOn) return "Add the date.";
   if (!sheet.customerName.trim()) return "Add the customer name.";
   if (!sheet.engineerName.trim()) return "Add the engineer name.";
+  if (!sheet.kitAsOrdered) return "Confirm all kit was installed as ordered.";
   if (!sheet.workCarriedOut.trim()) return "Add the work carried out.";
-  if (!sheet.ladderCheck) return "Confirm the ladder check.";
   return (
     boolAnswer(sheet.locationOk, "the location question") ||
-    boolAnswer(sheet.fixingWall, "the wall fixing question") ||
-    boolAnswer(sheet.fixingFloor, "the floor fixing question") ||
     boolAnswer(sheet.workOk, "whether the customer is satisfied") ||
     boolAnswer(sheet.siteOk, "whether the site was left satisfactory")
   );
+}
+
+export function jobSheetCompleteLine(orderNo: string, customerName: string) {
+  const label = orderNo.trim() || customerName.trim();
+  return label ? `Job sheet for ${label} is complete.` : "Job sheet is complete.";
+}
+
+export function vehicleChoiceProblem(registration: string, vans: { registration: string }[]) {
+  if (vans.length === 0) return null;
+  if (!vans.some((van) => van.registration === registration)) return "Choose a van.";
+  return null;
 }
 
 function londonOffsetMinutes(instant: Date) {
@@ -172,20 +174,15 @@ export function sheetPayload(
     orderNo: sheet.orderNo.trim(),
     jobNo: sheet.jobNo.trim(),
     serviceContract: sheet.serviceContract,
-    callOutCharge: sheet.callOutCharge,
     timeOn: clock(sheet.sheetOn, sheet.timeOn),
     timeOff: clock(sheet.sheetOn, sheet.timeOff),
-    overnightStay: sheet.overnightStay,
     parkingFee: sheet.parkingFee.trim() || null,
     service: sheet.service,
     delivery: sheet.delivery,
     installation: sheet.installation,
     warranty: sheet.warranty,
-    ladderCheck: sheet.ladderCheck,
     workCarriedOut: sheet.workCarriedOut.trim(),
     locationOk: sheet.locationOk,
-    fixingWall: sheet.fixingWall,
-    fixingFloor: sheet.fixingFloor,
     workOk: sheet.workOk,
     siteOk: sheet.siteOk,
     engineerName: sheet.engineerName.trim(),
