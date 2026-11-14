@@ -37,7 +37,7 @@ async function ModuleGate({ params }: { params: Promise<{ id: string }> }) {
           This part of Jordan Pulse is not open yet. Pulse People is the module you can use today.
         </p>
         <Link
-          href="/dashboard"
+          href="/people"
           className="mt-8 inline-flex min-h-11 w-fit items-center rounded-full bg-red px-5 font-semibold text-white"
         >
           Open Pulse People

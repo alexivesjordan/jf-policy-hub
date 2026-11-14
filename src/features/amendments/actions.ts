@@ -46,7 +46,7 @@ export async function suggestAmendment(_prev: ActionState, formData: FormData): 
   const result = data as AgentResult;
   await dispatchNotificationEmails(result);
   revalidatePath("/amendments");
-  revalidatePath("/dashboard");
+  revalidatePath("/people");
   revalidatePath("/notifications");
   revalidatePath(`/policies/${policyId}`);
 
@@ -81,7 +81,7 @@ export async function reviewAmendment(_prev: ActionState, formData: FormData): P
   await dispatchNotificationEmails(result);
   revalidatePath("/amendments");
   revalidatePath(`/amendments/${id}`);
-  revalidatePath("/dashboard");
+  revalidatePath("/people");
   revalidatePath("/notifications");
   if (result.policy_id) {
     revalidatePath(`/policies/${result.policy_id}`);

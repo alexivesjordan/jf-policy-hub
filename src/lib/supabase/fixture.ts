@@ -199,6 +199,26 @@ function tables(): Record<string, Record<string, unknown>[]> {
     policy_versions: [],
     amendments: [],
     notifications: [],
+    calendar_entries: [
+      {
+        id: "cal-leave",
+        entry_type: "annual_leave",
+        profile_id: USER_ID,
+        starts_on: "2026-11-16",
+        ends_on: "2026-11-18",
+        notes: "Annual leave",
+        request_status: "confirmed",
+      },
+      {
+        id: "cal-event",
+        entry_type: "company_event",
+        profile_id: null,
+        starts_on: "2026-11-20",
+        ends_on: "2026-11-20",
+        notes: "All-hands",
+        request_status: "confirmed",
+      },
+    ],
     audit_log: [],
     module_access: [
       { module_id: "people", enabled: true, profile_id: USER_ID },
@@ -247,6 +267,11 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     };
   }
   if (fn === "install_list_vans" || fn === "install_manage_vans") return [];
+  if (fn === "people_resource_absence") {
+    return [
+      { id: "unavail-1", name: "Lewis", startsOn: "2026-11-12", endsOn: "2026-11-13", reason: "sickness", notes: null },
+    ];
+  }
   if (fn === "sales_pulse") {
     const rep = typeof args?.p_rep === "string" ? args.p_rep : null;
     const admin = process.env.PULSE_FIXTURE_ROLE !== "rep";

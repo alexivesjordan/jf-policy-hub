@@ -16,7 +16,7 @@ export async function markNotificationRead(formData: FormData) {
     .eq("user_id", user.id)
     .is("read_at", null);
   revalidatePath("/notifications");
-  revalidatePath("/dashboard");
+  revalidatePath("/people");
   revalidatePath("/", "layout");
 }
 
@@ -29,6 +29,6 @@ export async function markAllNotificationsRead() {
     .eq("user_id", user.id)
     .is("read_at", null);
   revalidatePath("/notifications");
-  revalidatePath("/dashboard");
+  revalidatePath("/people");
   revalidatePath("/", "layout");
 }

@@ -23,6 +23,12 @@ describe("module nav", () => {
     expect(navItemActive("/sales/quote", "/sales/quote")).toBe(true);
   });
 
+  it("sends People to Overview, Calendar, and Policies", () => {
+    const people = visibleNav(pulseModules.find((module) => module.id === "people")?.nav ?? [], profile, true);
+    expect(people.map((item) => item.label)).toEqual(["Overview", "Calendar", "Policies"]);
+    expect(people.map((item) => item.href)).toEqual(["/people", "/people/calendar", "/policies"]);
+  });
+
   it("keeps Quotes as a parent over the existing quote pages", () => {
     const sales = visibleNav(pulseModules.find((module) => module.id === "sales")?.nav ?? [], profile, false);
     expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Quotes"]);

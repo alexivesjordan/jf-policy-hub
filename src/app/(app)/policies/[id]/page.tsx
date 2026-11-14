@@ -4,7 +4,7 @@ import { DiffView } from "@/components/diff-view";
 import { PolicyContent } from "@/components/policy-content";
 import { Banner, Badge, Card, TextLink } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
-import { getPolicy, listPolicyAudit, listVersions } from "@/features/policies/queries";
+import { getPolicy, listPolicyAmendments, listPolicyAudit, listVersions } from "@/features/policies/queries";
 import { requireUser } from "@/lib/auth";
 import { actorName, displayName, formatDate, formatTimestamp, needsDocument, statusLabel } from "@/lib/format";
 import { oneParam } from "@/lib/utils";
@@ -32,7 +32,12 @@ export default async function PolicyPage({
   const { id } = await params;
   const query = await searchParams;
   const uploaded = oneParam(query.uploaded);
-  const [policy, versions, audit] = await Promise.all([getPolicy(id), listVersions(id), listPolicyAudit(id)]);
+  const [policy, versions, audit, suggestions] = await Promise.all([
+    getPolicy(id),
+    listVersions(id),
+    listPolicyAudit(id),
+    listPolicyAmendments(id),
+  ]);
   const empty = needsDocument(policy);
   const previous = versions[1];
   const latest = versions[0];
@@ -162,6 +167,24 @@ export default async function PolicyPage({
             rightLabel={`Version ${latest.version_number}`}
           />
         </section>
+      ) : null}
+
+      {suggestions.length > 0 ? (
+        <Card>
+          <h2 className="font-display text-2xl">Suggestions</h2>
+          <ul className="mt-4 space-y-3">
+            {suggestions.map((item) => (
+              <li key={item.id}>
+                <Link href={`/amendments/${item.id}`} className="font-semibold text-ink underline decoration-red underline-offset-2">
+                  {item.summary}
+                </Link>
+                <p className="text-sm text-ink/70">
+                  {statusLabel(item.status)} · {formatTimestamp(item.created_at)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       <Card>
