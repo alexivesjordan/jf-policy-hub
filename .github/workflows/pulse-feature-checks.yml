@@ -5,6 +5,8 @@ on:
     paths:
       - "src/features/logistics/**"
       - "src/features/radar/**"
+      - "scripts/radar-collector.ts"
+      - "Dockerfile.radar"
       - "src/components/logistics/**"
       - "src/components/radar/**"
       - "src/app/api/logistics/**"
