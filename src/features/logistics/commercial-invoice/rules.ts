@@ -48,8 +48,8 @@ export type InvoiceDraft = {
   frenchVatNumber: string;
   frenchFiscalRepresentativeVat: string;
   ddpModel: EuropaDdpModel;
-  carrier: "Europa";
-  entryCountry: "FR";
+  carrier: "Europa" | "FedEx" | "Collection" | "Other";
+  entryCountry: string;
   clearanceCountry: string;
   destinationCountry: string;
   incoterm: string;
@@ -103,7 +103,7 @@ export function mergeInvoiceOrders(orders: InvoiceOrder[], seller: InvoiceParty)
     orders: orders.map(o => o.orderNumber), seller,
     buyer: { ...first.buyer }, consignee: { ...first.consignee }, importer: blankParty(),
     frenchVatNumber: "", frenchFiscalRepresentativeVat: "",
-    ddpModel: "unspecified", carrier: "Europa", entryCountry: "FR",
+    ddpModel: "not_applicable", carrier: "Other", entryCountry: "",
     clearanceCountry: "", destinationCountry: first.country,
     incoterm: "", namedPlace: "", procedure: "unconfirmed",
     approvedStatement: "", statementApprovedBy: "",
@@ -129,32 +129,36 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   required(d.reference,"Document reference");
   if (!/^[A-Z]{3}$/.test(d.currency)) errors.push("Select a three-letter invoice currency.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.issueDate) || Number.isNaN(Date.parse(d.issueDate))) errors.push("Issue date is invalid.");
-  for (const [label,party] of [["Seller",d.seller],["Buyer",d.buyer],["Consignee",d.consignee],["Importer",d.importer]] as const) {
+  for (const [label,party] of [["Seller",d.seller],["Buyer",d.buyer],["Consignee",d.consignee]] as const) {
     required(party.name,label + " name");
     required(party.address,label + " address");
   }
   required(d.seller.eori,"Seller EORI");
   required(d.seller.vat,"Seller VAT");
-  required(d.importer.eori,"Importer EORI");
   required(d.destinationCountry,"Final destination country");
-  required(d.clearanceCountry,"Customs clearance country");
+  if (d.incoterm === "DDP") {
+    required(d.importer.name,"Importer name");
+    required(d.importer.address,"Importer address");
+    required(d.importer.eori,"Importer EORI");
+    required(d.clearanceCountry,"Customs clearance country");
+  }
   if (!/^[A-Z]{2}$/.test(d.destinationCountry)) errors.push("Final destination country must be a 2-letter ISO code.");
-  if (!/^[A-Z]{2}$/.test(d.clearanceCountry)) errors.push("Clearance country must be a 2-letter ISO code.");
+  if (d.clearanceCountry && !/^[A-Z]{2}$/.test(d.clearanceCountry)) errors.push("Clearance country must be a 2-letter ISO code.");
   if (!["DDP","DAP","EXW","FCA","CPT","CIP","DPU","FOB","FAS","CFR","CIF"].includes(d.incoterm)) errors.push("Select a valid Incoterm.");
   required(d.namedPlace,"Incoterm named place");
   if (d.incoterm === "DDP") {
-    if (d.ddpModel === "unspecified" || d.ddpModel === "not_applicable")
-      errors.push("Choose Europa's confirmed 2026 DDP Flow model.");
-    if (d.ddpModel === "own_french_vat") {
+    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "unspecified")
+      errors.push("Choose Europa's confirmed DDP Flow model for French clearance.");
+    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "own_french_vat") {
       required(d.frenchVatNumber,"Jordan French VAT number");
       if (d.importer.name !== d.seller.name) errors.push("Verify Jordan is named as importer of record for the own-French-VAT model.");
     }
-    if (d.ddpModel === "importers_signature") {
+    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "importers_signature") {
       required(d.importer.vat,"Importer VAT number");
       if (d.importer.name === d.seller.name) errors.push("The importer-signature model needs the confirmed EU importer, not Jordan.");
     }
   }
-  if (d.procedure === "unconfirmed") errors.push("Customs procedure must be confirmed against Europa's shipment arrangements.");
+  if (d.incoterm === "DDP" && d.procedure === "unconfirmed") errors.push("DDP customs procedure must be confirmed against carrier/broker documents.");
   if (d.procedure === "42") {
     if (d.clearanceCountry !== "FR") errors.push("This workflow only supports Procedure 42 with verified French import clearance.");
     if (d.destinationCountry === "FR" || !eu.has(d.destinationCountry)) errors.push("Procedure 42 requires a different EU destination from France.");
