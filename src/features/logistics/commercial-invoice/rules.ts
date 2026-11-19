@@ -39,6 +39,7 @@ export type InvoiceOrder = {
 export type InvoiceDraft = {
   reference: string;
   issueDate: string;
+  currency: string;
   orders: string[];
   seller: InvoiceParty;
   buyer: InvoiceParty;
@@ -98,7 +99,7 @@ export function mergeInvoiceOrders(orders: InvoiceOrder[], seller: InvoiceParty)
   const lines = orders.flatMap(o => o.lines);
   if (!lines.length || lines.length > 200) throw new Error("One invoice must contain 1 to 200 goods lines.");
   return {
-    reference: "", issueDate: new Date().toISOString().slice(0, 10),
+    reference: "", issueDate: new Date().toISOString().slice(0, 10), currency: first.currency,
     orders: orders.map(o => o.orderNumber), seller,
     buyer: { ...first.buyer }, consignee: { ...first.consignee }, importer: blankParty(),
     frenchVatNumber: "", frenchFiscalRepresentativeVat: "",
@@ -126,6 +127,7 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
     else if (value.length > 1000) errors.push(name + " is too long.");
   };
   required(d.reference,"Document reference");
+  if (!/^[A-Z]{3}$/.test(d.currency)) errors.push("Select a three-letter invoice currency.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.issueDate) || Number.isNaN(Date.parse(d.issueDate))) errors.push("Issue date is invalid.");
   for (const [label,party] of [["Seller",d.seller],["Buyer",d.buyer],["Consignee",d.consignee],["Importer",d.importer]] as const) {
     required(party.name,label + " name");
