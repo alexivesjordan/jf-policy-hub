@@ -1,0 +1,11 @@
+# Radar-only Azure Container Apps job; no Next.js application server is deployed.
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+# tsx is a dev dependency in the existing project; include it for this job.
+RUN npm ci --include=dev --no-audit --no-fund
+COPY scripts/radar-collector.ts scripts/radar-collector.ts
+COPY src/features/radar src/features/radar
+USER node
+CMD ["./node_modules/.bin/tsx", "scripts/radar-collector.ts"]
