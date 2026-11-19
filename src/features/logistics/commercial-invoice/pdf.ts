@@ -4,7 +4,7 @@ import {
   type InvoiceDraft,
 } from "./rules";
 
-const A4 = [595.28, 841.89] as const;
+const A4: [number, number] = [595.28, 841.89];
 const money = (value: number, currency: string) =>
   new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) + " " + currency;
 
