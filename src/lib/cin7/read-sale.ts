@@ -39,30 +39,81 @@ function weightKg(product: Record<string, unknown>) {
   return weight;
 }
 
-function customerAddress(customer: Record<string, unknown> | null) {
+/**
+ * Delivery address for this order.
+ * Sale.ShippingAddress is the address on the sale (Ship to other or a chosen
+ * ship-to). The customer card is used only when that sale address is empty,
+ * and only its DefaultForType shipping address. The first shipping address
+ * and the billing address are not used: on SO-00650 the first customer
+ * shipping address was a historic site, not the delivery address.
+ */
+function deliveryAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+  const onSale = filledAddress(record(sale.ShippingAddress));
+  if (onSale) return onSale;
   const addresses = list(customer?.Addresses);
-  const shipping = addresses.filter((address) => text(address.Type) === "Shipping");
-  const billing = addresses.filter((address) => text(address.Type) === "Billing");
   return (
-    shipping.find((address) => address.DefaultForType === true) ??
-    shipping[0] ??
-    billing.find((address) => address.DefaultForType === true) ??
-    billing[0] ??
+    addresses.find((address) => text(address.Type) === "Shipping" && address.DefaultForType === true) ??
     null
   );
 }
 
+function filledAddress(address: Record<string, unknown> | null) {
+  if (!address) return null;
+  const filled = [text(address.Line1), text(address.Line2), text(address.City), text(address.State), text(address.Postcode)].some(Boolean);
+  return filled ? address : null;
+}
+
 function shippingPostcode(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
-  const raw = text(customerAddress(customer)?.Postcode) ?? text(record(sale.ShippingAddress)?.Postcode);
+  const raw = text(deliveryAddress(customer, sale)?.Postcode);
   return raw ? normaliseUkPostcode(raw) : null;
 }
 
 function addressLines(address: Record<string, unknown> | null) {
   if (!address) return null;
-  const parts = [text(address.Line1), text(address.Line2), text(address.City), text(address.Postcode)].filter(
+  const postcode = text(address.Postcode);
+  const parts = [text(address.Line1), text(address.Line2), text(address.City), text(address.State), postcode ? normaliseUkPostcode(postcode) : null].filter(
     (part): part is string => Boolean(part),
   );
   return parts.length ? parts.join(", ") : null;
+}
+
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+/**
+ * Customer email for the access form, first match wins:
+ * 1. Sale.Email — the customer contact email stored on this order.
+ * 2. Customer.Email — only when a payload has a top-level customer email.
+ * 3. The customer Contacts row whose Name matches sale.Contact, when that row has an email.
+ * 4. The customer's default contact email (Contacts.Default).
+ * On SO-00650, Sale.Email was blank and the contact named on the sale had no email,
+ * so none of these fields held the address. The rep enters it before booking.
+ */
+export function orderContactEmail(sale: Record<string, unknown>, customer: Record<string, unknown> | null) {
+  return (
+    emailValue(sale.Email) ??
+    emailValue(customer?.Email) ??
+    namedContactEmail(customer, text(sale.Contact)) ??
+    defaultContactEmail(customer)
+  );
+}
+
+function emailValue(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const match = raw.match(EMAIL);
+  return match ? match[0] : null;
+}
+
+function namedContactEmail(customer: Record<string, unknown> | null, name: string | null) {
+  if (!name) return null;
+  const wanted = name.toLowerCase();
+  const match = list(customer?.Contacts).find((contact) => text(contact.Name)?.toLowerCase() === wanted);
+  return emailValue(match?.Email);
+}
+
+function defaultContactEmail(customer: Record<string, unknown> | null) {
+  const preferred = list(customer?.Contacts).find((contact) => contact.Default === true);
+  return emailValue(preferred?.Email);
 }
 
 function orderDocument(sale: Record<string, unknown>) {
@@ -94,8 +145,9 @@ function customerOf(body: unknown) {
 }
 
 /**
- * Sale list, one sale, its products, and the customer shipping postcode.
- * Phone, email, and street lines are not copied onto the quote.
+ * Sale list, one sale, its products, and the delivery postcode.
+ * The postcode is sale.ShippingAddress.Postcode. Phone, email, and street
+ * lines are not copied onto the quote.
  */
 export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Promise<Cin7Quote | null> {
   const lookup = orderNumberOrId.trim();
@@ -204,9 +256,9 @@ export async function readCin7BookingDetails(orderNumberOrId: string, get: Cin7G
   const customerId = text(sale.CustomerID);
   const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
   return {
-    siteAddress: addressLines(customerAddress(customer) ?? record(sale.ShippingAddress)),
+    siteAddress: addressLines(deliveryAddress(customer, sale)),
     contactName: text(sale.Contact) ?? text(customer?.Name),
-    contactEmail: text(sale.Email) ?? text(customer?.Email),
+    contactEmail: orderContactEmail(sale, customer),
     contactPhone: text(sale.Phone) ?? text(customer?.Phone),
   };
 }

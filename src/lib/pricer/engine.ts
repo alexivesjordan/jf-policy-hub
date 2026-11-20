@@ -1,6 +1,7 @@
 import { deriveJobRequirements, type JobRequirements } from "@/lib/pulse/requirements";
 import { compareStays, driverCheck, evaluateCrewPlans, type QuoteBreakdown } from "@/lib/pricer/breakdown";
 import { loadBundledEffortTable, type EffortRow } from "@/lib/pricer/effort-table";
+import { ELITE_CARDIO_HQ, isEliteCardio } from "@/lib/pricer/elite-cardio";
 import { matchesPinLoadedRule } from "@/lib/pricer/strength-rule";
 import {
   BEST_CASE_NOTICE,
@@ -306,6 +307,39 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
       row,
     };
   }
+  if (isEliteCardio(sku, line.productName)) {
+    const bySku = sku ? table.find((row) => row.sku === sku) : undefined;
+    const overridden = bySku?.status === "confirmed" && bySku.buildLocation !== "hq";
+    if (!overridden) {
+      const base = bySku ?? defaultRow(line.productName, line.category?.trim() || "cardio", {
+        category: "cardio",
+        buildCrew: ELITE_CARDIO_HQ.hqBuildCrew,
+        buildMinutes: ELITE_CARDIO_HQ.hqBuildMinutes,
+        note: "Built at HQ and shipped assembled.",
+      });
+      return {
+        productName: line.productName,
+        qty: line.qty,
+        match: bySku ? "exact" : "category_default",
+        category: base.category || "cardio",
+        provisional: false,
+        note: "Built at HQ and shipped assembled. On site: placement only.",
+        row: {
+          ...base,
+          sku: sku || base.sku,
+          productName: line.productName,
+          buildLocation: "hq",
+          needsAssembly: true,
+          buildMinutes: null,
+          buildCrew: null,
+          hqBuildMinutes: bySku?.status === "confirmed" ? (bySku.hqBuildMinutes ?? ELITE_CARDIO_HQ.hqBuildMinutes) : ELITE_CARDIO_HQ.hqBuildMinutes,
+          hqBuildCrew: bySku?.status === "confirmed" ? (bySku.hqBuildCrew ?? ELITE_CARDIO_HQ.hqBuildCrew) : ELITE_CARDIO_HQ.hqBuildCrew,
+          sitePositionMinutes: bySku?.sitePositionMinutes ?? ELITE_CARDIO_HQ.sitePositionMinutes,
+        },
+      };
+    }
+  }
+
   if (sku) {
     const bySku = table.find((row) => row.sku === sku);
     if (bySku) {

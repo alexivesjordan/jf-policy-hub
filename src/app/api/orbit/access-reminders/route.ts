@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     if (!due) continue;
     const result = await issueInstallAccess(
       { id: install.id, contactEmail: install.email, endOn: String(install.endOn).slice(0, 10) },
-      { rotate: false },
+      { rotate: false, reminder: true },
     );
     if (result.status === "failed") continue;
     await admin.rpc("install_mark_reminder_sent", { p_install: install.id, p_day: today });

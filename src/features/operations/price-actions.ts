@@ -94,6 +94,7 @@ export type PricedQuote = ReturnType<typeof forSales> & {
   marginFloorConfigured?: boolean;
   flags?: string[];
   service?: ServiceQuoteView | null;
+  contactEmail?: string | null;
   provisionalItems?: string[];
   bigInstallTriggers?: string[];
 };
@@ -133,8 +134,8 @@ async function effortTableFor(lines: { sku: string }[]) {
     suggestion_rule?: string | null;
     status?: string | null;
     effort_unit?: "each" | "tile" | "m2" | null;
-  }[]).map((row) =>
-    effortRowForSku({
+  }[]).map((row) => ({
+    ...effortRowForSku({
       sku: row.sku,
       productName: row.product_name,
       category: row.cin7_category,
@@ -149,7 +150,8 @@ async function effortTableFor(lines: { sku: string }[]) {
       workPhase: row.suggestion_rule === "sled-track" ? "sled" : row.effort_unit === "tile" || row.effort_unit === "m2" ? "floor" : "job",
       needsReview: row.status === "suggested" || Boolean(row.suggestion_rule),
     }),
-  );
+    status: row.status === "confirmed" ? "confirmed" as const : "suggested" as const,
+  }));
   return [...rows, ...bundled];
 }
 
@@ -467,8 +469,11 @@ async function rememberInstallQuote(
   result: { breakdown: QuoteBreakdown | null; flags: string[]; customerPrice: number | null; requirements: { installers: number; licensedDrivers: number; vanSize: string; vanCount: number; stairClimber: boolean } | null },
   service: ServiceQuoteView | null,
 ) {
-  if (result.customerPrice == null || !result.requirements || !result.breakdown) return null;
   const contact = draft.source === "cin7" ? await loadCin7BookingDetails(draft.quoteNumber) : null;
+  const contactEmail = contact?.contactEmail?.trim() || null;
+  if (result.customerPrice == null || !result.requirements || !result.breakdown) {
+    return { id: null, contactEmail };
+  }
   const span = jobSpanDays(result.breakdown.days, result.breakdown.hq?.personHours ?? 0, result.requirements.installers);
   const site = service?.prices[0]?.prices;
   const supabase = await createClient();
@@ -481,7 +486,7 @@ async function rememberInstallQuote(
       postcode: draft.postcode || null,
       siteAddress: contact?.siteAddress ?? (draft.postcode || null),
       contactName: contact?.contactName ?? null,
-      contactEmail: contact?.contactEmail ?? null,
+      contactEmail,
       contactPhone: contact?.contactPhone ?? null,
       cin7SaleId: draft.saleId || null,
       cin7CustomerId: draft.customerId || null,
@@ -513,7 +518,7 @@ async function rememberInstallQuote(
       })),
     },
   });
-  return typeof saved.data === "string" ? saved.data : null;
+  return { id: typeof saved.data === "string" ? saved.data : null, contactEmail };
 }
 
 function quoteInputs(draft: QuoteDraft, result: { breakdown: unknown; flags: string[]; notice: string | null; customerPrice: number | null; segment: string | null; markup: number | null }) {
@@ -670,11 +675,12 @@ export async function priceReviewedQuote(_state: ActionState, formData: FormData
       }
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
-    const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const saved = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const savedQuoteId = saved?.id ?? null;
     return {
       ok: !result.blockedReason,
       message: result.blockedReason ?? (service ? "Install and service prices are ready." : "Best-case price ready. Create the job when you want it booked."),
-      quote: { ...view, service, savedQuoteId: savedQuoteId ?? undefined },
+      quote: { ...view, service, savedQuoteId: savedQuoteId ?? undefined, contactEmail: saved?.contactEmail ?? null },
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Could not price that quote." };
@@ -735,7 +741,8 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       }
     }
     const service = formData.get("alsoService") === "yes" ? await priceIngestedService(serviceIngest(draft)) : null;
-    const savedQuoteId = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const saved = result.blockedReason ? null : await rememberInstallQuote(draft, result, service);
+    const savedQuoteId = saved?.id ?? null;
     const readyMessage = result.blockedReason ?? (service ? "Install and service prices are ready." : "Install price ready.");
     const priced = salesOrderActionResult({
       ok: !result.blockedReason,
@@ -746,6 +753,8 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       postcode: view.postcode,
       customerPrice: view.customerPrice,
       savedQuoteId: savedQuoteId ?? undefined,
+      contactEmail: saved?.contactEmail ?? null,
+      missingCin7Email: draft.source === "cin7" && !saved?.contactEmail,
       service,
     });
     if (String(formData.get("mode") ?? "") !== "subcontractor") return priced;

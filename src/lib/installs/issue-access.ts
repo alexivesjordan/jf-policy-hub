@@ -1,6 +1,7 @@
 import "server-only";
 
 import { deliverPulseEmail } from "@/lib/email/deliver";
+import { accessFormLetter, accessFormSubject } from "@/lib/installs/access-email";
 import { closedInstallMessage } from "@/lib/installs/access-auth";
 import { siteUrl } from "@/lib/site-url";
 import { createTokenLink } from "@/lib/pulse/tokens";
@@ -13,15 +14,13 @@ export type AccessIssueResult = {
   path: string | null;
 };
 
-const SUBJECT = "Site access for your Jordan Fitness install";
-
 function accessUrl(path: string) {
   return `${siteUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export async function issueInstallAccess(
   install: { id: string; contactEmail?: string | null; endOn?: string | null },
-  options: { rotate?: boolean } = {},
+  options: { rotate?: boolean; reminder?: boolean } = {},
 ): Promise<AccessIssueResult> {
   const rotate = options.rotate !== false;
   const admin = createAdminClient();
@@ -52,7 +51,7 @@ export async function issueInstallAccess(
   if (!email) {
     await admin.rpc("email_record", {
       p_to: "missing",
-      p_subject: SUBJECT,
+      p_subject: accessFormSubject(false),
       p_template: "access_form",
       p_install: install.id,
       p_provider_id: null,
@@ -66,15 +65,27 @@ export async function issueInstallAccess(
   }
 
   const url = accessUrl(path);
+  const context = await accessEmailContext(admin, install.id);
+  const letter = accessFormLetter({
+    contactName: context?.contactName,
+    orderNumber: context?.orderNumber,
+    postcode: context?.postcode,
+    siteAddress: context?.siteAddress,
+    repName: context?.repName,
+    repEmail: context?.repEmail,
+    url,
+    reminder: options.reminder === true,
+  });
   const result = await deliverPulseEmail({
     to: email,
-    subject: SUBJECT,
+    subject: letter.subject,
     template: "access_form",
     installId: install.id,
     tokenLinkId,
     accessPath: path,
-    text: `Tell us about access for your install: ${url}`,
-    html: `<p>Tell us about access for your install.</p><p><a href="${url}">${url}</a></p>`,
+    replyTo: letter.replyTo,
+    text: letter.text,
+    html: letter.html,
   });
   const delivered = result.status === "sent" || result.status === "redirected";
   await admin.rpc("install_mark_access_sent", {
@@ -90,6 +101,21 @@ export async function refusedClosedInstall(client: unknown, installId: string) {
   const gate = await (client as { rpc: (fn: string, args: { p_id: string }) => Promise<{ error: { message?: string } | null }> }).rpc("install_assert_linkable", { p_id: installId });
   if (!gate.error) return null;
   return closedInstallMessage(statusFromGate(gate.error.message));
+}
+
+type AccessEmailContext = {
+  contactName?: string | null;
+  orderNumber?: string | null;
+  postcode?: string | null;
+  siteAddress?: string | null;
+  repName?: string | null;
+  repEmail?: string | null;
+};
+
+async function accessEmailContext(admin: NonNullable<ReturnType<typeof createAdminClient>>, installId: string) {
+  const loaded = await admin.rpc("install_access_email_context", { p_install: installId });
+  if (loaded.error || !loaded.data || typeof loaded.data !== "object") return null;
+  return loaded.data as AccessEmailContext;
 }
 
 function statusFromGate(message: string | undefined) {

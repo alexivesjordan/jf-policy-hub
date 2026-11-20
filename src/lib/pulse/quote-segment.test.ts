@@ -94,5 +94,31 @@ describe("install quote segment", () => {
     assert.equal(json.includes("4743.62"), true);
     assert.equal(json.includes("quote-1"), true);
     assert.equal(result.needsSegment, false);
+    assert.equal(result.quote?.contactEmail, null);
+  });
+
+  it("keeps a customer email on the quote result and leaves a blank one empty", () => {
+    const withEmail = salesOrderActionResult({
+      ok: true,
+      message: "Install price ready.",
+      needsSegment: false,
+      quoteNumber: "SO-00650",
+      customerName: "Example Sports Centre",
+      postcode: "PE30 4JJ",
+      customerPrice: 100,
+      contactEmail: " alex.example@example.com ",
+    });
+    assert.equal(withEmail.quote?.contactEmail, "alex.example@example.com");
+    const missing = salesOrderActionResult({
+      ok: true,
+      message: "Install price ready.",
+      needsSegment: false,
+      quoteNumber: "SO-00650",
+      customerName: "Example Sports Centre",
+      postcode: "PE30 4JJ",
+      customerPrice: 100,
+      contactEmail: "  ",
+    });
+    assert.equal(missing.quote?.contactEmail, null);
   });
 });

@@ -604,8 +604,12 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         version_label: "v1-original",
         lines: [
           { label: "Additional installer time, within agreed hours", rate: 30, unit: "per installer per hour" },
+          { label: "Additional installer time, outside agreed hours", rate: 45, unit: "per installer per hour" },
+          { label: "Site survey (where required)", rate: 250, mileage: 0.5, unit: "flat plus per mile" },
           { label: "Materials and consumables", basis: "cost_plus_25" },
+          { label: "Abortive visit (site not ready, access refused, no signatory)", rate: 300, mileage: 0.5, unit: "per crew day plus per mile" },
           { label: "Equipment movement beyond the agreed floor plan", basis: "additional_installer_time" },
+          { label: "Waste removal beyond packaging", rate: 45, unit: "per collection" },
           { label: "Parking, permits, congestion fees (clause 8)", basis: "at_cost" },
         ],
       },
@@ -616,6 +620,22 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   }
   if (fn === "orbit_register_file") return "22222222-2222-4222-8222-222222222222";
   if (fn === "install_save_access") return { ok: true };
+  if (fn === "install_prepare_quote_email") {
+    const given = String(args?.p_email ?? "").trim().toLowerCase();
+    if (given && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(given)) throw new Error("app: Enter an email address.");
+    return given || null;
+  }
+  if (fn === "install_access_email_context") {
+    return {
+      contactName: "Alex Example",
+      customerName: "Example Sports Centre",
+      orderNumber: "SO-00650",
+      siteAddress: "Unit 1, Example Road, King's Lynn, PE30 4JJ",
+      postcode: "PE30 4JJ",
+      repName: "Alex Ives",
+      repEmail: "alex.ives@jordanfitness.com",
+    };
+  }
   if (fn === "install_set_contact_email" || fn === "install_revoke_access_links" || fn === "install_mark_access_sent") return true;
   if (fn === "install_read") {
     const id = String(args?.p_id ?? "");
