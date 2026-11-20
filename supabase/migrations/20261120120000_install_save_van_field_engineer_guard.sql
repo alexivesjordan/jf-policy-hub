@@ -1,10 +1,11 @@
--- Issue #45. Behaviour unchanged. New file only.
+-- Issue #45. New file only. Do not edit earlier migrations.
 -- Replaces public.install_save_van(uuid, text, text, boolean, text, date, date, date, date, text)
--- from 20261114140000_fleet_and_schedule.sql. That function already requires
--- public.workspace_is_admin(), and ops.is_field_engineer() is false for admins,
--- so a field engineer was already refused with the same error. The new check is
--- only the explicit refusal the grant audit expects.
--- Do not edit earlier migrations.
+-- from 20261114140000_fleet_and_schedule.sql.
+-- Who can save a van is unchanged: the function still requires public.workspace_is_admin(),
+-- and ops.is_field_engineer() is false for admins. The field-engineer check is the
+-- explicit refusal the grant audit expects, and it runs before the admin check.
+-- The van.updated audit reads the active flag from the update's returning clause.
+-- The previous body used a bare `active` column inside that perform, which has no from.
 
 create or replace function public.install_save_van(
   p_id uuid,
@@ -31,6 +32,7 @@ declare
   v_notes text := nullif(btrim(coalesce(p_notes, '')), '');
   v_before jsonb;
   v_id uuid := p_id;
+  v_active boolean;
 begin
   if ops.is_field_engineer() then
     raise exception 'app: You cannot change the vans.';
@@ -87,10 +89,10 @@ begin
       service_due = p_service_due,
       notes = v_notes
   where id = p_id
-  returning id into v_id;
+  returning id, active into v_id, v_active;
   perform public.write_access_audit(
     'van.updated', 'van', v_id, v_before,
-    jsonb_build_object('registration', v_reg, 'makeModel', v_model, 'active', coalesce(p_active, active))
+    jsonb_build_object('registration', v_reg, 'makeModel', v_model, 'active', v_active)
   );
   return v_id;
 end;
