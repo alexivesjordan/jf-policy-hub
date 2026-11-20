@@ -53,7 +53,7 @@ export async function loadVisit(installId: string, token: string | null) {
   return visit;
 }
 
-const PHOTO_KINDS = new Set(["concern", "equipment"]);
+const PHOTO_KINDS = new Set(["concern", "equipment", "hq_photo", "vehicle_damage"]);
 
 export async function gateVisitUpload(installId: string, token: string | null, kind: string) {
   if (!PHOTO_KINDS.has(kind)) throw new Error("That photo is not allowed.");

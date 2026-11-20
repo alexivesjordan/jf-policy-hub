@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
+import { JobBriefingView } from "@/components/field/job-briefing";
 import { VisitFlow, type VisitScreen } from "@/components/field/visit-flow";
 import { listActiveVans, mySignature, visitContext } from "@/features/field/queries";
 import { getCurrentProfile } from "@/lib/auth";
@@ -12,7 +13,7 @@ export const metadata = { title: "Job" };
 
 export default function FieldJobPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<FieldFrame title="Job" back={{ href: "/field", label: "Jobs" }}><p className="text-grey">Loading...</p></FieldFrame>}>
+    <Suspense fallback={<FieldFrame title="Job" back={{ href: "/field", label: "My jobs" }}><p className="text-grey">Loading...</p></FieldFrame>}>
       <Job params={params} />
     </Suspense>
   );
@@ -22,7 +23,7 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
   await connection();
   const { id } = await params;
   if (!isSupabaseConfigured() && !isFixtureMode()) {
-    return <FieldFrame title="Job" back={{ href: "/field", label: "Jobs" }}><p>Add the Supabase keys, then open the job again.</p></FieldFrame>;
+    return <FieldFrame title="Job" back={{ href: "/field", label: "My jobs" }}><p>Add the Supabase keys, then open the job again.</p></FieldFrame>;
   }
   const profile = await getCurrentProfile();
   if (!profile) redirect(`/login?next=/field/${id}`);
@@ -37,7 +38,7 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
     problem = error instanceof Error ? error.message : "Could not open that job.";
   }
   if (!visit) {
-    return <FieldFrame title="Job" back={{ href: "/field", label: "Jobs" }}><p>{problem ?? "That job was not found."}</p></FieldFrame>;
+    return <FieldFrame title="Job" back={{ href: "/field", label: "My jobs" }}><p>{problem ?? "That job was not found."}</p></FieldFrame>;
   }
   const signature = visit.submitted ? null : await mySignature().catch(() => null);
   const vans = await listActiveVans();
@@ -60,9 +61,22 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
     signatureUrl: signature?.url ?? null,
     signatureFileId: signature?.fileId ?? null,
   };
+  const showSheet = visit.briefing.started || visit.submitted;
   return (
-    <FieldFrame title={visit.job.orderNumber} back={{ href: "/field", label: "Jobs" }}>
-      <VisitFlow screen={screen} />
+    <FieldFrame title={visit.job.orderNumber} back={{ href: "/field", label: "My jobs" }}>
+      <div className="space-y-8">
+        <JobBriefingView
+          installId={id}
+          orderNumber={visit.job.orderNumber}
+          customerName={visit.job.customerName}
+          siteAddress={visit.job.siteAddress}
+          startOn={visit.job.startOn}
+          endOn={visit.job.endOn}
+          lines={visit.lines}
+          briefing={visit.briefing}
+        />
+        {showSheet ? <VisitFlow screen={screen} /> : null}
+      </div>
     </FieldFrame>
   );
 }

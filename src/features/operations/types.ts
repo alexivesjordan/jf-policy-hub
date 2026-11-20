@@ -160,6 +160,8 @@ export type PulseTask = {
   status: string;
   priority: string;
   due_at: string | null;
+  entity_table?: string | null;
+  entity_id?: string | null;
   assignee_id: string | null;
   created_by: string | null;
   created_at: string;
