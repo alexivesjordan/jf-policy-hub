@@ -948,9 +948,13 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
 export function priceInstall(request: PriceRequest): PriceResult {
   const pricing = request.pricing ?? DEFAULT_PRICING;
   const profile = request.mode === "A" ? BEST_CASE_PROFILE : (request.profile ?? BEST_CASE_PROFILE);
-  const distance = request.miles != null
-    ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
-    : estimateMilesFromKingsLynn(request.postcode);
+  const postcode = (request.postcode ?? "").trim();
+  const missingPostcode = request.miles == null && postcode === "";
+  const distance = missingPostcode
+    ? { miles: null, method: null, speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
+    : request.miles != null
+      ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
+      : estimateMilesFromKingsLynn(postcode);
   const resolved = request.lines.map((line) => applyLineWeight(line, matchLine(line, request.table, request.categoryDefaults ?? [])));
   const review = resolved.filter((line) => line.match === "unknown" || line.row?.reviewFlag === "needs-review");
 
@@ -984,6 +988,10 @@ export function priceInstall(request: PriceRequest): PriceResult {
     breakdown: null,
     variation: null,
   };
+
+  if (missingPostcode || distance.miles == null) {
+    return { ...base, blockedReason: "Enter the postcode.", cost: null, customerPrice: null, miles: null, milesMethod: null };
+  }
 
   if (!request.segment) {
     return { ...base, blockedReason: SEGMENT_NOT_SET };

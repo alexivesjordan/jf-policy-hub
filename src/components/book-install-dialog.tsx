@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button, Field, Input } from "@/components/pulse/ui";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { bookInstall, listInstallStartDates } from "@/features/sales/install-actions";
+import { bookingEmailReady } from "@/lib/installs/booking-email";
 import { isWeekend } from "@/lib/pulse/booking-range";
 import type { WarrantyChoice } from "@/lib/pulse/install-booking";
 import { ukDate } from "@/components/install-sales-view";
@@ -44,8 +45,6 @@ function useWideScreen() {
     () => false,
   );
 }
-
-const CUSTOMER_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function BookInstallDialog({
   quoteId,
@@ -160,7 +159,7 @@ export function BookInstallDialog({
         )}
         {booked ? null : (
           <DialogFooter>
-            <Button type="button" disabled={!start || loading || (!contactEmail && !CUSTOMER_EMAIL.test(email.trim()))} onClick={() => void confirm()}>Confirm booking</Button>
+            <Button type="button" disabled={!start || loading || !bookingEmailReady(contactEmail, email)} onClick={() => void confirm()}>Confirm booking</Button>
           </DialogFooter>
         )}
       </DialogContent>

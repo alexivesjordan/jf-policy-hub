@@ -22,7 +22,8 @@ set needs_assembly = true,
     site_position_minutes = 45,
     suggestion_rule = case when status = 'suggested' then 'elite-cardio' else suggestion_rule end,
     updated_at = now()
-where ops.elite_cardio_item(sku, product_name);
+where ops.elite_cardio_item(sku, product_name)
+  and status <> 'confirmed';
 
 comment on function ops.elite_cardio_item(text, text) is
   'Default HQ profile for Jordan Elite Cardio. A confirmed SKU row can still override it in the pricer.';

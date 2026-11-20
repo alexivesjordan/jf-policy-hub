@@ -47,14 +47,19 @@ function weightKg(product: Record<string, unknown>) {
  * and the billing address are not used: on SO-00650 the first customer
  * shipping address was a historic site, not the delivery address.
  */
-function deliveryAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+export type DeliverySource = "sale" | "default-shipping" | "none";
+
+function deliveryChoice(customer: Record<string, unknown> | null, sale: Record<string, unknown>): { address: Record<string, unknown> | null; source: DeliverySource } {
   const onSale = filledAddress(record(sale.ShippingAddress));
-  if (onSale) return onSale;
+  if (onSale) return { address: onSale, source: "sale" };
   const addresses = list(customer?.Addresses);
-  return (
-    addresses.find((address) => text(address.Type) === "Shipping" && address.DefaultForType === true) ??
-    null
-  );
+  const fallback = addresses.find((address) => text(address.Type) === "Shipping" && address.DefaultForType === true) ?? null;
+  if (fallback) return { address: fallback, source: "default-shipping" };
+  return { address: null, source: "none" };
+}
+
+function deliveryAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+  return deliveryChoice(customer, sale).address;
 }
 
 function filledAddress(address: Record<string, unknown> | null) {
@@ -88,13 +93,22 @@ const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
  * On SO-00650, Sale.Email was blank and the contact named on the sale had no email,
  * so none of these fields held the address. The rep enters it before booking.
  */
+export type EmailSource = "sale" | "customer" | "named-contact" | "default-contact";
+
+export function orderContactEmailChoice(sale: Record<string, unknown>, customer: Record<string, unknown> | null): { email: string; source: EmailSource } | null {
+  const saleEmail = emailValue(sale.Email);
+  if (saleEmail) return { email: saleEmail, source: "sale" };
+  const customerEmail = emailValue(customer?.Email);
+  if (customerEmail) return { email: customerEmail, source: "customer" };
+  const named = namedContactEmail(customer, text(sale.Contact));
+  if (named) return { email: named, source: "named-contact" };
+  const fallback = defaultContactEmail(customer);
+  if (fallback) return { email: fallback, source: "default-contact" };
+  return null;
+}
+
 export function orderContactEmail(sale: Record<string, unknown>, customer: Record<string, unknown> | null) {
-  return (
-    emailValue(sale.Email) ??
-    emailValue(customer?.Email) ??
-    namedContactEmail(customer, text(sale.Contact)) ??
-    defaultContactEmail(customer)
-  );
+  return orderContactEmailChoice(sale, customer)?.email ?? null;
 }
 
 function emailValue(value: unknown) {
@@ -260,6 +274,34 @@ export async function readCin7BookingDetails(orderNumberOrId: string, get: Cin7G
     contactName: text(sale.Contact) ?? text(customer?.Name),
     contactEmail: orderContactEmail(sale, customer),
     contactPhone: text(sale.Phone) ?? text(customer?.Phone),
+  };
+}
+
+/** Chosen delivery address, postcode, and email, with the rung each one came from. */
+export async function readCin7AddressReport(orderNumberOrId: string, get: Cin7Getter) {
+  const lookup = orderNumberOrId.trim();
+  if (!lookup) return null;
+  let sale: Record<string, unknown> | null = null;
+  if (GUID.test(lookup)) {
+    sale = record(await get("sale", { ID: lookup }));
+  } else {
+    if (!ORDER_NUMBER.test(lookup)) return null;
+    const listed = await findSale(lookup, get);
+    const id = listed ? saleId(listed) : null;
+    if (!id) return null;
+    sale = record(await get("sale", { ID: id }));
+  }
+  if (!sale) return null;
+  const customerId = text(sale.CustomerID);
+  const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
+  const chosen = deliveryChoice(customer, sale);
+  const email = orderContactEmailChoice(sale, customer);
+  return {
+    address: addressLines(chosen.address),
+    postcode: chosen.address ? shippingPostcode(customer, sale) : null,
+    addressSource: chosen.source,
+    email: email?.email ?? null,
+    emailSource: email?.source ?? "none",
   };
 }
 
