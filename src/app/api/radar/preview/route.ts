@@ -2,7 +2,6 @@ import { getCurrentProfile } from "@/lib/auth";
 import { canUseSales } from "@/lib/access";
 import { fetchTenderBatch, radarPreview } from "@/features/radar/feed";
 
-export const runtime = "nodejs";
 
 export async function GET() {
   const profile = await getCurrentProfile();
