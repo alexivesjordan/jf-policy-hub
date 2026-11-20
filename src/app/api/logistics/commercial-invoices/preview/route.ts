@@ -4,7 +4,6 @@ import { getCurrentProfile } from "@/lib/auth";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
 import { validateCommercialInvoice } from "@/features/logistics/commercial-invoice/rules";
 
-export const runtime = "nodejs";
 
 const party = z.object({
   name: z.string().max(200),

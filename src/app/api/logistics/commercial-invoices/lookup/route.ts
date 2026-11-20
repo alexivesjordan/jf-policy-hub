@@ -4,7 +4,6 @@ import { getCurrentProfile } from "@/lib/auth";
 import { cin7IsConnected, getCin7Client, loadCin7BookingDetails } from "@/lib/cin7/client";
 import { parseOrderNumbers, type InvoiceOrder, type InvoiceParty } from "@/features/logistics/commercial-invoice/rules";
 
-export const runtime = "nodejs";
 const requestSchema = z.object({ orderNumbers: z.string().min(1).max(500) }).strict();
 
 export async function POST(request: Request) {
