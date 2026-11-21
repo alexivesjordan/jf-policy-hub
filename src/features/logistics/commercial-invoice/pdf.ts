@@ -224,10 +224,21 @@ function instructionParts(shipment: InvoiceShipment) {
   return note ? [note] : [];
 }
 
+function termsColumn() {
+  const signW = CONTENT_W - 150 - 8;
+  return { x: signW / 2, width: signW / 2 - 12 };
+}
+
+function labeledLines(label: string, value: string, font: PDFFont) {
+  const prefix = label.endsWith(" ") ? label : label + " ";
+  const valueWidth = Math.max(24, termsColumn().width - font.widthOfTextAtSize(prefix, 7.5));
+  const lines = wrap(value.trim() || "—", font, 7.5, valueWidth);
+  return { prefix, lines: lines.length ? lines : ["—"] };
+}
+
 function signBlockHeight(origin: string, font: PDFFont) {
-  const width = (CONTENT_W - 150 - 8) / 2 - 16;
-  const originLines = Math.max(1, wrap(origin || "—", font, 7.5, width).length);
-  return Math.max(SIGN_H, 16 + (originLines + 2) * 12 + 10);
+  const lines = labeledLines("Country of Origin:", origin, font).lines.length + 2;
+  return Math.max(SIGN_H, 18 + lines * 12 + 14);
 }
 
 function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
@@ -304,10 +315,16 @@ function takePiece(piece: SummaryPiece, room: number, metrics: SummaryMetrics): 
   if (whole <= room) return { fit: piece, rest: null, height: whole };
   if (piece.kind === "closing") return { fit: null, rest: piece, height: 0 };
   if (piece.kind === "dims") {
-    const header = DIM_HEADER;
-    let rows = Math.floor((room - header) / DIM_LINE);
-    if (piece.from + rows >= piece.to && whole > room) rows = piece.to - piece.from - 1;
+    let rows = Math.min(piece.to - piece.from, Math.floor((room - DIM_HEADER) / DIM_LINE));
+    while (rows > 0) {
+      const end = piece.from + rows;
+      const leavesTotalAlone = piece.to === metrics.dimRows && end === metrics.dimRows - 1;
+      const candidate: SummaryPiece = { kind: "dims", from: piece.from, to: end };
+      if (!leavesTotalAlone && pieceHeight(candidate, metrics) <= room) break;
+      rows -= 1;
+    }
     if (rows < 1) return { fit: null, rest: piece, height: 0 };
+    if (piece.from + rows >= piece.to) return { fit: piece, rest: null, height: whole };
     const fit: SummaryPiece = { kind: "dims", from: piece.from, to: piece.from + rows };
     return { fit, rest: { kind: "dims", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
   }
@@ -699,15 +716,18 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       if (signature) page.drawImage(signature, { x: MARGIN + 58, y: signTop - 28, width: 80, height: 22 });
       underline("Name:", MARGIN + 8, signTop - 40, signW / 2 - 20);
       underline("Date:", MARGIN + 8, signTop - 62, signW / 2 - 20);
-      const origin = originSummary(shippedLines(draft));
       const termsX = MARGIN + signW / 2;
-      const termsW = signW / 2 - 12;
-      const originLines = wrap(origin || "—", regular, 7.5, termsW);
-      text(page, "Country of Origin:", termsX, signTop - 16, 7.5, bold);
-      originLines.forEach((line, index) => text(page, line, termsX, signTop - 28 - index * 10, 7.5, regular));
-      const termsY = signTop - 28 - originLines.length * 10 - 6;
-      text(page, "Country of Export: United Kingdom", termsX, termsY, 7.5, regular);
-      text(page, "Incoterms: " + draft.incoterm, termsX, termsY - 12, 7.5, regular);
+      let termsY = signTop - 18;
+      const drawTerm = (label: string, value: string) => {
+        const { prefix, lines } = labeledLines(label, value, regular);
+        text(page, prefix + lines[0], termsX, termsY, 7.5, regular);
+        const hang = regular.widthOfTextAtSize(prefix, 7.5);
+        lines.slice(1).forEach((line, index) => text(page, line, termsX + hang, termsY - (index + 1) * 12, 7.5, regular));
+        termsY -= lines.length * 12;
+      };
+      drawTerm("Country of Origin:", originSummary(shippedLines(draft)));
+      drawTerm("Country of Export:", "United Kingdom");
+      drawTerm("Incoterms:", draft.incoterm);
       roundBox(page, MARGIN + signW + 8, signTop, stampW, metrics.signH);
       text(page, "Company stamp", MARGIN + signW + 16, signTop - 16, 8, regular, grey);
       if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - metrics.signH + 10, width: stampW - 24, height: 40 });

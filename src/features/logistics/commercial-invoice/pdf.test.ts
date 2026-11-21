@@ -111,7 +111,7 @@ describe("commercial invoice PDF", () => {
     expect(text[0]).toMatch(/Page:\s+1 of 1/);
     expect(text[0]).toMatch(/Goods Net/);
     expect(text[0]).toMatch(/COMMERCIAL INVOICE/);
-    expect(text[0]).toMatch(/Country of Origin:/);
+    expect(text[0]).toMatch(/Country of Origin: China/);
     expect(text[0]).toMatch(/Country of Export: United Kingdom/);
     expect(text[0]).toMatch(/Incoterms: DAP/);
     expect(text[0]).not.toMatch(/Position:/);
@@ -276,6 +276,37 @@ describe("commercial invoice PDF", () => {
     expect(pages.at(-1)).toMatch(/Signed:/);
     expect(pages.at(-1)).toMatch(/Goods Net/);
     expect(pages.slice(0, -1).some((page) => /STATEMENT-END/.test(page))).toBe(false);
+  });
+
+  it("keeps the pallet total with the last pallet row", async () => {
+    const face = await font();
+    for (let pallets = 1; pallets <= 30; pallets += 1) {
+      for (const count of [1, 40, 80, 160]) {
+        const draft = withPallets(draftFor(count), pallets);
+        draft.lines.forEach((line) => { line.productName = "Bench"; });
+        draft.shipment = { ...draft.shipment!, customsStatementId: "custom", customsStatementText: "Cleared for export.\n".repeat(20) };
+        const plan = planCommercialInvoice(draft, face);
+        for (const page of plan) {
+          for (const piece of page.pieces) {
+            if (piece.kind === "dims" && piece.to === pallets + 1) {
+              expect(piece.from, pallets + " pallets, " + count + " lines").toBeLessThanOrEqual(pallets - 1);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("prints a long origin list on the same line as its label", async () => {
+    const codes = ["CN", "ES", "TW", "PL", "DE", "FR", "IT", "NL", "BE", "PT", "SE", "AT"];
+    const draft = draftFor(codes.length);
+    draft.lines.forEach((line, index) => { line.originCountry = codes[index]!; });
+    const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    expect(text).toMatch(/Country of Origin: Austria, Belgium, China/);
+    expect(text).toMatch(/Country of Export: United Kingdom/);
+    expect(text).toMatch(/Incoterms: DAP/);
+    await saveDraft("invoice-origins.pdf", draft);
   });
 
   it("leaves line VAT at 0.00 unless a VAT total was entered", async () => {
