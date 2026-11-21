@@ -1,7 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
-import sharp from "sharp";
 import { degrees, PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { COMMERCIAL_INVOICE_MARKS, COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
@@ -49,6 +48,10 @@ function money(pence: number) {
 
 function kilos(kg: number) {
   return kg.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Kg";
+}
+
+function grossKilos(kg: number) {
+  return kg.toLocaleString("en-GB", { maximumFractionDigits: 2 }) + " Kg";
 }
 
 function currencyName(code: string) {
@@ -193,8 +196,9 @@ export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): Invoi
   return pages;
 }
 
-function roundBox(page: PDFPage, x: number, y: number, w: number, h: number) {
-  const r = 4;
+/** `top` is the PDF y of the top edge. The SVG path is flipped, so it extends downward by `h`. */
+function roundBox(page: PDFPage, x: number, top: number, w: number, h: number) {
+  const r = Math.min(4, h / 2, w / 2);
   const path = [
     `M ${r} 0`,
     `L ${w - r} 0`,
@@ -207,7 +211,7 @@ function roundBox(page: PDFPage, x: number, y: number, w: number, h: number) {
     `Q 0 0 ${r} 0`,
     "Z",
   ].join(" ");
-  page.drawSvgPath(path, { x, y, borderColor: line, borderWidth: 0.6 });
+  page.drawSvgPath(path, { x, y: top, borderColor: line, borderWidth: 0.6 });
 }
 
 async function optionalImage(pdf: PDFDocument, file: string) {
@@ -231,8 +235,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const fontDir = path.join(process.cwd(), "src/features/logistics/commercial-invoice/fonts");
   const regular = await pdf.embedFont(await readFile(path.join(fontDir, "NotoSans-Regular.ttf")), { subset: true });
   const bold = await pdf.embedFont(await readFile(path.join(fontDir, "NotoSans-Bold.ttf")), { subset: true });
-  const logoPng = await sharp(await readFile(path.join(process.cwd(), "public/brand/jordan-fitness.svg"))).png().toBuffer();
-  const logo = await pdf.embedPng(logoPng);
+  const logo = await pdf.embedPng(await readFile(path.join(process.cwd(), "public/brand/jordan-wordmark.png")));
   const signature = await optionalImage(pdf, COMMERCIAL_INVOICE_MARKS.signatureFile);
   const stamp = await optionalImage(pdf, COMMERCIAL_INVOICE_MARKS.stampFile);
   const plan = planCommercialInvoice(draft, regular);
@@ -246,7 +249,13 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const pages = plan.map(() => pdf.addPage(A4));
 
   const text = (page: PDFPage, value: string, x: number, y: number, size: number, font: PDFFont, color = ink, maxWidth?: number) => {
+    if (!value) return;
     page.drawText(value, { x, y, size, font, color, maxWidth });
+  };
+  const aligned = (page: PDFPage, value: string, x: number, y: number, w: number, size: number, font: PDFFont, align: "left" | "right" | "center", color = ink) => {
+    const width = font.widthOfTextAtSize(value, size);
+    const left = align === "right" ? x + w - width - 3 : align === "center" ? x + (w - width) / 2 : x + 3;
+    text(page, value, left, y, size, font, color);
   };
 
   const footer = (page: PDFPage, index: number) => {
@@ -259,14 +268,17 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   };
 
   const tableHeader = (page: PDFPage, y: number) => {
-    roundBox(page, MARGIN, y - 22, CONTENT_W, 26);
-    let x = MARGIN + 3;
-    for (const column of COLS) {
-      const lines = wrap(column.label, bold, 6.5, column.w - 4);
-      lines.forEach((part, index) => text(page, part, x, y - index * 8, 6.5, bold));
-      x += column.w;
-    }
-    return y - 28;
+    const headerLines = COLS.map((column) => wrap(column.label, bold, 6.5, column.w - 6));
+    const rowsHigh = Math.max(...headerLines.map((lines) => lines.length));
+    const top = y + 4;
+    const height = 8 + rowsHigh * 8 + 4;
+    roundBox(page, MARGIN, top, CONTENT_W, height);
+    let x = MARGIN;
+    headerLines.forEach((lines, index) => {
+      lines.forEach((part, lineNo) => aligned(page, part, x, top - 12 - lineNo * 8, COLS[index]!.w, 6.5, bold, "center"));
+      x += COLS[index]!.w;
+    });
+    return top - height - 4;
   };
 
   const drawRows = (page: PDFPage, y: number, from: number, to: number) => {
@@ -276,22 +288,24 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       const top = y - 9;
       text(page, row.line.sku, x, top, 7, regular, ink, COLS[0].w - 4);
       row.description.forEach((part, lineNo) => text(page, part, x + COLS[0].w, top - lineNo * 9, 7, regular, ink, COLS[1].w - 4));
-      const values = [
-        row.line.orderNumber,
-        normaliseHsCode(row.line.hsCode) ?? row.line.hsCode,
-        money(chargedLinePence(row.line)),
-        money(0),
-        kilos(lineWeightKg(row.line)),
-        row.line.shippedQuantity.toFixed(2),
+      const numeric: [string, "left" | "right" | "center"][] = [
+        [row.line.orderNumber, "right"],
+        [normaliseHsCode(row.line.hsCode) ?? row.line.hsCode, "right"],
+        [money(chargedLinePence(row.line)), "right"],
+        [money(0), "right"],
+        [kilos(lineWeightKg(row.line)), "right"],
+        [row.line.shippedQuantity.toFixed(2), "center"],
       ];
       let cursor = x + COLS[0].w + COLS[1].w;
-      values.forEach((value, valueIndex) => {
-        text(page, value, cursor, top, 7, regular, ink, COLS[valueIndex + 2].w - 3);
-        cursor += COLS[valueIndex + 2].w;
+      numeric.forEach(([value, align], valueIndex) => {
+        aligned(page, value, cursor, top, COLS[valueIndex + 2]!.w, 7, regular, align);
+        cursor += COLS[valueIndex + 2]!.w;
       });
-      row.origin.forEach((part, lineNo) => text(page, part, cursor, top - lineNo * 9, 7, regular, ink, COLS[8].w - 4));
-      const price = "Item Price: " + money(row.line.shippedQuantity > 0 ? Math.round(chargedLinePence(row.line) / row.line.shippedQuantity) : 0);
-      text(page, price, A4[0] - MARGIN - regular.widthOfTextAtSize(price, 6.5) - 4, y - row.height + 4, 6.5, regular, grey);
+      row.origin.forEach((part, lineNo) => aligned(page, part, cursor, top - lineNo * 9, COLS[8].w, 7, regular, "center"));
+      const unitPence = row.line.shippedQuantity > 0 ? Math.round(chargedLinePence(row.line) / row.line.shippedQuantity) : 0;
+      const price = "Item Price: " + money(unitPence);
+      const totalX = MARGIN + COLS[0].w + COLS[1].w + COLS[2].w + COLS[3].w;
+      aligned(page, price, totalX - 36, y - row.height + 3, COLS[4].w + 36, 6.5, regular, "right", grey);
       page.drawLine({ start: { x: MARGIN, y: y - row.height }, end: { x: A4[0] - MARGIN, y: y - row.height }, thickness: 0.4, color: line });
       y -= row.height;
     }
@@ -309,45 +323,54 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       "EORI number: " + COMMERCIAL_INVOICE_SELLER.eoriGb + " & " + COMMERCIAL_INVOICE_SELLER.eoriFr,
     ];
     address.forEach((part, index) => text(page, part, MARGIN, y - 14 - index * 10, 8, regular));
-    page.drawImage(logo, { x: A4[0] - MARGIN - 150, y: y - 18, width: 150, height: 28 });
-    const boxTop = y - 128;
-    const boxH = 108;
+    const logoW = 150;
+    const logoH = logoW * (logo.height / logo.width);
+    page.drawImage(logo, { x: A4[0] - MARGIN - logoW, y: y - logoH + 14, width: logoW, height: logoH });
+    const boxTop = y - 132;
     const gap = 8;
-    const rightW = 168;
+    const rightW = 176;
     const leftW = (CONTENT_W - rightW - gap * 2) / 2;
+    const customer = [
+      draft.buyer.name,
+      ...draft.buyer.address.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
+      draft.buyer.vat ? "VAT No: " + draft.buyer.vat : "",
+      draft.buyer.eori ? "EORI No: " + draft.buyer.eori : "",
+    ].filter(Boolean);
+    const delivery = [
+      shipment.fao ? "FAO " + shipment.fao : "",
+      ...shipment.deliveryAddress.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
+    ].filter(Boolean);
+    const invoiceBand = 26;
+    const boxH = Math.max(118, 30 + Math.max(customer.length, delivery.length) * 10);
     const boxes: [number, number, string, string[]][] = [
-      [MARGIN, leftW, "Customer Name & Address", [
-        draft.buyer.name,
-        ...draft.buyer.address.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
-        draft.buyer.vat ? "VAT No: " + draft.buyer.vat : "VAT No:",
-        draft.buyer.eori ? "EORI No: " + draft.buyer.eori : "",
-      ].filter(Boolean)],
-      [MARGIN + leftW + gap, leftW, "Delivery Address", [
-        shipment.fao ? "FAO " + shipment.fao : "",
-        ...shipment.deliveryAddress.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
-      ].filter(Boolean)],
+      [MARGIN, leftW, "Customer Name & Address", customer],
+      [MARGIN + leftW + gap, leftW, "Delivery Address", delivery],
     ];
     for (const [x, w, title, body] of boxes) {
-      roundBox(page, x, boxTop - boxH, w, boxH);
-      text(page, title, x + 6, boxTop - 14, 8, bold);
-      body.slice(0, 8).forEach((part, index) => text(page, part, x + 6, boxTop - 28 - index * 9, 7.5, regular, ink, w - 12));
+      roundBox(page, x, boxTop, w, boxH);
+      text(page, title, x + 8, boxTop - 16, 8, bold);
+      body.slice(0, 8).forEach((part, index) => text(page, part, x + 8, boxTop - 30 - index * 10, 7.5, regular, ink, w - 16));
     }
     const rx = A4[0] - MARGIN - rightW;
-    roundBox(page, rx, boxTop - boxH, rightW, boxH);
-    text(page, "COMMERCIAL INVOICE", rx + 8, boxTop - 14, 8, bold);
+    roundBox(page, rx, boxTop, rightW, boxH);
+    const title = "COMMERCIAL INVOICE";
+    text(page, title, rx + (rightW - bold.widthOfTextAtSize(title, 8)) / 2, boxTop - 16, 8, bold);
+    page.drawLine({ start: { x: rx, y: boxTop - 22 }, end: { x: rx + rightW, y: boxTop - 22 }, thickness: 0.6, color: line });
     const meta: [string, string][] = [
       ["FAO:", shipment.fao],
       ["Courier:", shipment.courier],
       ["Despatch Date:", dmy(shipment.despatchDate)],
     ];
     meta.forEach(([label, value], index) => {
-      text(page, label, rx + 8, boxTop - 32 - index * 14, 8, bold);
-      text(page, value, rx + 78, boxTop - 32 - index * 14, 8, regular, ink, rightW - 86);
+      const rowY = boxTop - 38 - index * 14;
+      text(page, label, rx + 8, rowY, 8, bold);
+      aligned(page, value, rx, rowY, rightW, 8, regular, "right");
     });
-    page.drawLine({ start: { x: rx, y: boxTop - 78 }, end: { x: rx + rightW, y: boxTop - 78 }, thickness: 0.6, color: line });
-    text(page, "Invoice No:", rx + 8, boxTop - 94, 8, bold);
-    text(page, preview ? "PREVIEW" : draft.reference, rx + 70, boxTop - 94, 8, regular);
-    return boxTop - boxH - 16;
+    const split = boxTop - boxH + invoiceBand;
+    page.drawLine({ start: { x: rx, y: split }, end: { x: rx + rightW, y: split }, thickness: 0.6, color: line });
+    text(page, "Invoice No:", rx + 8, split - 16, 8, bold);
+    aligned(page, preview ? "PREVIEW" : draft.reference, rx, split - 16, rightW, 8, regular, "right");
+    return boxTop - boxH - 14;
   };
 
   const summary = (page: PDFPage, y: number) => {
@@ -371,59 +394,68 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       cursor -= 6;
     }
     const boxW = (CONTENT_W - 16) / 3;
-    const boxH = 108;
-    const boxY = Math.max(BOTTOM + 8, cursor - boxH);
     const instructions = [
       "Country of origin: " + origins,
       "Country of export: United Kingdom",
       "Incoterms: " + draft.incoterm,
-      shipment.contactName ? "Contact: " + shipment.contactName : "Contact:",
-      shipment.contactEmail ? "Email: " + shipment.contactEmail : "Email:",
+      shipment.contactName ? "Contact: " + shipment.contactName : "",
+      shipment.contactEmail ? "Email: " + shipment.contactEmail : "",
       shipment.specialInstructions,
     ].filter(Boolean);
-    const blocks: [string, string[]][] = [
-      ["Special Instructions", instructions],
-      ["", [
-        "No. of parcels:  " + shipment.parcels.toFixed(2),
-        "No. of pallets:  " + shipment.pallets.toFixed(2),
-        "Total net weight:  " + kilos(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0)),
-        "Total gross weight:  " + kilos(draft.grossWeightKg),
-      ]],
-      ["", [
-        "Goods Net:  " + money(goods),
-        "Delivery:  " + money(shipment.deliveryPence),
-        "Surcharge:  " + money(shipment.surchargePence),
-        "Net:  " + money(net),
-        "VAT:  " + money(shipment.vatPence),
-        "Total:  " + money(total),
-        currencyName(draft.currency),
-      ]],
+    const middle: [string, string][] = [
+      ["No. of parcels:", shipment.parcels.toFixed(2)],
+      ["No. of pallets:", shipment.pallets.toFixed(2)],
+      ["Total net weight:", kilos(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0))],
+      ["Total gross weight:", grossKilos(draft.grossWeightKg)],
     ];
-    blocks.forEach(([title, body], index) => {
-      const x = MARGIN + index * (boxW + 8);
-      roundBox(page, x, boxY, boxW, boxH);
-      let lineY = boxY + boxH - 14;
-      if (title) {
-        text(page, title, x + 6, lineY, 8, bold);
-        lineY -= 14;
-      }
-      body.forEach((part) => {
-        for (const wrapped of wrap(part, regular, 7.5, boxW - 12)) {
-          const font = part.startsWith("Total:") ? bold : regular;
-          text(page, wrapped, x + 6, lineY, 7.5, font, ink, boxW - 12);
-          lineY -= 11;
-        }
+    const totals: [string, string, boolean][] = [
+      ["Goods Net:", money(goods), false],
+      ["Delivery:", money(shipment.deliveryPence), false],
+      ["Surcharge:", money(shipment.surchargePence), false],
+      ["Net:", money(net), false],
+      ["VAT:", money(shipment.vatPence), false],
+      ["Total:", money(total), true],
+    ];
+    const boxH = Math.max(108, 22 + instructions.length * 11 + 12, 16 + middle.length * 14 + 12, 16 + totals.length * 13 + 22);
+    const boxTop = cursor - 6;
+    const labelValue = (x: number, rowY: number, label: string, value: string, strong = false) => {
+      text(page, label, x + 8, rowY, 7.5, strong ? bold : regular);
+      aligned(page, value, x, rowY, boxW, 7.5, strong ? bold : regular, "right");
+    };
+    roundBox(page, MARGIN, boxTop, boxW, boxH);
+    text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
+    instructions.forEach((part, index) => {
+      wrap(part, regular, 7.5, boxW - 16).forEach((wrapped, lineNo) => {
+        text(page, wrapped, MARGIN + 8, boxTop - 30 - index * 11 - lineNo * 9, 7.5, regular, ink, boxW - 16);
       });
     });
-    const signY = boxY - 62;
-    text(page, "Signed:", MARGIN, signY + 36, 8, regular);
-    if (signature) page.drawImage(signature, { x: MARGIN + 42, y: signY + 28, width: 90, height: 28 });
-    text(page, "Name:", MARGIN, signY + 18, 8, regular);
-    text(page, "Position:", MARGIN + 180, signY + 18, 8, regular);
-    text(page, "Date:", MARGIN, signY, 8, regular);
-    roundBox(page, A4[0] - MARGIN - 120, signY - 4, 120, 52);
-    text(page, "Company stamp", A4[0] - MARGIN - 112, signY + 32, 7, regular, grey);
-    if (stamp) page.drawImage(stamp, { x: A4[0] - MARGIN - 112, y: signY, width: 100, height: 40 });
+    const midX = MARGIN + boxW + 8;
+    roundBox(page, midX, boxTop, boxW, boxH);
+    middle.forEach(([label, value], index) => labelValue(midX, boxTop - 18 - index * 16, label, value));
+    const rightX = MARGIN + (boxW + 8) * 2;
+    roundBox(page, rightX, boxTop, boxW, boxH);
+    totals.forEach(([label, value, strong], index) => labelValue(rightX, boxTop - 16 - index * 13, label, value, strong));
+    const currency = currencyName(draft.currency);
+    text(page, currency, rightX + (boxW - regular.widthOfTextAtSize(currency, 7.5)) / 2, boxTop - boxH + 10, 7.5, regular);
+
+    const signTop = boxTop - boxH - 12;
+    const signH = 78;
+    const stampW = 150;
+    const signW = CONTENT_W - stampW - 8;
+    roundBox(page, MARGIN, signTop, signW, signH);
+    const underline = (label: string, x: number, rowY: number, width: number) => {
+      text(page, label, x, rowY, 8, regular);
+      const start = x + regular.widthOfTextAtSize(label, 8) + 6;
+      page.drawLine({ start: { x: start, y: rowY - 1 }, end: { x: x + width, y: rowY - 1 }, thickness: 0.4, color: line });
+    };
+    underline("Signed:", MARGIN + 8, signTop - 18, signW / 2 - 16);
+    if (signature) page.drawImage(signature, { x: MARGIN + 58, y: signTop - 28, width: 80, height: 22 });
+    underline("Name:", MARGIN + 8, signTop - 40, signW / 2 - 20);
+    underline("Position:", MARGIN + signW / 2, signTop - 40, signW / 2 - 16);
+    underline("Date:", MARGIN + 8, signTop - 62, signW / 2 - 20);
+    roundBox(page, MARGIN + signW + 8, signTop, stampW, signH);
+    text(page, "Company stamp", MARGIN + signW + 16, signTop - 16, 8, regular, grey);
+    if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - signH + 10, width: stampW - 24, height: 40 });
   };
 
   pages.forEach((page, index) => {
@@ -438,8 +470,10 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       text(page, title, MARGIN, y, 11, bold, ink, CONTENT_W);
       y -= 16;
     }
-    y = tableHeader(page, y);
-    y = drawRows(page, y, item.from, item.to);
+    if (item.to > item.from) {
+      y = tableHeader(page, y);
+      y = drawRows(page, y, item.from, item.to);
+    }
     if (item.summary) summary(page, y - 8);
     footer(page, index);
   });
