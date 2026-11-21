@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mergeInvoiceOrders, parseOrderNumbers, validateCommercialInvoice, goodsTotal, type InvoiceOrder } from "./rules";
+import {
+  mergeInvoiceOrders, parseOrderNumbers, validateCommercialInvoice, goodsTotal, isGoodsLine,
+  vatCountryPrefix, shippedLinePence, withinInvoiceTolerance, summedNetWeightKg, toPence, normaliseHsCode,
+  type InvoiceOrder,
+} from "./rules";
 
 const seller={name:"Jordan Fitness Ltd",address:"King's Lynn, United Kingdom",vat:"GB385438070",eori:"GB385438070001"};
 const party={name:"Example Buyer",address:"Rotterdam, Netherlands",vat:"NL123456789B01",eori:"NL123456789"};
@@ -67,5 +71,41 @@ describe("Pulse Logistics commercial invoice rules",()=>{
   it("blocks missing currency",()=>{
     const d=validDraft();d.currency="";
     expect(validateCommercialInvoice(d).join(" ")).toMatch(/currency/);
+  });
+  it("uses EL for Greek VAT", () => {
+    expect(vatCountryPrefix("GR")).toBe("EL");
+    expect(vatCountryPrefix("FR")).toBe("FR");
+    const d = validDraft();
+    d.destinationCountry = "GR";
+    d.buyer.vat = "GR123456789";
+    expect(validateCommercialInvoice(d).join(" ")).toMatch(/buyer VAT/);
+    d.buyer.vat = "EL123456789";
+    expect(validateCommercialInvoice(d).join(" ")).not.toMatch(/buyer VAT/);
+  });
+  it("excludes service, install, freight and delivery lines", () => {
+    expect(isGoodsLine({ sku: "JF-1", productName: "Gym bench" })).toBe(true);
+    expect(isGoodsLine({ productName: "Installation" })).toBe(false);
+    expect(isGoodsLine({ productName: "Delivery charge" })).toBe(false);
+    expect(isGoodsLine({ sku: "FREIGHT", productName: "Outbound freight" })).toBe(false);
+    expect(isGoodsLine({ productName: "Service call" })).toBe(false);
+  });
+  it("sums line weights and reconciles pence within £10", () => {
+    const d = validDraft();
+    expect(summedNetWeightKg(d.lines)).toBe(60);
+    const line = d.lines[0];
+    expect(shippedLinePence(line)).toBe(toPence(291));
+    expect(withinInvoiceTolerance(1000, 0)).toBe(true);
+    expect(withinInvoiceTolerance(1001, 0)).toBe(false);
+    expect(normaliseHsCode("9506.91")).toBe("9506910000");
+  });
+  it("gives the last units the Cin7 remainder", () => {
+    const line = { ...validDraft().lines[0], orderedQuantity: 3, shippedQuantity: 2, lineNetPence: 100, unitNetValue: 100 / 300 };
+    expect(shippedLinePence(line)).toBe(67);
+    expect(shippedLinePence({ ...line, shippedQuantity: 1 }, 2, 67)).toBe(33);
+  });
+  it("refuses a shipment above the remaining quantity", () => {
+    const d = validDraft();
+    const line = { ...d.lines[0], shippedQuantity: 1 };
+    expect(() => shippedLinePence(line, 2, 29100)).toThrow(/remaining/);
   });
 });

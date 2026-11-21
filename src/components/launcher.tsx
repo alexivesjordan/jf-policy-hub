@@ -2,12 +2,12 @@ import Link from "next/link";
 import { ModuleGlyph } from "@/components/module-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { canManageWorkspace, canUsePeople, canUseSales } from "@/lib/access";
+import { canManageWorkspace, canUseLogistics, canUsePeople, canUseSales } from "@/lib/access";
 import type { Profile, PulseModuleId } from "@/lib/types";
 import { pulseModules } from "@/modules/registry";
 import { cn } from "@/lib/utils";
 
-export function Launcher({ profile }: { profile: Profile | null }) {
+export function Launcher({ profile, showLogistics = false }: { profile: Profile | null; showLogistics?: boolean }) {
   return (
     <div className="pulse-grid min-h-screen text-ink">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
@@ -24,6 +24,7 @@ export function Launcher({ profile }: { profile: Profile | null }) {
         </div>
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
           {pulseModules.map((module) => {
+            if (module.id === "logistics" && (!showLogistics || !profile || !canUseLogistics(profile))) return null;
             const soon = module.status === "coming-soon";
             const level = profile?.levels?.[module.id as PulseModuleId];
             if (profile?.levels && !soon && level === "none") return null;

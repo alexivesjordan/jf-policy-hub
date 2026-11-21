@@ -34,6 +34,10 @@ export type Cin7Quote = {
   segment: Cin7Segment;
   customerType: Cin7CustomerType;
   postcode?: string | null;
+  currency?: string | null;
+  buyerAddress?: string | null;
+  consigneeAddress?: string | null;
+  destinationCountry?: string | null;
   /** Cin7 CustomerID. Not a name or address. */
   customerId?: string | null;
   lines: Cin7QuoteLine[];

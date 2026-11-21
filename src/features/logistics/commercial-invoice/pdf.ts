@@ -1,6 +1,10 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import { COMMERCIAL_INVOICE_SELLER } from "./seller";
 import {
-  declaredTotal, goodsTotal, shippedLines, validateCommercialInvoice,
+  countryName, declaredTotal, goodsTotal, lineWeightKg, normaliseHsCode, shippedLinePence, shippedLines, validateCommercialInvoice,
   type InvoiceDraft,
 } from "./rules";
 
@@ -18,9 +22,12 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const pdf = await PDFDocument.create();
   pdf.setTitle("Commercial Invoice " + draft.reference);
   pdf.setAuthor(draft.seller.name);
-  pdf.setSubject("Commercial invoice preview — not an issued document");
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  pdf.setSubject(draft.reference === "PREVIEW" ? "Commercial invoice preview — not an issued document" : "Commercial invoice " + draft.reference);
+  const fontDir = path.join(process.cwd(), "src/features/logistics/commercial-invoice/fonts");
+  const regular = await pdf.embedFont(await readFile(path.join(fontDir, "NotoSans-Regular.ttf")), { subset: true });
+  const bold = await pdf.embedFont(await readFile(path.join(fontDir, "NotoSans-Bold.ttf")), { subset: true });
+  const logoPng = await sharp(await readFile(path.join(process.cwd(), "public/brand/jordan-fitness.svg"))).png().toBuffer();
+  const logo = await pdf.embedPng(logoPng);
   const ink = rgb(0.13, 0.17, 0.2);
   const muted = rgb(0.38, 0.43, 0.48);
   const light = rgb(0.88, 0.9, 0.92);
@@ -42,8 +49,8 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     page = pdf.addPage(A4);
     pageNumber += 1;
     y = A4[1] - 46;
-    draw(draft.seller.name, margin, y, 17, true);
-    draw("COMMERCIAL INVOICE — PREVIEW", 323, y, 10, true, 235);
+    page.drawImage(logo, { x: margin, y: y - 8, width: 150, height: 26 });
+    draw(draft.reference === "PREVIEW" ? "COMMERCIAL INVOICE — PREVIEW" : "COMMERCIAL INVOICE", 323, y, 10, true, 235);
     y -= 18;
     horizontal(y);
     y -= 22;
@@ -86,7 +93,14 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const party = (name: string, p: typeof draft.buyer) => [
     p.name, p.address, p.vat ? "VAT " + p.vat : "", p.eori ? "EORI " + p.eori : "",
   ].filter(Boolean).join(" | ");
-  section("Exporter", party("Exporter", draft.seller));
+  section("Exporter", [
+    COMMERCIAL_INVOICE_SELLER.name,
+    COMMERCIAL_INVOICE_SELLER.address,
+    "VAT " + COMMERCIAL_INVOICE_SELLER.vat,
+    "EORI " + COMMERCIAL_INVOICE_SELLER.eoriGb,
+    "EORI " + COMMERCIAL_INVOICE_SELLER.eoriFr,
+    "Company " + COMMERCIAL_INVOICE_SELLER.companyNumber,
+  ].join(" | "));
   section("Buyer", party("Buyer", draft.buyer));
   section("Consignee", party("Consignee", draft.consignee));
   section("Importer of record", party("Importer", draft.importer));
@@ -122,10 +136,10 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     draw(line.orderNumber, margin, y, 8);
     draw(line.sku.slice(0, 41), 107, y, 8, true);
     draw(String(line.shippedQuantity), 365, y, 8);
-    draw(money(line.shippedQuantity * line.unitNetValue, draft.currency), 435, y, 8, true, 125);
+    draw(money(shippedLinePence(line) / 100, draft.currency), 435, y, 8, true, 125);
     y -= 13;
     for (const text of descriptions) { draw(text, 107, y, 8); y -= 11; }
-    draw("HS " + line.hsCode + " | Origin " + line.originCountry + " | Unit " + money(line.unitNetValue, draft.currency), 107, y, 7);
+    draw("HS " + (normaliseHsCode(line.hsCode) ?? line.hsCode) + " | Origin " + countryName(line.originCountry) + " | " + lineWeightKg(line).toFixed(3) + " kg | Unit " + money(line.unitNetValue, draft.currency), 107, y, 7);
     y -= 18;
     horizontal(y);
     y -= 12;
@@ -153,10 +167,10 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   if (y < 110) nextPage();
   draw("Approved signatory: " + draft.signatory, margin, y, 9, true);
   y -= 15;
-  draw("PREVIEW ONLY — NOT AN ISSUED COMMERCIAL INVOICE", margin, y, 8, true);
+  if (draft.reference === "PREVIEW") draw("PREVIEW ONLY — NOT AN ISSUED COMMERCIAL INVOICE", margin, y, 8, true);
   const pages = pdf.getPages();
   pages.forEach((p, i) => {
-    p.drawText("Jordan Pulse Logistics • Preview • Page " + (i + 1) + " of " + pages.length, {
+    p.drawText("Jordan Fitness • Page " + (i + 1) + " of " + pages.length, {
       x: margin, y: 27, font: regular, size: 8, color: muted,
     });
   });

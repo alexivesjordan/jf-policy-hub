@@ -20,6 +20,8 @@ export type GoodsLine = {
   orderedQuantity: number;
   shippedQuantity: number;
   unitNetValue: number;
+  /** Authoritative line net in pence for the ordered quantity. Totals use this, not a rounded unit price. */
+  lineNetPence?: number;
   hsCode: string;
   originCountry: string;
   unitWeightKg: number | null;
@@ -87,6 +89,75 @@ export function parseOrderNumbers(input: string): string[] {
 const same = (a: string, b: string) => a.trim().toLowerCase().replace(/\s+/g, " ") === b.trim().toLowerCase().replace(/\s+/g, " ");
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
+/** A gap from £0.00 to £10.00 against the Cin7 line totals is accepted. Above that, refuse. */
+export const INVOICE_TOLERANCE_PENCE = 1000;
+
+export function toPence(amount: number) {
+  return Math.round((amount + Number.EPSILON) * 100);
+}
+
+export function normaliseHsCode(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 6 || digits.length > 10) return null;
+  return digits.padEnd(10, "0");
+}
+
+const NON_GOODS = /\b(service|installation|install|freight|delivery|carriage|shipping)\b/i;
+
+export function isGoodsLine(line: { sku?: string | null; productName?: string | null; category?: string | null }) {
+  const text = [line.sku, line.productName, line.category].filter(Boolean).join(" ");
+  return !NON_GOODS.test(text);
+}
+
+export function vatCountryPrefix(country: string) {
+  const iso = country.trim().toUpperCase();
+  return iso === "GR" ? "EL" : iso;
+}
+
+export function countryName(iso: string) {
+  const code = iso.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return code;
+  const name = new Intl.DisplayNames(["en"], { type: "region" }).of(code);
+  return name && name !== code ? name : code;
+}
+
+export function lineNetPence(line: GoodsLine) {
+  if (line.lineNetPence != null) return line.lineNetPence;
+  return toPence(line.orderedQuantity * line.unitNetValue);
+}
+
+/** Pence for this shipment. The last units take the remainder so full shipments match Cin7. */
+export function shippedLinePence(line: GoodsLine, alreadyQty = 0, alreadyPence = 0) {
+  const ordered = line.orderedQuantity;
+  const shipped = line.shippedQuantity;
+  if (shipped <= 0) return 0;
+  if (alreadyQty + shipped > ordered) throw new Error("Shipped quantity is above the remaining order quantity.");
+  const total = lineNetPence(line);
+  if (alreadyQty + shipped === ordered) return total - alreadyPence;
+  return Math.round((total * shipped) / ordered);
+}
+
+export function unitPriceDriftPence(line: GoodsLine) {
+  if (line.orderedQuantity <= 0) return 0;
+  const total = lineNetPence(line);
+  const unit = Math.round(total / line.orderedQuantity);
+  return Math.abs(unit * line.orderedQuantity - total);
+}
+
+export function withinInvoiceTolerance(actualPence: number, expectedPence: number) {
+  const gap = Math.abs(actualPence - expectedPence);
+  return gap <= INVOICE_TOLERANCE_PENCE;
+}
+
+export function lineWeightKg(line: GoodsLine) {
+  if (line.shippedQuantity <= 0 || line.unitWeightKg == null) return 0;
+  return Math.round(line.unitWeightKg * line.shippedQuantity * 1000) / 1000;
+}
+
+export function summedNetWeightKg(lines: GoodsLine[]) {
+  return Math.round(lines.reduce((sum, line) => sum + lineWeightKg(line), 0) * 1000) / 1000;
+}
+
 export function mergeInvoiceOrders(orders: InvoiceOrder[], seller: InvoiceParty): InvoiceDraft {
   if (!orders.length || orders.length > 10) throw new Error("Choose 1 to 10 orders.");
   const first = orders[0];
@@ -115,7 +186,8 @@ export function mergeInvoiceOrders(orders: InvoiceOrder[], seller: InvoiceParty)
 }
 
 export const shippedLines = (draft: InvoiceDraft) => draft.lines.filter(l => l.shippedQuantity > 0);
-export const goodsTotal = (draft: InvoiceDraft) => roundMoney(shippedLines(draft).reduce((n,l) => n + (l.shippedQuantity * l.unitNetValue), 0));
+export const goodsTotalPence = (draft: InvoiceDraft) => shippedLines(draft).reduce((sum, line) => sum + shippedLinePence(line), 0);
+export const goodsTotal = (draft: InvoiceDraft) => roundMoney(goodsTotalPence(draft) / 100);
 export const declaredTotal = (draft: InvoiceDraft) => roundMoney(goodsTotal(draft) + draft.freightValue + draft.insuranceValue + draft.otherChargesValue);
 
 const eu = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
@@ -162,7 +234,7 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   if (d.procedure === "42") {
     if (d.clearanceCountry !== "FR") errors.push("This workflow only supports Procedure 42 with verified French import clearance.");
     if (d.destinationCountry === "FR" || !eu.has(d.destinationCountry)) errors.push("Procedure 42 requires a different EU destination from France.");
-    if (!d.buyer.vat.trim() || !d.buyer.vat.toUpperCase().startsWith(d.destinationCountry))
+    if (!d.buyer.vat.trim() || !d.buyer.vat.toUpperCase().startsWith(vatCountryPrefix(d.destinationCountry)))
       errors.push("Procedure 42 requires the confirmed destination-country buyer VAT number (or a documented transfer arrangement).");
     if (!d.frenchVatNumber.trim() && !d.frenchFiscalRepresentativeVat.trim())
       errors.push("Procedure 42 requires a confirmed French importer/fiscal-representative VAT identifier.");
@@ -176,7 +248,9 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   required(d.reasonForExport,"Reason for export");
   required(d.packageType,"Package type");
   if (!Number.isSafeInteger(d.packages) || d.packages <= 0) errors.push("Number of packages must be greater than zero.");
-  if (!Number.isFinite(d.netWeightKg) || d.netWeightKg <= 0) errors.push("Confirmed net mass must be greater than zero.");
+  const summedNet = summedNetWeightKg(d.lines);
+  if (summedNet <= 0) errors.push("Confirmed net mass must be greater than zero.");
+  else if (Math.abs(d.netWeightKg - summedNet) > 0.001) errors.push("Net mass must equal the sum of the line weights.");
   if (!Number.isFinite(d.grossWeightKg) || d.grossWeightKg < d.netWeightKg || d.grossWeightKg <= 0) errors.push("Gross mass must be at least net mass.");
   for (const [name,amount] of [["Freight",d.freightValue],["Insurance",d.insuranceValue],["Other charges",d.otherChargesValue]] as const) {
     if (!Number.isFinite(amount) || amount < 0 || amount > 100000000) errors.push(name + " amount is invalid.");
@@ -193,9 +267,13 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
         || !Number.isFinite(line.shippedQuantity) || line.shippedQuantity < 0
         || line.shippedQuantity > line.orderedQuantity) errors.push(name + " shipped quantity is invalid.");
     if (!Number.isFinite(line.unitNetValue) || line.unitNetValue < 0 || line.unitNetValue > 100000000) errors.push(name + " unit price is invalid.");
-    if (line.shippedQuantity > 0) {
-      if (!/^\d{6,10}$/.test(line.hsCode.replace(/[\s.]/g,""))) errors.push(name + " HS/commodity code requires 6-10 digits.");
+    if (line.shippedQuantity > 0 && line.shippedQuantity <= line.orderedQuantity) {
+      if (!normaliseHsCode(line.hsCode)) errors.push(name + " HS/commodity code requires 6-10 digits.");
       if (!/^[A-Z]{2}$/.test(line.originCountry)) errors.push(name + " origin country is missing or invalid.");
+      if (line.unitWeightKg == null || !Number.isFinite(line.unitWeightKg) || line.unitWeightKg <= 0) errors.push(name + " weight is missing.");
+      if (!withinInvoiceTolerance(shippedLinePence(line), toPence(line.shippedQuantity * line.unitNetValue))) {
+        errors.push(name + " unit price does not reconcile to the line total.");
+      }
     }
   }
   return Array.from(new Set(errors));

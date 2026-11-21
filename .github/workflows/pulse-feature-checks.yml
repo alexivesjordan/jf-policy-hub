@@ -9,6 +9,7 @@ on:
       - "src/components/radar/**"
       - "src/app/api/logistics/**"
       - "src/app/api/radar/**"
+      - "src/app/(logistics)/**"
       - "src/app/(sales)/sales/commercial-invoices/**"
       - "src/app/(sales)/sales/radar/**"
       - ".github/workflows/pulse-feature-checks.yml"
@@ -33,4 +34,4 @@ jobs:
       - name: Complete regression test suite
         run: npm test
       - name: New-feature unit tests
-        run: npx vitest run src/features/logistics/commercial-invoice/rules.test.ts src/features/radar/domain.test.ts src/features/radar/feed.test.ts --passWithNoTests
+        run: npx vitest run src/features/logistics

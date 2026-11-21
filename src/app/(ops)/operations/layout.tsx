@@ -89,7 +89,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   const nav = role === "engineer" ? ENGINEER_NAV : officeNav;
 
   return (
-    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications}>
+    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={role !== "engineer"}>
       <Cin7Notice />
       {children}
     </AppShell>

@@ -1,4 +1,4 @@
-export type ModuleIcon = "people" | "service" | "supply" | "operations" | "sales" | "finance";
+export type ModuleIcon = "people" | "service" | "supply" | "operations" | "sales" | "finance" | "logistics";
 
 export type ModuleStatus = "active" | "coming-soon";
 
@@ -109,6 +109,18 @@ export const pulseModules: PulseModule[] = [
           { href: "/sales/service", label: "Warranties & servicing" },
         ],
       },
+    ],
+  },
+  {
+    id: "logistics",
+    name: "Pulse Logistics",
+    tagline: "Commercial invoices",
+    href: "/logistics/commercial-invoices",
+    status: "active",
+    icon: "logistics",
+    paths: ["/logistics"],
+    nav: [
+      { href: "/logistics/commercial-invoices", label: "Commercial invoices" },
     ],
   },
   {

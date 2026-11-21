@@ -62,6 +62,13 @@ export function canUseOperations(profile: Profile) {
   return moduleAllows(profile, "operations", "view");
 }
 
+/** Office operations and admins. Field engineers are refused separately; this does not grant sales. */
+export function canUseLogistics(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.role === "admin") return true;
+  return moduleAllows(profile, "operations", "view");
+}
+
 export function canUseSales(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;
   if (profile.workspace_role === "owner") return true;

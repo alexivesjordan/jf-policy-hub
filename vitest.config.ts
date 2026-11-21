@@ -12,6 +12,7 @@ export default defineConfig({
       "src/lib/installs/visit-form.test.ts",
       "src/lib/installs/signature-image.test.ts",
       "src/lib/installs/field-grants.test.ts",
+      "src/features/logistics/**/*.test.ts",
     ],
   },
   resolve: {

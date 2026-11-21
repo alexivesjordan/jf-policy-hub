@@ -1,74 +1,78 @@
 import { z } from "zod";
-import { canUseSales } from "@/lib/access";
-import { getCurrentProfile } from "@/lib/auth";
+import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
+import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
+import { applyLineEdits, customsFromRpc, draftFromOrders, ordersFromCin7, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
 import { validateCommercialInvoice } from "@/features/logistics/commercial-invoice/rules";
+import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
+import type { Cin7Quote } from "@/lib/cin7/types";
+import { createClient } from "@/lib/supabase/server";
 
-
-const party = z.object({
-  name: z.string().max(200),
-  address: z.string().max(1000),
-  vat: z.string().max(80),
-  eori: z.string().max(80),
-});
-const line = z.object({
-  id: z.string().max(200), orderNumber: z.string().max(80),
-  sku: z.string().max(100), productName: z.string().max(300),
-  orderedQuantity: z.number().finite().nonnegative(),
-  shippedQuantity: z.number().finite().nonnegative(),
-  unitNetValue: z.number().finite().nonnegative(),
-  hsCode: z.string().max(30), originCountry: z.string().max(8),
-  unitWeightKg: z.number().finite().nonnegative().nullable(),
-});
-const draftSchema = z.object({
-  reference: z.string().max(100), issueDate: z.string().max(30),
-  currency: z.string().max(8), orders: z.array(z.string().max(80)).min(1).max(10),
-  seller: party, buyer: party, consignee: party, importer: party,
-  frenchVatNumber: z.string().max(80),
-  frenchFiscalRepresentativeVat: z.string().max(80),
-  ddpModel: z.enum(["unspecified", "importers_signature", "own_french_vat", "not_applicable"]),
-  carrier: z.enum(["Europa","FedEx","Collection","Other"]),
-  entryCountry: z.string().max(8), clearanceCountry: z.string().max(8),
-  destinationCountry: z.string().max(8), incoterm: z.string().max(12),
-  namedPlace: z.string().max(200), procedure: z.enum(["unconfirmed","40","42","transit","other"]),
-  approvedStatement: z.string().max(2000), statementApprovedBy: z.string().max(200),
-  reasonForExport: z.string().max(200),
-  packages: z.number().int().nonnegative().max(100000),
+const bodySchema = z.object({
+  orderNumbers: z.array(z.string().max(40)).min(1).max(10),
+  incoterm: z.string().max(12),
+  namedPlace: z.string().max(200),
+  destinationCountry: z.string().max(8),
+  packages: z.number().int().nonnegative(),
   packageType: z.string().max(100),
-  netWeightKg: z.number().finite().nonnegative().max(10000000),
-  grossWeightKg: z.number().finite().nonnegative().max(10000000),
-  freightValue: z.number().finite().nonnegative().max(100000000),
-  insuranceValue: z.number().finite().nonnegative().max(100000000),
-  otherChargesValue: z.number().finite().nonnegative().max(100000000),
-  shipmentRef: z.string().max(100), signatory: z.string().max(150),
-  notes: z.string().max(2000), physicalShipmentConfirmed: z.boolean(),
-  lines: z.array(line).min(1).max(200),
+  grossWeightKg: z.number().finite().nonnegative(),
+  buyerVat: z.string().max(80).optional(),
+  buyerEori: z.string().max(80).optional(),
+  lines: z.array(z.object({
+    orderNumber: z.string(),
+    sku: z.string(),
+    shippedQuantity: z.number().finite().nonnegative(),
+    hsCode: z.string(),
+    originCountry: z.string(),
+    unitWeightKg: z.number().finite().nonnegative().nullable(),
+  })).max(200),
 }).strict();
 
+async function loadQuotes(numbers: string[]) {
+  const client = getCin7Client();
+  const quotes: Array<Cin7Quote | undefined> = [];
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      const number = numbers[index];
+      if (!number) return;
+      const sale = await client.getQuote(number);
+      if (!sale || !sale.currency || !sale.buyerAddress) throw new Error("Could not load " + number);
+      quotes[index] = sale;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(3, numbers.length) }, () => worker()));
+  return quotes.filter((sale): sale is Cin7Quote => sale != null);
+}
+
 export async function POST(request: Request) {
-  const profile = await getCurrentProfile();
-  if (!profile) return Response.json({ error: "Sign in required." }, { status: 401 });
-  if (!canUseSales(profile)) return Response.json({ error: "Forbidden." }, { status: 403 });
-  const raw = await request.text();
-  if (raw.length > 350_000) return Response.json({ error: "Document request too large." }, { status: 413 });
-  let body: unknown;
-  try { body = JSON.parse(raw); } catch { return Response.json({ error: "Invalid JSON." }, { status: 400 }); }
-  const validated = draftSchema.safeParse(body);
-  if (!validated.success) return Response.json({ error: "Malformed invoice data.", details: validated.error.issues.slice(0, 12).map(i => i.path.join(".") + ": " + i.message) }, { status: 400 });
-  const errors = validateCommercialInvoice(validated.data);
-  if (errors.length) return Response.json({ error: "Invoice requires review before PDF preview.", details: errors }, { status: 422 });
+  const gate = await requireLogisticsApi();
+  if (gate.error) return Response.json({ error: gate.error }, { status: gate.status });
+  if (!cin7IsConnected()) return Response.json({ error: "Cin7 is not available." }, { status: 503 });
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "That invoice could not be read." }, { status: 400 });
   try {
-    const bytes = await renderCommercialInvoicePdf(validated.data);
+    const quotes = await loadQuotes(parsed.data.orderNumbers);
+    const skus = quotes.flatMap((sale) => sale.lines.map((line) => line.sku).filter((sku): sku is string => Boolean(sku)));
+    const supabase = await createClient();
+    const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
+    const orders = applyLineEdits(ordersFromCin7(quotes, customsFromRpc(customs.data)), parsed.data.lines as LineEdit[]);
+    const draft = draftFromOrders(orders, parsed.data);
+    draft.reference = "PREVIEW";
+    const errors = validateCommercialInvoice(draft);
+    if (errors.length) return Response.json({ error: "Invoice requires review.", details: errors }, { status: 422 });
+    const bytes = await renderCommercialInvoicePdf(draft);
+    const filename = commercialInvoiceFileName({ buyer: draft.buyer.name, number: "PREVIEW", incoterm: draft.incoterm });
     return new Response(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="commercial-invoice-preview.pdf"',
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
         "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
-    console.error("Commercial invoice PDF preview generation error", error);
-    return Response.json({ error: "The PDF could not be generated. Check any special characters in addresses and try again." }, { status: 422 });
+    return Response.json({ error: error instanceof Error ? error.message : "The PDF could not be generated." }, { status: 422 });
   }
 }

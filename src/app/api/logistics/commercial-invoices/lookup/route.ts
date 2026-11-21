@@ -1,58 +1,56 @@
 import { z } from "zod";
-import { canUseSales } from "@/lib/access";
-import { getCurrentProfile } from "@/lib/auth";
-import { cin7IsConnected, getCin7Client, loadCin7BookingDetails } from "@/lib/cin7/client";
-import { parseOrderNumbers, type InvoiceOrder, type InvoiceParty } from "@/features/logistics/commercial-invoice/rules";
+import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
+import { customsFromRpc, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
+import { parseOrderNumbers } from "@/features/logistics/commercial-invoice/rules";
+import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
+import type { Cin7Quote } from "@/lib/cin7/types";
+import { createClient } from "@/lib/supabase/server";
 
 const requestSchema = z.object({ orderNumbers: z.string().min(1).max(500) }).strict();
 
+async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      out[index] = await fn(items[index]!);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return out;
+}
+
 export async function POST(request: Request) {
-  const profile = await getCurrentProfile();
-  if (!profile) return Response.json({ error: "Sign in required." }, { status: 401 });
-  if (!canUseSales(profile)) return Response.json({ error: "You do not have access to this feature." }, { status: 403 });
-  if (!cin7IsConnected()) return Response.json({ error: "The Cin7 API is not configured in this environment." }, { status: 503 });
+  const gate = await requireLogisticsApi();
+  if (gate.error) return Response.json({ error: gate.error }, { status: gate.status });
+  if (!cin7IsConnected()) return Response.json({ error: "Cin7 is not available." }, { status: 503 });
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Enter valid order numbers." }, { status: 400 });
   let numbers: string[];
   try { numbers = parseOrderNumbers(parsed.data.orderNumbers); }
   catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid orders." }, { status: 400 }); }
+
   const client = getCin7Client();
-  const results: InvoiceOrder[] = [];
-  for (const orderNumber of numbers) {
-    try {
+  let quotes: Cin7Quote[];
+  try {
+    quotes = await mapLimited(numbers, 3, async (orderNumber) => {
       const sale = await client.getQuote(orderNumber);
-      if (!sale) return Response.json({ error: "Could not find order " + orderNumber }, { status: 404 });
-      if (sale.usedQuoteLines) return Response.json({ error: orderNumber + " is still a quotation or has no order lines. A commercial invoice needs a confirmed sale order." }, { status: 422 });
-      if (!sale.lines.length) return Response.json({ error: orderNumber + " has no goods lines." }, { status: 422 });
-      if (sale.moneyFlags?.length || sale.lines.some(line => line.lineNet === null || line.lineNet === undefined)) {
-        return Response.json({ error: "Price reconciliation is incomplete for " + orderNumber + ". Review its values in Cin7." }, { status: 422 });
-      }
-      const shipping = await loadCin7BookingDetails(orderNumber);
-      const buyer: InvoiceParty = { name: sale.customerName, address: "", vat: "", eori: "" };
-      const consignee: InvoiceParty = {
-        name: sale.customerName, address: shipping?.siteAddress ?? "", vat: "", eori: "",
-      };
-      results.push({
-        id: sale.id, orderNumber: sale.number, buyer, consignee,
-        country: "", currency: "",
-        warnings: [
-          "Verify legal buyer and consignee, currency and full addresses.",
-          "Commodity codes and origin countries are not available from the existing Cin7 quote adapter.",
-          "Check that line quantities describe goods physically in this consignment.",
-          ...(!shipping?.siteAddress ? ["Delivery address could not be retrieved."] : []),
-        ],
-        lines: sale.lines.map((line, index) => ({
-          id: sale.id + "-" + index, orderNumber: sale.number,
-          sku: line.sku ?? "", productName: line.productName,
-          orderedQuantity: line.qty, shippedQuantity: line.qty,
-          unitNetValue: Math.round(((line.lineNet ?? 0) / line.qty) * 10000) / 10000,
-          hsCode: "", originCountry: "", unitWeightKg: line.unitWeightKg ?? null,
-        })),
-      });
-    } catch (error) {
-      console.error("Pulse Logistics Cin7 lookup failed", { orderNumber, error: error instanceof Error ? error.message : "Unknown error" });
-      return Response.json({ error: "Cin7 lookup failed for " + orderNumber + ". Please try again." }, { status: 502 });
-    }
+      if (!sale) throw new Error("Could not find order " + orderNumber);
+      if (sale.usedQuoteLines) throw new Error(orderNumber + " has no order lines.");
+      if (!sale.currency) throw new Error(orderNumber + " has no currency.");
+      if (!sale.buyerAddress || !sale.destinationCountry) throw new Error(orderNumber + " has no buyer address.");
+      return sale;
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Cin7 lookup failed.";
+    return Response.json({ error: message }, { status: message.startsWith("Could not find") ? 404 : 422 });
   }
-  return Response.json({ orders: results }, { headers: { "Cache-Control": "no-store" } });
+
+  const skus = quotes.flatMap((sale) => sale.lines.map((line) => line.sku).filter((sku): sku is string => Boolean(sku)));
+  const supabase = await createClient();
+  const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
+  return Response.json({ orders: ordersFromCin7(quotes, customsFromRpc(customs.data)) }, { headers: { "Cache-Control": "no-store" } });
 }

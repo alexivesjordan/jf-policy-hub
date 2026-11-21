@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
 import { listPulseNotifications } from "@/features/operations/queries";
+import { fieldRole } from "@/features/field/queries";
+import { canUseLogistics } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
@@ -31,6 +33,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 async function AuthedShell({ children }: { children: React.ReactNode }) {
   const profile = await requireUser();
+  let engineer = false;
+  try {
+    engineer = (await fieldRole()) === "engineer";
+  } catch {
+    engineer = false;
+  }
   const [pending, unread, people, operations] = await Promise.all([
     pendingCount(),
     unreadCount(profile.id),
@@ -61,7 +69,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
     .slice(0, 20)
     .map(({ createdAt: _createdAt, ...item }) => item);
   return (
-    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications}>
+    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer}>
       {children}
     </AppShell>
   );

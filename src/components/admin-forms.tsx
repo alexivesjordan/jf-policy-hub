@@ -99,6 +99,7 @@ export function UserForm({ person }: { person: DirectoryUser }) {
         <legend className="text-sm font-semibold">Module licences</legend>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {pulseModules.map((module) => {
+            if (module.id === "logistics") return null;
             const stored = person.modules.find((item) => item.module_id === module.id);
             if (module.id === "people") {
               return (

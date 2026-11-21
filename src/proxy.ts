@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (user && path.startsWith("/operations") && !path.startsWith("/operations/documents")) {
+  if (user && (path.startsWith("/logistics") || (path.startsWith("/operations") && !path.startsWith("/operations/documents")))) {
     const { data } = await supabase.rpc("install_field_role");
     if (data === "engineer") {
       const redirect = NextResponse.redirect(new URL("/field", request.url));
