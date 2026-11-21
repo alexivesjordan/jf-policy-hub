@@ -129,9 +129,10 @@ async function findCount(pages: number, roles?: InvoicePageRole[]) {
 }
 
 async function saveSample(name: string, count: number) {
+  const dir = process.env.CI_RENDER_DIR;
+  if (!dir) return;
   const { draft } = await planned(count);
   const bytes = await renderCommercialInvoicePdf(draft);
-  const dir = "/cursor/stores/self/ci-render";
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), bytes);
 }
