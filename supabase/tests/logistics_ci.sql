@@ -21,6 +21,8 @@ declare
   v_seller text;
   v_filename text;
   v_payload jsonb;
+  v_goods integer;
+  v_full integer;
 begin
   perform set_config('orbit.profile_sync', 'on', true);
 
@@ -104,6 +106,7 @@ begin
     'incoterm', 'DAP',
     'grossWeightKg', 2,
     'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
+    'shipment', jsonb_build_object('deliveryPence', 45000, 'surchargePence', 3250, 'vatPence', 2000),
     'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-ci', 'number', 'SO-CI')),
     'lines', jsonb_build_array(jsonb_build_object(
       'id', 'sale-ci:0',
@@ -127,6 +130,11 @@ begin
     v_fail := v_fail + 1;
     v_notes := v_notes || ' issue ' || sqlerrm || ';';
   end;
+
+  select totals_pence, total_pence into v_goods, v_full
+  from logistics.commercial_invoices where id = v_id;
+  if v_goods = 10000 and v_full = 60250 then v_ok := v_ok + 1;
+  else v_fail := v_fail + 1; v_notes := v_notes || ' total_pence goods ' || coalesce(v_goods::text, 'null') || ' full ' || coalesce(v_full::text, 'null') || ';'; end if;
 
   begin
     v_replay := public.logistics_issue_commercial_invoice(v_payload);
@@ -270,6 +278,14 @@ begin
   end;
 
   reset role;
+  begin
+    update logistics.commercial_invoices set total_pence = 1 where id = v_id;
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' total update allowed;';
+  exception when others then
+    if sqlerrm ilike '%cannot be changed%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' total update ' || sqlerrm || ';'; end if;
+  end;
   begin
     update logistics.commercial_invoices set currency = 'USD' where id = v_id;
     v_fail := v_fail + 1;

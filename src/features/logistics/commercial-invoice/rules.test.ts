@@ -64,9 +64,23 @@ describe("Pulse Logistics commercial invoice rules",()=>{
     const d=validDraft();d.lines[0].shippedQuantity=3;
     expect(validateCommercialInvoice(d).join(" ")).toMatch(/shipped quantity/);
   });
-  it("does not treat a DDP order as proof of procedure 42",()=>{
-    const d=validDraft();d.procedure="unconfirmed";
-    expect(validateCommercialInvoice(d).join(" ")).toMatch(/must be confirmed/);
+  it("issues DDP with only the customs statement and no importer or clearance", () => {
+    const d = validDraft();
+    d.procedure = "unconfirmed";
+    d.ddpModel = "not_applicable";
+    d.importer = { name: "", address: "", vat: "", eori: "" };
+    d.clearanceCountry = "";
+    d.approvedStatement = "";
+    d.statementApprovedBy = "";
+    d.carrier = "Other";
+    d.frenchVatNumber = "";
+    expect(validateCommercialInvoice(d)).toEqual([]);
+  });
+  it("still checks a filled Europa French DDP model", () => {
+    const d = validDraft();
+    d.ddpModel = "importers_signature";
+    d.importer = { ...d.seller };
+    expect(validateCommercialInvoice(d).join(" ")).toMatch(/EU importer/);
   });
   it("blocks missing currency",()=>{
     const d=validDraft();d.currency="";

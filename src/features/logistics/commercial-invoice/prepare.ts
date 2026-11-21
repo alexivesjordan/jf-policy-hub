@@ -1,7 +1,7 @@
 import { COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
   isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
-  type GoodsLine, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment,
+  type CustomsProcedure, type EuropaDdpModel, type GoodsLine, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment,
 } from "./rules";
 import type { Cin7Quote } from "@/lib/cin7/types";
 
@@ -167,6 +167,43 @@ export function applyShipment(draft: InvoiceDraft, input: Partial<InvoiceShipmen
     freightValue: shipment.deliveryPence / 100,
     otherChargesValue: shipment.surchargePence / 100,
     notes: shipment.specialInstructions,
+  };
+}
+
+export type OptionalDdpInput = {
+  importerName?: string;
+  importerAddress?: string;
+  importerVat?: string;
+  importerEori?: string;
+  clearanceCountry?: string;
+  procedure?: CustomsProcedure;
+  ddpModel?: EuropaDdpModel;
+  frenchVatNumber?: string;
+  statementApprovedBy?: string;
+};
+
+/** Importer, clearance, procedure and DDP model are optional. Filled values are kept and checked. */
+export function applyOptionalDdp(draft: InvoiceDraft, input: OptionalDdpInput): InvoiceDraft {
+  if (draft.incoterm !== "DDP") return draft;
+  const procedure = input.procedure ?? "unconfirmed";
+  const statement = draft.shipment?.customsStatementText?.trim() ?? "";
+  const approvedStatement = procedure === "42" || procedure === "other"
+    ? (draft.approvedStatement.trim() || statement)
+    : "";
+  return {
+    ...draft,
+    importer: {
+      name: input.importerName?.trim() ?? "",
+      address: input.importerAddress?.trim() ?? "",
+      vat: input.importerVat?.trim() ?? "",
+      eori: input.importerEori?.trim() ?? "",
+    },
+    clearanceCountry: input.clearanceCountry?.trim().toUpperCase() ?? "",
+    procedure,
+    ddpModel: input.ddpModel ?? "not_applicable",
+    frenchVatNumber: input.frenchVatNumber?.trim() ?? "",
+    statementApprovedBy: input.statementApprovedBy?.trim() ?? "",
+    approvedStatement,
   };
 }
 

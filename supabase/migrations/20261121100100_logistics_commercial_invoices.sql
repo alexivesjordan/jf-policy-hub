@@ -15,6 +15,7 @@ create table logistics.commercial_invoices (
   currency text not null,
   incoterm text not null,
   totals_pence integer not null,
+  total_pence integer not null,
   net_weight_kg numeric(12,3) not null,
   gross_weight_kg numeric(12,3) not null,
   cin7_orders jsonb not null,
@@ -133,6 +134,7 @@ begin
      and new.currency = old.currency
      and new.incoterm = old.incoterm
      and new.totals_pence = old.totals_pence
+     and new.total_pence = old.total_pence
      and new.net_weight_kg = old.net_weight_kg
      and new.gross_weight_kg = old.gross_weight_kg
      and new.cin7_orders = old.cin7_orders
@@ -157,6 +159,7 @@ begin
      and new.currency = old.currency
      and new.incoterm = old.incoterm
      and new.totals_pence = old.totals_pence
+     and new.total_pence = old.total_pence
      and new.net_weight_kg = old.net_weight_kg
      and new.gross_weight_kg = old.gross_weight_kg
      and new.cin7_orders = old.cin7_orders
@@ -221,6 +224,7 @@ declare
   v_line jsonb;
   v_pos integer := 0;
   v_total integer := 0;
+  v_invoice_total integer := 0;
   v_net numeric := 0;
   v_ordered numeric;
   v_shipped numeric;
@@ -388,15 +392,19 @@ begin
   end if;
 
   v_number := logistics.next_invoice_number(v_year);
+  v_invoice_total := v_total
+    + coalesce((p_payload#>>'{shipment,deliveryPence}')::integer, 0)
+    + coalesce((p_payload#>>'{shipment,surchargePence}')::integer, 0)
+    + coalesce((p_payload#>>'{shipment,vatPence}')::integer, 0);
   v_filename := 'Commercial Invoice - ' || regexp_replace(coalesce(p_payload#>>'{buyer,name}', 'Buyer'), '[/\\:*?"<>|]', '', 'g') || ' - ' || v_number || ' - ' || regexp_replace(coalesce(p_payload->>'incoterm', ''), '[/\\:*?"<>|]', '', 'g') || '.pdf';
   v_document := coalesce(p_payload->'document', '{}'::jsonb)
-    || jsonb_build_object('reference', v_number, 'lines', v_doc_lines);
+    || jsonb_build_object('reference', v_number, 'lines', v_doc_lines, 'totalPence', v_invoice_total);
   insert into logistics.commercial_invoices (
-    number, status, seller, buyer, currency, incoterm, totals_pence,
+    number, status, seller, buyer, currency, incoterm, totals_pence, total_pence,
     net_weight_kg, gross_weight_kg, cin7_orders, pdf_filename, issued_by, idempotency_key, document, shipment
   ) values (
     v_number, 'issued', v_seller, p_payload->'buyer',
-    p_payload->>'currency', p_payload->>'incoterm', v_total,
+    p_payload->>'currency', p_payload->>'incoterm', v_total, v_invoice_total,
     v_net, (p_payload->>'grossWeightKg')::numeric, p_payload->'orders',
     v_filename, v_actor, v_key, v_document,
     coalesce(p_payload->'shipment', p_payload->'document'->'shipment', '{}'::jsonb)

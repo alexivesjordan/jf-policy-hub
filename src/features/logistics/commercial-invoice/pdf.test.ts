@@ -5,7 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { extractText } from "unpdf";
 import { draftFromOrders } from "./prepare";
-import { planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
+import { commercialInvoicePageRoom, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
 import type { InvoiceOrder } from "./rules";
 
 function orders(count: number): InvoiceOrder[] {
@@ -90,7 +90,7 @@ describe("commercial invoice PDF", () => {
     const found = await findCount(3, ["first", "continuation", "last"]);
     const { plan, text } = await pagesOf(found);
     expect(plan.map((page) => page.role)).toEqual(["first", "continuation", "last"]);
-    expect(plan.filter((page) => page.summary).map((_, index, all) => index)).toEqual([0]);
+    expect(plan.filter((page) => page.summary)).toHaveLength(1);
     expect(plan.at(-1)?.summary).toBe(true);
     expect(text).toHaveLength(3);
     expect(text[0]).toMatch(/COMMERCIAL INVOICE/);
@@ -116,6 +116,70 @@ describe("commercial invoice PDF", () => {
     await saveSample("invoice-1.pdf", 1);
     await saveSample("invoice-8.pdf", found);
   }, 20000);
+
+  it("prints a DDP invoice that only carries the customs statement", async () => {
+    const { draft } = await planned(2);
+    draft.incoterm = "DDP";
+    draft.procedure = "unconfirmed";
+    draft.ddpModel = "not_applicable";
+    draft.importer = { name: "", address: "", vat: "", eori: "" };
+    draft.clearanceCountry = "";
+    draft.approvedStatement = "";
+    draft.statementApprovedBy = "";
+    draft.shipment = { ...draft.shipment!, customsStatementId: "ddp_vat_postponed", customsStatementText: "" };
+    const plain = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const plainText = Array.isArray(plain.text) ? plain.text.join("\n") : plain.text;
+    expect(plainText).toMatch(/Goods cleared regime 40 00 DDP VAT postponed/);
+    expect(plainText).not.toMatch(/Importer:/);
+    draft.importer = { name: "Frictionless Trade Services SAS", address: "70 Rue Mollien", vat: "", eori: "" };
+    draft.clearanceCountry = "FR";
+    const filled = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const filledText = Array.isArray(filled.text) ? filled.text.join("\n") : filled.text;
+    expect(filledText).toMatch(/Importer: Frictionless Trade Services SAS/);
+    expect(filledText).toMatch(/Importer address: 70 Rue Mollien/);
+    expect(filledText).toMatch(/Clearance country: FR/);
+    expect(filledText).not.toMatch(/Importer EORI/);
+  });
+
+  it("keeps the full statement, instructions, description and a 40-line dimension list", async () => {
+    const { draft } = await planned(3);
+    const statement = "¶".repeat(2000);
+    const instructions = "¤".repeat(2000);
+    const description = "Kettlebell " + "Ω".repeat(240);
+    draft.lines[0]!.productName = description;
+    draft.lines[0]!.originCountry = "CN";
+    draft.lines[1]!.originCountry = "GB";
+    draft.lines[2]!.originCountry = "PL";
+    draft.shipment = {
+      ...draft.shipment!,
+      customsStatementId: "custom",
+      customsStatementText: statement,
+      specialInstructions: instructions,
+      dimensions: Array.from({ length: 40 }, (_, index) => ({ lengthCm: index + 1, widthCm: 10, heightCm: 12, weightKg: index + 1 })),
+    };
+    const face = await font();
+    const plan = planCommercialInvoice(draft, face);
+    for (const page of plan) {
+      expect(page.used).toBeLessThanOrEqual(commercialInvoicePageRoom(draft, page.role) + 0.1);
+    }
+    expect(plan.filter((page) => page.summary).length).toBeGreaterThan(1);
+    expect(plan.slice(1).every((page) => page.role !== "first")).toBe(true);
+    const bytes = await renderCommercialInvoicePdf(draft);
+    const extracted = await extractText(bytes, { mergePages: false });
+    const pages = extracted.text;
+    const compact = pages.join("").replace(/\s+/g, "");
+    expect(compact.match(/¶/g)?.length).toBe(2000);
+    expect(compact.match(/¤/g)?.length).toBe(2000);
+    expect(compact.match(/Ω/g)?.length).toBe(240);
+    expect(compact).toContain("Countryoforigin:China,UnitedKingdom,Poland");
+    const joined = pages.join("\n");
+    expect(joined).toContain("1 x 10 x 12 = 1kg");
+    expect(joined).toContain("40 x 10 x 12 = 40kg");
+    expect(pages[0]).toMatch(/COMMERCIAL INVOICE/);
+    expect(pages.slice(1).every((page) => /Document No:/.test(page))).toBe(true);
+    expect(pages.slice(1).some((page) => /COMMERCIAL INVOICE/.test(page))).toBe(false);
+    await saveDraft("invoice-stress.pdf", draft);
+  }, 20000);
 });
 
 async function findCount(pages: number, roles?: InvoicePageRole[]) {
@@ -129,9 +193,13 @@ async function findCount(pages: number, roles?: InvoicePageRole[]) {
 }
 
 async function saveSample(name: string, count: number) {
+  const { draft } = await planned(count);
+  await saveDraft(name, draft);
+}
+
+async function saveDraft(name: string, draft: Awaited<ReturnType<typeof planned>>["draft"]) {
   const dir = process.env.CI_RENDER_DIR;
   if (!dir) return;
-  const { draft } = await planned(count);
   const bytes = await renderCommercialInvoicePdf(draft);
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), bytes);

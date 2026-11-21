@@ -105,6 +105,17 @@ export function CommercialInvoiceWorkspace() {
       buyerVat: draft.buyer.vat,
       buyerEori: draft.buyer.eori,
       shipment: draft.shipment,
+      ...(draft.incoterm === "DDP" ? {
+        importerName: draft.importer.name,
+        importerAddress: draft.importer.address,
+        importerVat: draft.importer.vat,
+        importerEori: draft.importer.eori,
+        clearanceCountry: draft.clearanceCountry,
+        procedure: draft.procedure,
+        ddpModel: draft.ddpModel,
+        frenchVatNumber: draft.frenchVatNumber,
+        statementApprovedBy: draft.statementApprovedBy,
+      } : {}),
       lines: draft.lines.map((line) => ({
         lineId: line.id,
         orderNumber: line.orderNumber,
@@ -227,6 +238,52 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Named place
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.namedPlace} onChange={(event) => setDraft({ ...draft, namedPlace: event.currentTarget.value })} />
             </label>
+            {draft.incoterm === "DDP" ? (
+              <>
+                <label className="text-sm font-semibold">Importer name
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.name} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, name: event.currentTarget.value } })} />
+                </label>
+                <label className="text-sm font-semibold md:col-span-2">Importer address
+                  <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.address} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, address: event.currentTarget.value } })} />
+                </label>
+                <label className="text-sm font-semibold">Importer VAT
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.vat} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, vat: event.currentTarget.value } })} />
+                </label>
+                <label className="text-sm font-semibold">Importer EORI
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.eori} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, eori: event.currentTarget.value } })} />
+                </label>
+                <label className="text-sm font-semibold">Clearance country
+                  <input maxLength={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.clearanceCountry} onChange={(event) => setDraft({ ...draft, clearanceCountry: event.currentTarget.value.toUpperCase() })} />
+                </label>
+                <label className="text-sm font-semibold">Customs procedure
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.procedure} onChange={(event) => setDraft({ ...draft, procedure: event.currentTarget.value as InvoiceDraft["procedure"] })}>
+                    <option value="unconfirmed">Unconfirmed</option>
+                    <option value="40">40</option>
+                    <option value="42">42</option>
+                    <option value="transit">Transit</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="text-sm font-semibold">DDP model
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.ddpModel} onChange={(event) => setDraft({ ...draft, ddpModel: event.currentTarget.value as InvoiceDraft["ddpModel"] })}>
+                    <option value="not_applicable">Not applicable</option>
+                    <option value="unspecified">Unspecified</option>
+                    <option value="importers_signature">Importer signature</option>
+                    <option value="own_french_vat">Own French VAT</option>
+                  </select>
+                </label>
+                {draft.ddpModel === "own_french_vat" ? (
+                  <label className="text-sm font-semibold">French VAT
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.frenchVatNumber} onChange={(event) => setDraft({ ...draft, frenchVatNumber: event.currentTarget.value })} />
+                  </label>
+                ) : null}
+                {draft.procedure === "42" || draft.procedure === "other" ? (
+                  <label className="text-sm font-semibold">Statement reviewer
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.statementApprovedBy} onChange={(event) => setDraft({ ...draft, statementApprovedBy: event.currentTarget.value })} />
+                  </label>
+                ) : null}
+              </>
+            ) : null}
             <label className="text-sm font-semibold">Buyer VAT
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.vat} onChange={(event) => setDraft({ ...draft, buyer: { ...draft.buyer, vat: event.currentTarget.value } })} />
             </label>
@@ -252,22 +309,22 @@ export function CommercialInvoiceWorkspace() {
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.contactEmail ?? ""} onChange={(event) => patchShipment({ contactEmail: event.currentTarget.value })} />
             </label>
             <label className="text-sm font-semibold">Parcels
-              <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.parcels ?? 0} onChange={(event) => patchShipment({ parcels: Number(event.currentTarget.value) })} />
+              <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.parcels ?? 0} onChange={(event) => patchShipment({ parcels: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Pallets
-              <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.pallets ?? 0} onChange={(event) => patchShipment({ pallets: Number(event.currentTarget.value) })} />
+              <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.pallets ?? 0} onChange={(event) => patchShipment({ pallets: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Gross kg
               <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.grossWeightKg} onChange={(event) => setDraft({ ...draft, grossWeightKg: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Delivery
-              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />
+              <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
             <label className="text-sm font-semibold">Surcharge
-              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.surchargePence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ surchargePence: Math.round(Number(event.currentTarget.value) * 100) })} />
+              <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.surchargePence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ surchargePence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
             <label className="text-sm font-semibold">VAT
-              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.vatPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ vatPence: Math.round(Number(event.currentTarget.value) * 100) })} />
+              <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.vatPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ vatPence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
             <label className="text-sm font-semibold">Customs statement
               <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.customsStatementId ?? "none"} onChange={(event) => patchShipment({ customsStatementId: event.currentTarget.value })}>

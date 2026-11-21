@@ -2,8 +2,8 @@ import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
-import { applyLineEdits, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
-import { shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
+import { applyLineEdits, applyOptionalDdp, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
+import { optionalDdpSchema, shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
 import type { Profile } from "@/lib/types";
@@ -24,6 +24,7 @@ const bodySchema = z.object({
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
   shipment: shipmentSchema.optional(),
+  ...optionalDdpSchema,
   lines: z.array(z.object({
     orderNumber: z.string(),
     sku: z.string(),
@@ -129,12 +130,12 @@ export async function POST(request: Request) {
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
   let draft;
   try {
-    draft = applyShipment(withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data)), {
+    draft = applyOptionalDdp(applyShipment(withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data)), {
       ...input.shipment,
       buyerVat: input.buyerVat ?? input.shipment?.buyerVat,
       buyerEori: input.buyerEori ?? input.shipment?.buyerEori,
       grossWeightKg: input.grossWeightKg,
-    });
+    }), input);
   } catch (error) {
     return Response.json({ error: clientError(error, "Shipped quantity is invalid.") }, { status: 400 });
   }

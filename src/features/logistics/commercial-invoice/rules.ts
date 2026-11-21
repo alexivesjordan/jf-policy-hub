@@ -251,29 +251,18 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   required(d.seller.eori,"Seller EORI");
   required(d.seller.vat,"Seller VAT");
   required(d.destinationCountry,"Final destination country");
-  if (d.incoterm === "DDP") {
-    required(d.importer.name,"Importer name");
-    required(d.importer.address,"Importer address");
-    required(d.importer.eori,"Importer EORI");
-    required(d.clearanceCountry,"Customs clearance country");
-  }
   if (!/^[A-Z]{2}$/.test(d.destinationCountry)) errors.push("Final destination country must be a 2-letter ISO code.");
   if (d.clearanceCountry && !/^[A-Z]{2}$/.test(d.clearanceCountry)) errors.push("Clearance country must be a 2-letter ISO code.");
   if (!["DDP","DAP","EXW","FCA","CPT","CIP","DPU","FOB","FAS","CFR","CIF"].includes(d.incoterm)) errors.push("Select a valid Incoterm.");
   required(d.namedPlace,"Incoterm named place");
-  if (d.incoterm === "DDP") {
-    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "unspecified")
-      errors.push("Choose Europa's confirmed DDP Flow model for French clearance.");
-    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "own_french_vat") {
-      required(d.frenchVatNumber,"Jordan French VAT number");
-      if (d.importer.name !== d.seller.name) errors.push("Verify Jordan is named as importer of record for the own-French-VAT model.");
-    }
-    if (d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "importers_signature") {
-      required(d.importer.vat,"Importer VAT number");
-      if (d.importer.name === d.seller.name) errors.push("The importer-signature model needs the confirmed EU importer, not Jordan.");
-    }
+  if (d.incoterm === "DDP" && d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "own_french_vat") {
+    required(d.frenchVatNumber,"Jordan French VAT number");
+    if (d.importer.name !== d.seller.name) errors.push("Verify Jordan is named as importer of record for the own-French-VAT model.");
   }
-  if (d.incoterm === "DDP" && d.procedure === "unconfirmed") errors.push("DDP customs procedure must be confirmed against carrier/broker documents.");
+  if (d.incoterm === "DDP" && d.carrier === "Europa" && d.clearanceCountry === "FR" && d.ddpModel === "importers_signature") {
+    required(d.importer.vat,"Importer VAT number");
+    if (d.importer.name === d.seller.name) errors.push("The importer-signature model needs the confirmed EU importer, not Jordan.");
+  }
   if (d.procedure === "42") {
     if (d.clearanceCountry !== "FR") errors.push("This workflow only supports Procedure 42 with verified French import clearance.");
     if (d.destinationCountry === "FR" || !eu.has(d.destinationCountry)) errors.push("Procedure 42 requires a different EU destination from France.");

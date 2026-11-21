@@ -11,7 +11,6 @@ import {
 const A4: [number, number] = [595.28, 841.89];
 const MARGIN = 28;
 const FOOTER = 42;
-const BOTTOM = MARGIN + FOOTER;
 const CONTENT_W = A4[0] - MARGIN * 2;
 
 const COLS = [
@@ -27,7 +26,20 @@ const COLS = [
 ] as const;
 
 export type InvoicePageRole = "first" | "continuation" | "last";
-export type InvoicePagePlan = { role: InvoicePageRole; from: number; to: number; summary: boolean };
+export type SummaryPiece =
+  | { kind: "dims"; from: number; to: number }
+  | { kind: "statement"; from: number; to: number }
+  | { kind: "boxes"; from: number; to: number }
+  | { kind: "sign" };
+export type InvoicePagePlan = {
+  role: InvoicePageRole;
+  from: number;
+  to: number;
+  summary: boolean;
+  pieces: SummaryPiece[];
+  anchor: "top" | "bottom";
+  used: number;
+};
 
 const ink = rgb(0.1, 0.1, 0.1);
 const grey = rgb(0.42, 0.42, 0.42);
@@ -126,7 +138,7 @@ function wrap(text: string, font: PDFFont, size: number, width: number) {
     current = piece;
   }
   if (current) lines.push(current);
-  return lines.slice(0, 3);
+  return lines;
 }
 
 type Measured = { line: GoodsLine; height: number; description: string[]; origin: string[] };
@@ -186,54 +198,240 @@ function rowsTopContinuation() {
   return A4[1] - 28 - 16 - HEADER_BLOCK;
 }
 
-function summaryLayout(draft: InvoiceDraft) {
+const DIM_LINE = 11;
+const DIM_HEADER = 14;
+const DIM_TAIL = 6;
+const STATEMENT_LINE = 12;
+const STATEMENT_TAIL = 8;
+const INSTR_LINE = 9;
+const SIGN_H = 78;
+const SUMMARY_GAP = 12;
+
+type SummaryMetrics = {
+  columns: number;
+  dimRows: number;
+  statementLines: string[];
+  instructionLines: string[];
+  boxH: number;
+  signH: number;
+  gap: number;
+  total: number;
+};
+
+function dimensionColumns(count: number) {
+  if (count > 16) return 3;
+  if (count > 8) return 2;
+  return 1;
+}
+
+function ddpLines(draft: InvoiceDraft) {
+  if (draft.incoterm !== "DDP") return [];
+  const models: Record<string, string> = {
+    importers_signature: "Importer's signature",
+    own_french_vat: "Own French VAT",
+  };
+  return [
+    draft.importer.name ? "Importer: " + draft.importer.name : "",
+    draft.importer.address ? "Importer address: " + draft.importer.address : "",
+    draft.importer.vat ? "Importer VAT: " + draft.importer.vat : "",
+    draft.importer.eori ? "Importer EORI: " + draft.importer.eori : "",
+    draft.clearanceCountry ? "Clearance country: " + draft.clearanceCountry : "",
+    draft.procedure !== "unconfirmed" ? "Customs procedure: " + draft.procedure : "",
+    models[draft.ddpModel] ? "DDP model: " + models[draft.ddpModel] : "",
+    draft.ddpModel === "own_french_vat" && draft.frenchVatNumber ? "French VAT: " + draft.frenchVatNumber : "",
+  ].filter(Boolean);
+}
+
+function instructionParts(draft: InvoiceDraft, shipment: InvoiceShipment, origins: string) {
+  return [
+    "Country of origin: " + origins,
+    "Country of export: United Kingdom",
+    "Incoterms: " + draft.incoterm,
+    ...ddpLines(draft),
+    shipment.contactName ? "Contact: " + shipment.contactName : "",
+    shipment.contactEmail ? "Email: " + shipment.contactEmail : "",
+    shipment.specialInstructions,
+  ].filter(Boolean);
+}
+
+function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
   const shipment = shipmentOf(draft);
   const statement = resolveCustomsStatement(shipment.customsStatementId, shipment.customsStatementText) || shipment.customsStatementText;
   const statementLines = statement
-    ? statement.split("\n").reduce((count, part) => count + Math.max(1, Math.ceil(part.length / 100)), 0)
-    : 0;
-  const instructions = [
-    "Country of origin: x",
-    "Country of export: United Kingdom",
-    "Incoterms: " + draft.incoterm,
-    shipment.contactName ? "contact" : "",
-    shipment.contactEmail ? "email" : "",
-    shipment.specialInstructions,
-  ].filter(Boolean);
-  const boxH = Math.max(108, 22 + instructions.length * 11 + 12, 16 + 4 * 14 + 12, 16 + 6 * 13 + 22);
-  const signH = 78;
-  const gap = 12;
-  const dimsH = shipment.dimensions.length ? 14 + shipment.dimensions.length * 11 + 6 : 0;
-  const statementH = statementLines ? statementLines * 12 + 8 : 0;
-  return { boxH, signH, gap, dimsH, statementH, total: dimsH + statementH + boxH + gap + signH };
+    ? statement.split("\n").flatMap((part) => {
+      const wrapped = wrap(part, font, 8, CONTENT_W);
+      return wrapped.length ? wrapped : [""];
+    })
+    : [];
+  const origins = [...new Set(shippedLines(draft).map((row) => countryName(row.originCountry)).filter(Boolean))].join(", ");
+  const boxW = (CONTENT_W - 16) / 3;
+  const parts = instructionParts(draft, shipment, origins);
+  const instructionLines = parts.flatMap((part) => wrap(part, font, 7.5, boxW - 16));
+  const boxH = boxesHeight(0, instructionLines.length);
+  const columns = dimensionColumns(shipment.dimensions.length);
+  const dimRows = shipment.dimensions.length ? Math.ceil(shipment.dimensions.length / columns) : 0;
+  const dimsH = dimRows ? DIM_HEADER + dimRows * DIM_LINE + DIM_TAIL : 0;
+  const statementH = statementLines.length ? statementLines.length * STATEMENT_LINE + STATEMENT_TAIL : 0;
+  return {
+    columns, dimRows, statementLines, instructionLines, boxH, signH: SIGN_H, gap: SUMMARY_GAP,
+    total: dimsH + statementH + boxH + SUMMARY_GAP + SIGN_H,
+  };
+}
+
+function boxesHeight(from: number, to: number) {
+  const lines = Math.max(0, to - from);
+  return Math.max(108, 30 + lines * INSTR_LINE + 12, 16 + 4 * 14 + 12, 16 + 6 * 13 + 22);
+}
+
+function pieceHeight(piece: SummaryPiece, metrics: SummaryMetrics) {
+  if (piece.kind === "dims") {
+    const header = piece.from === 0 ? DIM_HEADER : 0;
+    const tail = piece.to === metrics.dimRows ? DIM_TAIL : 0;
+    return header + (piece.to - piece.from) * DIM_LINE + tail;
+  }
+  if (piece.kind === "statement") {
+    const tail = piece.to === metrics.statementLines.length ? STATEMENT_TAIL : 0;
+    return (piece.to - piece.from) * STATEMENT_LINE + tail;
+  }
+  return piece.kind === "boxes" ? boxesHeight(piece.from, piece.to) : metrics.signH;
+}
+
+function sourcePieces(metrics: SummaryMetrics): SummaryPiece[] {
+  const pieces: SummaryPiece[] = [];
+  if (metrics.dimRows) pieces.push({ kind: "dims", from: 0, to: metrics.dimRows });
+  if (metrics.statementLines.length) pieces.push({ kind: "statement", from: 0, to: metrics.statementLines.length });
+  pieces.push({ kind: "boxes", from: 0, to: metrics.instructionLines.length }, { kind: "sign" });
+  return pieces;
+}
+
+function takePiece(piece: SummaryPiece, room: number, metrics: SummaryMetrics): { fit: SummaryPiece | null; rest: SummaryPiece | null; height: number } {
+  const whole = pieceHeight(piece, metrics);
+  if (whole <= room) return { fit: piece, rest: null, height: whole };
+  if (piece.kind === "sign") return { fit: null, rest: piece, height: 0 };
+  if (piece.kind === "boxes") {
+    if (room < 108) return { fit: null, rest: piece, height: 0 };
+    const lineCap = Math.max(0, Math.floor((room - 42) / INSTR_LINE));
+    const lines = Math.min(piece.to - piece.from, lineCap);
+    if (lines < 1 && piece.to > piece.from) return { fit: null, rest: piece, height: 0 };
+    const to = piece.from + Math.max(lines, piece.to === piece.from ? 0 : lines);
+    const fit: SummaryPiece = { kind: "boxes", from: piece.from, to };
+    if (fit.to >= piece.to) return { fit: piece, rest: null, height: whole };
+    return { fit, rest: { kind: "boxes", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
+  }
+  if (piece.kind === "dims") {
+    const header = piece.from === 0 ? DIM_HEADER : 0;
+    let rows = Math.floor((room - header) / DIM_LINE);
+    if (piece.from + rows >= piece.to && whole > room) rows = piece.to - piece.from - 1;
+    if (rows < 1) return { fit: null, rest: piece, height: 0 };
+    const fit: SummaryPiece = { kind: "dims", from: piece.from, to: piece.from + rows };
+    return { fit, rest: { kind: "dims", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
+  }
+  let lines = Math.floor((room - (piece.to === metrics.statementLines.length ? STATEMENT_TAIL : 0)) / STATEMENT_LINE);
+  if (piece.from + lines >= piece.to && whole > room) lines = piece.to - piece.from - 1;
+  if (lines < 1) return { fit: null, rest: piece, height: 0 };
+  const fit: SummaryPiece = { kind: "statement", from: piece.from, to: piece.from + lines };
+  return { fit, rest: { kind: "statement", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
+}
+
+function packPieces(pieces: SummaryPiece[], room: number, metrics: SummaryMetrics) {
+  const placed: SummaryPiece[] = [];
+  let used = 0;
+  let index = 0;
+  while (index < pieces.length) {
+    const piece = pieces[index]!;
+    const gap = piece.kind === "sign" && used > 0 ? SUMMARY_GAP : 0;
+    const taken = takePiece(piece, room - used - gap, metrics);
+    if (!taken.fit) break;
+    placed.push(taken.fit);
+    used += gap + taken.height;
+    if (taken.rest) return { placed, rest: [taken.rest, ...pieces.slice(index + 1)], height: used };
+    index += 1;
+  }
+  return { placed, rest: pieces.slice(index), height: used };
+}
+
+function summaryComplete(pieces: SummaryPiece[], metrics: SummaryMetrics) {
+  const dims = pieces.find((piece) => piece.kind === "dims");
+  const statement = pieces.find((piece) => piece.kind === "statement");
+  const boxes = pieces.find((piece) => piece.kind === "boxes");
+  if (!pieces.some((piece) => piece.kind === "sign")) return false;
+  if (!(boxes?.kind === "boxes" && boxes.from === 0 && boxes.to === metrics.instructionLines.length)) return false;
+  if (metrics.dimRows && !(dims?.kind === "dims" && dims.from === 0 && dims.to === metrics.dimRows)) return false;
+  if (metrics.statementLines.length && !(statement?.kind === "statement" && statement.from === 0 && statement.to === metrics.statementLines.length)) return false;
+  return true;
+}
+
+function pageOf(role: InvoicePageRole, from: number, to: number, pieces: SummaryPiece[], anchor: "top" | "bottom", used: number): InvoicePagePlan {
+  return { role, from, to, summary: pieces.length > 0, pieces, anchor, used };
+}
+
+function rowsHeight(rows: Measured[], from: number, to: number) {
+  let used = 0;
+  for (let index = from; index < to; index += 1) used += rows[index]!.height;
+  return used;
+}
+
+export function commercialInvoicePageRoom(draft: InvoiceDraft, role: InvoicePageRole) {
+  return (role === "first" ? rowsTopFirst(draft) : rowsTopContinuation()) - ROW_BOTTOM;
 }
 
 export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): InvoicePagePlan[] {
   const rows = measure(shippedLines(draft), font);
-  const summary = summaryLayout(draft).total;
-  const firstRoom = rowsTopFirst(draft) - ROW_BOTTOM;
-  const contRoom = rowsTopContinuation() - ROW_BOTTOM;
-  const pages: InvoicePagePlan[] = [];
-  if (fits(rows, 0, rows.length, firstRoom - summary)) {
-    return [{ role: "first", from: 0, to: rows.length, summary: true }];
-  }
-  const firstEnd = take(rows, 0, firstRoom);
-  pages.push({ role: "first", from: 0, to: firstEnd, summary: false });
-  let cursor = firstEnd;
-  while (cursor < rows.length || pages[pages.length - 1]?.summary !== true) {
-    if (cursor >= rows.length) {
-      pages.push({ role: "last", from: cursor, to: cursor, summary: true });
-      break;
+  const metrics = measureSummary(draft, font);
+  const pieces = sourcePieces(metrics);
+  const firstRoom = commercialInvoicePageRoom(draft, "first");
+  const contRoom = commercialInvoicePageRoom(draft, "continuation");
+  const reserve = metrics.total <= contRoom ? metrics.total : 0;
+  const built: InvoicePagePlan[] = [];
+
+  const addSummaryPages = (pending: SummaryPiece[]) => {
+    let rest = pending;
+    while (rest.length) {
+      const packed = packPieces(rest, contRoom, metrics);
+      const placed = packed.placed.length ? packed.placed : [rest[0]!];
+      const next = packed.placed.length ? packed.rest : rest.slice(1);
+      const height = packed.placed.length ? packed.height : pieceHeight(placed[0]!, metrics);
+      built.push(pageOf("continuation", rows.length, rows.length, placed, summaryComplete(placed, metrics) ? "bottom" : "top", height));
+      rest = next;
     }
-    if (fits(rows, cursor, rows.length, contRoom - summary)) {
-      pages.push({ role: "last", from: cursor, to: rows.length, summary: true });
-      break;
+  };
+
+  if (!rows.length) {
+    addSummaryPages(pieces);
+  } else if (metrics.total <= firstRoom && fits(rows, 0, rows.length, firstRoom - metrics.total)) {
+    built.push(pageOf("first", 0, rows.length, pieces, "bottom", rowsHeight(rows, 0, rows.length) + metrics.total));
+  } else {
+    let cursor = take(rows, 0, firstRoom);
+    built.push(pageOf("first", 0, cursor, [], "top", rowsHeight(rows, 0, cursor)));
+    while (cursor < rows.length) {
+      if (reserve > 0 && fits(rows, cursor, rows.length, contRoom - reserve)) {
+        built.push(pageOf("continuation", cursor, rows.length, pieces, "bottom", rowsHeight(rows, cursor, rows.length) + metrics.total));
+        cursor = rows.length;
+        break;
+      }
+      const end = take(rows, cursor, contRoom);
+      built.push(pageOf("continuation", cursor, end, [], "top", rowsHeight(rows, cursor, end)));
+      cursor = end;
     }
-    const end = take(rows, cursor, contRoom);
-    pages.push({ role: "continuation", from: cursor, to: end, summary: false });
-    cursor = end;
+    if (!built.some((page) => page.summary)) {
+      const last = built[built.length - 1]!;
+      const room = last.role === "first" ? firstRoom : contRoom;
+      const leftover = room - last.used;
+      const packed = packPieces(pieces, leftover, metrics);
+      if (packed.placed.length) {
+        last.pieces = packed.placed;
+        last.summary = true;
+        last.anchor = summaryComplete(packed.placed, metrics) ? "bottom" : "top";
+        last.used += packed.height;
+        addSummaryPages(packed.rest);
+      } else addSummaryPages(pieces);
+    }
   }
-  return pages;
+
+  return built.map((page, index) => ({
+    ...page,
+    role: index === 0 ? "first" : index === built.length - 1 ? "last" : "continuation",
+  }));
 }
 
 /** `top` is the PDF y of the top edge. The SVG path is flipped, so it extends downward by `h`. */
@@ -281,11 +479,9 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const plan = planCommercialInvoice(draft, regular);
   const rows = measure(shippedLines(draft), regular);
   const shipment = shipmentOf(draft);
-  const statement = resolveCustomsStatement(shipment.customsStatementId, shipment.customsStatementText) || shipment.customsStatementText;
   const goods = shippedLines(draft).reduce((sum, row) => sum + chargedLinePence(row), 0);
   const net = goods + shipment.deliveryPence + shipment.surchargePence;
   const total = net + shipment.vatPence;
-  const origins = [...new Set(shippedLines(draft).map((row) => countryName(row.originCountry)).filter(Boolean))].join(", ");
   const pages = plan.map(() => pdf.addPage(A4));
 
   const text = (page: PDFPage, value: string, x: number, y: number, size: number, font: PDFFont, color = ink, maxWidth?: number) => {
@@ -324,7 +520,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const drawRows = (page: PDFPage, y: number, from: number, to: number) => {
     for (let index = from; index < to; index += 1) {
       const row = rows[index]!;
-      let x = MARGIN + 3;
+      const x = MARGIN + 3;
       const top = y - 9;
       text(page, row.line.sku, x, top, 7, regular, ink, COLS[0].w - 4);
       row.description.forEach((part, lineNo) => text(page, part, x + COLS[0].w, top - lineNo * 9, 7, regular, ink, COLS[1].w - 4));
@@ -353,7 +549,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   };
 
   const letterhead = (page: PDFPage) => {
-    let y = A4[1] - 36;
+    const y = A4[1] - 36;
     text(page, COMMERCIAL_INVOICE_SELLER.name, MARGIN, y, 12, bold);
     const address = [
       ...COMMERCIAL_INVOICE_SELLER.lines,
@@ -413,89 +609,102 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     return boxTop - boxH - 14;
   };
 
-  const summary = (page: PDFPage) => {
-    const layout = summaryLayout(draft);
-    const signTop = ROW_BOTTOM + layout.signH;
-    const boxTop = signTop + layout.gap + layout.boxH;
-    let cursor = boxTop + layout.statementH + layout.dimsH - 12;
-    if (shipment.dimensions.length) {
-      text(page, "Dimensions:", MARGIN, cursor, 9, bold);
-      cursor -= 14;
-      for (const item of shipment.dimensions) {
-        text(page, `${item.lengthCm} x ${item.widthCm} x ${item.heightCm} = ${item.weightKg}kg`, MARGIN, cursor, 8, regular);
-        cursor -= 11;
+  const metrics = measureSummary(draft, regular);
+  const boxW = (CONTENT_W - 16) / 3;
+  const drawSummary = (page: PDFPage, ceiling: number, item: InvoicePagePlan) => {
+    const blockHeight = item.pieces.reduce((sum, piece, index) => {
+      const gap = piece.kind === "sign" && index > 0 ? SUMMARY_GAP : 0;
+      return sum + gap + pieceHeight(piece, metrics);
+    }, 0);
+    let cursor = item.anchor === "bottom" ? Math.min(ceiling, ROW_BOTTOM + blockHeight) : ceiling;
+    const drawDims = (piece: Extract<SummaryPiece, { kind: "dims" }>) => {
+      if (piece.from === 0) {
+        text(page, "Dimensions:", MARGIN, cursor - 11, 9, bold);
+        cursor -= DIM_HEADER;
       }
-      cursor -= 6;
-    }
-    if (statement) {
-      for (const part of statement.split("\n")) {
-        for (const wrapped of wrap(part, regular, 8, CONTENT_W)) {
-          text(page, wrapped, MARGIN, cursor, 8, regular);
-          cursor -= 12;
+      const colW = CONTENT_W / metrics.columns;
+      for (let row = piece.from; row < piece.to; row += 1) {
+        for (let column = 0; column < metrics.columns; column += 1) {
+          const dim = shipment.dimensions[row * metrics.columns + column];
+          if (!dim) continue;
+          text(page, `${dim.lengthCm} x ${dim.widthCm} x ${dim.heightCm} = ${dim.weightKg}kg`, MARGIN + column * colW, cursor - 9, 8, regular);
         }
+        cursor -= DIM_LINE;
       }
-    }
-    const boxW = (CONTENT_W - 16) / 3;
-    const instructions = [
-      "Country of origin: " + origins,
-      "Country of export: United Kingdom",
-      "Incoterms: " + draft.incoterm,
-      shipment.contactName ? "Contact: " + shipment.contactName : "",
-      shipment.contactEmail ? "Email: " + shipment.contactEmail : "",
-      shipment.specialInstructions,
-    ].filter(Boolean);
-    const middle: [string, string][] = [
-      ["No. of parcels:", shipment.parcels.toFixed(2)],
-      ["No. of pallets:", shipment.pallets.toFixed(2)],
-      ["Total net weight:", kilos(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0))],
-      ["Total gross weight:", grossKilos(draft.grossWeightKg)],
-    ];
-    const totals: [string, string, boolean][] = [
-      ["Goods Net:", money(goods), false],
-      ["Delivery:", money(shipment.deliveryPence), false],
-      ["Surcharge:", money(shipment.surchargePence), false],
-      ["Net:", money(net), false],
-      ["VAT:", money(shipment.vatPence), false],
-      ["Total:", money(total), true],
-    ];
-    const boxH = layout.boxH;
-    const labelValue = (x: number, rowY: number, label: string, value: string, strong = false) => {
-      text(page, label, x + 8, rowY, 7.5, strong ? bold : regular);
-      aligned(page, value, x, rowY, boxW, 7.5, strong ? bold : regular, "right");
+      if (piece.to === metrics.dimRows) cursor -= DIM_TAIL;
     };
-    roundBox(page, MARGIN, boxTop, boxW, boxH);
-    text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
-    instructions.forEach((part, index) => {
-      wrap(part, regular, 7.5, boxW - 16).forEach((wrapped, lineNo) => {
-        text(page, wrapped, MARGIN + 8, boxTop - 30 - index * 11 - lineNo * 9, 7.5, regular, ink, boxW - 16);
-      });
+    const drawStatement = (piece: Extract<SummaryPiece, { kind: "statement" }>) => {
+      for (let index = piece.from; index < piece.to; index += 1) {
+        text(page, metrics.statementLines[index] ?? "", MARGIN, cursor - 10, 8, regular);
+        cursor -= STATEMENT_LINE;
+      }
+      if (piece.to === metrics.statementLines.length) cursor -= STATEMENT_TAIL;
+    };
+    const drawBoxes = (piece: Extract<SummaryPiece, { kind: "boxes" }>) => {
+      const boxTop = cursor;
+      const boxH = boxesHeight(piece.from, piece.to);
+      const middle: [string, string][] = [
+        ["No. of parcels:", shipment.parcels.toFixed(2)],
+        ["No. of pallets:", shipment.pallets.toFixed(2)],
+        ["Total net weight:", kilos(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0))],
+        ["Total gross weight:", grossKilos(draft.grossWeightKg)],
+      ];
+      const totals: [string, string, boolean][] = [
+        ["Goods Net:", money(goods), false],
+        ["Delivery:", money(shipment.deliveryPence), false],
+        ["Surcharge:", money(shipment.surchargePence), false],
+        ["Net:", money(net), false],
+        ["VAT:", money(shipment.vatPence), false],
+        ["Total:", money(total), true],
+      ];
+      const labelValue = (x: number, rowY: number, label: string, value: string, strong = false) => {
+        text(page, label, x + 8, rowY, 7.5, strong ? bold : regular);
+        aligned(page, value, x, rowY, boxW, 7.5, strong ? bold : regular, "right");
+      };
+      roundBox(page, MARGIN, boxTop, boxW, boxH);
+      text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
+      let lineY = boxTop - 30;
+      for (const wrapped of metrics.instructionLines.slice(piece.from, piece.to)) {
+        text(page, wrapped, MARGIN + 8, lineY, 7.5, regular);
+        lineY -= INSTR_LINE;
+      }
+      const midX = MARGIN + boxW + 8;
+      roundBox(page, midX, boxTop, boxW, boxH);
+      middle.forEach(([label, value], index) => labelValue(midX, boxTop - 18 - index * 16, label, value));
+      const rightX = MARGIN + (boxW + 8) * 2;
+      roundBox(page, rightX, boxTop, boxW, boxH);
+      totals.forEach(([label, value, strong], index) => labelValue(rightX, boxTop - 16 - index * 13, label, value, strong));
+      const currency = currencyName(draft.currency);
+      text(page, currency, rightX + (boxW - regular.widthOfTextAtSize(currency, 7.5)) / 2, boxTop - boxH + 10, 7.5, regular);
+      cursor -= boxH;
+    };
+    const drawSign = () => {
+      const signTop = cursor;
+      const stampW = 150;
+      const signW = CONTENT_W - stampW - 8;
+      roundBox(page, MARGIN, signTop, signW, metrics.signH);
+      const underline = (label: string, x: number, rowY: number, width: number) => {
+        text(page, label, x, rowY, 8, regular);
+        const start = x + regular.widthOfTextAtSize(label, 8) + 6;
+        page.drawLine({ start: { x: start, y: rowY - 1 }, end: { x: x + width, y: rowY - 1 }, thickness: 0.4, color: line });
+      };
+      underline("Signed:", MARGIN + 8, signTop - 18, signW / 2 - 16);
+      if (signature) page.drawImage(signature, { x: MARGIN + 58, y: signTop - 28, width: 80, height: 22 });
+      underline("Name:", MARGIN + 8, signTop - 40, signW / 2 - 20);
+      underline("Position:", MARGIN + signW / 2, signTop - 40, signW / 2 - 16);
+      underline("Date:", MARGIN + 8, signTop - 62, signW / 2 - 20);
+      roundBox(page, MARGIN + signW + 8, signTop, stampW, metrics.signH);
+      text(page, "Company stamp", MARGIN + signW + 16, signTop - 16, 8, regular, grey);
+      if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - metrics.signH + 10, width: stampW - 24, height: 40 });
+      cursor -= metrics.signH;
+    };
+    item.pieces.forEach((piece, index) => {
+      if (piece.kind === "sign" && index > 0) cursor -= SUMMARY_GAP;
+      if (piece.kind === "dims") drawDims(piece);
+      else if (piece.kind === "statement") drawStatement(piece);
+      else if (piece.kind === "boxes") drawBoxes(piece);
+      else drawSign();
     });
-    const midX = MARGIN + boxW + 8;
-    roundBox(page, midX, boxTop, boxW, boxH);
-    middle.forEach(([label, value], index) => labelValue(midX, boxTop - 18 - index * 16, label, value));
-    const rightX = MARGIN + (boxW + 8) * 2;
-    roundBox(page, rightX, boxTop, boxW, boxH);
-    totals.forEach(([label, value, strong], index) => labelValue(rightX, boxTop - 16 - index * 13, label, value, strong));
-    const currency = currencyName(draft.currency);
-    text(page, currency, rightX + (boxW - regular.widthOfTextAtSize(currency, 7.5)) / 2, boxTop - boxH + 10, 7.5, regular);
-
-    const signH = layout.signH;
-    const stampW = 150;
-    const signW = CONTENT_W - stampW - 8;
-    roundBox(page, MARGIN, signTop, signW, signH);
-    const underline = (label: string, x: number, rowY: number, width: number) => {
-      text(page, label, x, rowY, 8, regular);
-      const start = x + regular.widthOfTextAtSize(label, 8) + 6;
-      page.drawLine({ start: { x: start, y: rowY - 1 }, end: { x: x + width, y: rowY - 1 }, thickness: 0.4, color: line });
-    };
-    underline("Signed:", MARGIN + 8, signTop - 18, signW / 2 - 16);
-    if (signature) page.drawImage(signature, { x: MARGIN + 58, y: signTop - 28, width: 80, height: 22 });
-    underline("Name:", MARGIN + 8, signTop - 40, signW / 2 - 20);
-    underline("Position:", MARGIN + signW / 2, signTop - 40, signW / 2 - 16);
-    underline("Date:", MARGIN + 8, signTop - 62, signW / 2 - 20);
-    roundBox(page, MARGIN + signW + 8, signTop, stampW, signH);
-    text(page, "Company stamp", MARGIN + signW + 16, signTop - 16, 8, regular, grey);
-    if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - signH + 10, width: stampW - 24, height: 40 });
   };
 
   pages.forEach((page, index) => {
@@ -514,7 +723,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       y = tableHeader(page, y);
       y = drawRows(page, y, item.from, item.to);
     }
-    if (item.summary) summary(page);
+    if (item.pieces.length) drawSummary(page, y, item);
     footer(page, index);
   });
   return pdf.save();
