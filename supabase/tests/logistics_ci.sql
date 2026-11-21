@@ -106,6 +106,7 @@ begin
     'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
     'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-ci', 'number', 'SO-CI')),
     'lines', jsonb_build_array(jsonb_build_object(
+      'id', 'sale-ci:0',
       'orderNumber', 'SO-CI', 'cin7SaleId', 'sale-ci', 'sku', 'CI-TEST-SKU', 'description', 'Bench',
       'orderedQty', 2, 'shippedQty', 1, 'lineNetPence', 20000, 'shippedPence', 10000,
       'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1.5, 'lineWeightKg', 1.5
@@ -140,6 +141,15 @@ begin
     v_notes := v_notes || ' replay ' || sqlerrm || ';';
   end;
 
+  begin
+    perform public.logistics_issue_commercial_invoice(jsonb_set(v_payload, '{issuedBy}', to_jsonb(v_engineer::text)));
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' other user replay allowed;';
+  exception when others then
+    if sqlerrm ilike '%cannot open%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' other user replay ' || sqlerrm || ';'; end if;
+  end;
+
   reset role;
   select last_number into v_after from logistics.invoice_counters where year = v_year;
   execute 'set local role service_role';
@@ -167,6 +177,38 @@ begin
   exception when others then
     if sqlerrm ilike '%already on an issued invoice%' then v_ok := v_ok + 1;
     else v_fail := v_fail + 1; v_notes := v_notes || ' over-ship ' || sqlerrm || ';'; end if;
+  end;
+
+  v_payload := jsonb_build_object(
+    'idempotencyKey', gen_random_uuid(),
+    'issuedBy', v_admin,
+    'currency', 'GBP',
+    'incoterm', 'DAP',
+    'grossWeightKg', 6,
+    'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
+    'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-dup', 'number', 'SO-DUP')),
+    'lines', jsonb_build_array(
+      jsonb_build_object('id', 'sale-dup:0', 'orderNumber', 'SO-DUP', 'cin7SaleId', 'sale-dup', 'sku', 'CI-DUP', 'description', 'Bench A', 'orderedQty', 2, 'shippedQty', 2, 'lineNetPence', 200, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 2),
+      jsonb_build_object('id', 'sale-dup:1', 'orderNumber', 'SO-DUP', 'cin7SaleId', 'sale-dup', 'sku', 'CI-DUP', 'description', 'Bench B', 'orderedQty', 3, 'shippedQty', 3, 'lineNetPence', 300, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 3)
+    )
+  );
+  begin
+    perform public.logistics_issue_commercial_invoice(v_payload);
+    v_ok := v_ok + 1;
+  exception when others then
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' duplicate sku ' || sqlerrm || ';';
+  end;
+  v_payload := jsonb_set(v_payload, '{idempotencyKey}', to_jsonb(gen_random_uuid()::text));
+  v_payload := jsonb_set(v_payload, '{lines,0,shippedQty}', '1'::jsonb);
+  v_payload := jsonb_set(v_payload, '{lines,1,shippedQty}', '0'::jsonb);
+  begin
+    perform public.logistics_issue_commercial_invoice(v_payload);
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' duplicate sku over-ship allowed;';
+  exception when others then
+    if sqlerrm ilike '%already on an issued invoice%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' duplicate sku over-ship ' || sqlerrm || ';'; end if;
   end;
 
   select seller::text, pdf_filename into v_seller, v_filename

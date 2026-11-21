@@ -6,6 +6,8 @@ export type Cin7Segment = "independent" | "franchisee" | "trade" | "big_corporat
 /** A quote as Pulse needs it. Field names are ours. They are not a Cin7 payload map. */
 export type Cin7QuoteLine = {
   sku: string | null;
+  /** Cin7 sale-line ID when the payload has one. */
+  lineId?: string | null;
   productName: string;
   category: string | null;
   /** Cin7 product Category text. Not a Pulse category slug. */

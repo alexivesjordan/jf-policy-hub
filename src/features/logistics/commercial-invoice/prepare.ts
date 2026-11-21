@@ -19,8 +19,8 @@ export function issuedQuantities(data: unknown): IssuedQuantity[] {
     if (!row || typeof row !== "object") return [];
     const item = row as Record<string, unknown>;
     const qty = typeof item.qty === "number" ? item.qty : Number(item.qty);
-    if (typeof item.cin7SaleId !== "string" || typeof item.sku !== "string" || !Number.isFinite(qty)) return [];
-    return [{ cin7SaleId: item.cin7SaleId, sku: item.sku, qty }];
+    if (typeof item.cin7SaleId !== "string" || typeof item.sku !== "string" || typeof item.lineKey !== "string" || !Number.isFinite(qty)) return [];
+    return [{ cin7SaleId: item.cin7SaleId, sku: item.sku, lineKey: item.lineKey, qty }];
   });
 }
 
@@ -38,11 +38,42 @@ export function customsFromRpc(data: unknown): CustomsRow[] {
     }];
   });
 }
-export type LineEdit = { orderNumber: string; sku: string; shippedQuantity: number; hsCode: string; originCountry: string; unitWeightKg: number | null };
+export type LineEdit = { lineId: string; orderNumber: string; sku: string; shippedQuantity: number; hsCode: string; originCountry: string; unitWeightKg: number | null };
+
+/** True when each line stays within its own quantity and the sale+SKU total stays within the summed order quantity. */
+export function skuQuantityFits(
+  lines: { saleId: string; sku: string; lineId: string; orderedQty: number; shippedQty: number }[],
+  already: { saleId: string; sku: string; qty: number }[],
+) {
+  const byLine = new Map<string, { saleId: string; sku: string; orderedQty: number; shippedQty: number }>();
+  for (const line of lines) {
+    if (!line.lineId || line.orderedQty <= 0 || line.shippedQty < 0 || line.shippedQty > line.orderedQty) return false;
+    const key = line.saleId + "\0" + line.lineId;
+    const prev = byLine.get(key);
+    if (prev && (prev.orderedQty !== line.orderedQty || prev.sku !== line.sku)) return false;
+    byLine.set(key, prev ? { ...prev, shippedQty: prev.shippedQty + line.shippedQty } : { saleId: line.saleId, sku: line.sku, orderedQty: line.orderedQty, shippedQty: line.shippedQty });
+  }
+  const groups = new Map<string, { ordered: number; shipped: number }>();
+  for (const line of byLine.values()) {
+    const key = line.saleId + "\0" + line.sku;
+    const group = groups.get(key) ?? { ordered: 0, shipped: 0 };
+    group.ordered += line.orderedQty;
+    group.shipped += line.shippedQty;
+    groups.set(key, group);
+  }
+  for (const [key, group] of groups) {
+    if (group.shipped <= 0) continue;
+    const split = key.indexOf("\0");
+    const saleId = key.slice(0, split);
+    const sku = key.slice(split + 1);
+    const prior = already.reduce((sum, row) => sum + (row.saleId === saleId && row.sku === sku ? row.qty : 0), 0);
+    if (prior + group.shipped > group.ordered) return false;
+  }
+  return true;
+}
 
 export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): InvoiceOrder[] {
   return quotes.map((sale) => {
-    const goods = sale.lines.filter((line) => isGoodsLine({ sku: line.sku, productName: line.productName, category: line.cin7Category }));
     return {
       id: sale.id,
       orderNumber: sale.number,
@@ -51,11 +82,12 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): Invo
       country: sale.destinationCountry ?? "",
       currency: sale.currency ?? "",
       warnings: [],
-      lines: goods.map((line, index) => {
+      lines: sale.lines.flatMap((line, index) => {
+        if (!isGoodsLine({ sku: line.sku, productName: line.productName, category: line.cin7Category })) return [];
         const saved = customs.find((row) => row.sku === (line.sku ?? ""));
         const ordered = line.qty;
         const goodsLine: GoodsLine = {
-          id: sale.id + "-" + index,
+          id: line.lineId?.trim() || sale.id + ":" + index,
           orderNumber: sale.number,
           sku: line.sku ?? "",
           productName: line.productName,
@@ -67,7 +99,7 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): Invo
           originCountry: saved?.origin ?? "",
           unitWeightKg: saved?.netWeightKg ?? line.unitWeightKg ?? null,
         };
-        return goodsLine;
+        return [goodsLine];
       }),
     };
   });
@@ -77,7 +109,7 @@ export function applyLineEdits(orders: InvoiceOrder[], edits: LineEdit[]) {
   return orders.map((order) => ({
     ...order,
     lines: order.lines.map((line) => {
-      const edit = edits.find((item) => item.orderNumber === line.orderNumber && item.sku === line.sku);
+      const edit = edits.find((item) => item.lineId === line.id);
       if (!edit) return { ...line, shippedQuantity: 0 };
       return {
         ...line,
@@ -114,17 +146,16 @@ export function draftFromOrders(orders: InvoiceOrder[], input: { incoterm: strin
   return draft;
 }
 
-export type IssuedQuantity = { cin7SaleId: string; sku: string; qty: number };
+export type IssuedQuantity = { cin7SaleId: string; sku: string; lineKey: string; qty: number };
 
 export function issueLines(draft: InvoiceDraft, orders: InvoiceOrder[], already: IssuedQuantity[] = []) {
   const seen = new Map<string, number>();
   return draft.lines.filter((line) => line.shippedQuantity > 0).map((line) => {
     const sale = orders.find((order) => order.orderNumber === line.orderNumber);
     const saleId = sale?.id ?? "";
-    const key = saleId + "\0" + line.sku;
-    const prior = already.find((row) => row.cin7SaleId === saleId && row.sku === line.sku)?.qty ?? 0;
-    const shippedPence = shippedLinePence(line, prior + (seen.get(key) ?? 0));
-    seen.set(key, (seen.get(key) ?? 0) + line.shippedQuantity);
+    const prior = already.find((row) => row.lineKey === line.id)?.qty ?? 0;
+    const shippedPence = shippedLinePence(line, prior + (seen.get(line.id) ?? 0));
+    seen.set(line.id, (seen.get(line.id) ?? 0) + line.shippedQuantity);
     return {
       id: line.id,
       orderNumber: line.orderNumber,
@@ -145,11 +176,11 @@ export function issueLines(draft: InvoiceDraft, orders: InvoiceOrder[], already:
 }
 
 export function withShipmentPence(draft: InvoiceDraft, orders: InvoiceOrder[], already: IssuedQuantity[] = []): InvoiceDraft {
-  const priced = new Map(issueLines(draft, orders, already).map((line) => [line.orderNumber + "\0" + line.sku, line.shippedPence]));
+  const priced = new Map(issueLines(draft, orders, already).map((line) => [line.id, line.shippedPence]));
   return {
     ...draft,
     lines: draft.lines.map((line) => {
-      const shippedPence = priced.get(line.orderNumber + "\0" + line.sku);
+      const shippedPence = priced.get(line.id);
       return shippedPence == null ? line : { ...line, shippedPence };
     }),
   };

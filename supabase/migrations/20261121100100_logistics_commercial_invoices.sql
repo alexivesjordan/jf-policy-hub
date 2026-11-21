@@ -35,6 +35,7 @@ create table logistics.commercial_invoice_lines (
   position integer not null,
   order_number text not null,
   cin7_sale_id text not null,
+  line_key text not null,
   sku text not null,
   description text not null,
   ordered_qty numeric(12,3) not null,
@@ -213,6 +214,7 @@ declare
     'companyNumber', '12798165'
   );
   v_group record;
+  v_keyed record;
   v_line jsonb;
   v_pos integer := 0;
   v_total integer := 0;
@@ -239,6 +241,17 @@ begin
   v_key := (p_payload->>'idempotencyKey')::uuid;
   select * into v_existing from logistics.commercial_invoices where idempotency_key = v_key;
   if v_existing.id is not null then
+    if v_existing.issued_by is distinct from v_actor
+       and not exists (
+         select 1 from public.profiles p
+         where p.id = v_actor
+           and p.is_active
+           and p.access_granted
+           and (p.role = 'admin' or p.workspace_role in ('owner', 'admin'))
+       )
+    then
+      raise exception 'app: You cannot open that invoice.';
+    end if;
     return jsonb_build_object(
       'id', v_existing.id,
       'number', v_existing.number,
@@ -253,30 +266,54 @@ begin
     raise exception 'app: No goods selected for shipment.';
   end if;
 
-  for v_group in
+  for v_keyed in
     select
       line->>'cin7SaleId' as sale,
       line->>'sku' as sku,
-      sum((line->>'shippedQty')::numeric) as shipped,
+      line->>'id' as line_key,
+      count(*) as copies,
       min((line->>'orderedQty')::numeric) as ordered_min,
-      max((line->>'orderedQty')::numeric) as ordered_max
+      max((line->>'orderedQty')::numeric) as ordered_max,
+      sum((line->>'shippedQty')::numeric) as shipped
     from jsonb_array_elements(p_payload->'lines') as line
-    group by 1, 2
+    group by 1, 2, 3
   loop
-    perform pg_advisory_xact_lock(hashtext(coalesce(v_group.sale, '') || ':' || coalesce(v_group.sku, '')));
-    if v_group.ordered_min is distinct from v_group.ordered_max
-       or v_group.shipped <= 0
-       or v_group.shipped > v_group.ordered_max
+    if coalesce(v_keyed.line_key, '') = ''
+       or v_keyed.copies > 1
+       or v_keyed.ordered_min is distinct from v_keyed.ordered_max
+       or v_keyed.ordered_max <= 0
+       or v_keyed.shipped < 0
+       or v_keyed.shipped > v_keyed.ordered_max
     then
       raise exception 'app: Shipped quantity is invalid.';
     end if;
+  end loop;
+
+  for v_group in
+    select sale, sku, sum(ordered_max) as ordered, sum(shipped) as shipped
+    from (
+      select
+        line->>'cin7SaleId' as sale,
+        line->>'sku' as sku,
+        line->>'id' as line_key,
+        max((line->>'orderedQty')::numeric) as ordered_max,
+        sum((line->>'shippedQty')::numeric) as shipped
+      from jsonb_array_elements(p_payload->'lines') as line
+      group by 1, 2, 3
+    ) keyed
+    group by sale, sku
+  loop
+    if v_group.shipped <= 0 then
+      continue;
+    end if;
+    perform pg_advisory_xact_lock(hashtext(coalesce(v_group.sale, '') || ':' || coalesce(v_group.sku, '')));
     select coalesce(sum(saved.shipped_qty), 0) into v_already
     from logistics.commercial_invoice_lines saved
     join logistics.commercial_invoices invoice on invoice.id = saved.invoice_id
     where invoice.status = 'issued'
       and saved.cin7_sale_id = v_group.sale
       and saved.sku = v_group.sku;
-    if v_already + v_group.shipped > v_group.ordered_max then
+    if v_already + v_group.shipped > v_group.ordered then
       raise exception 'app: That quantity is already on an issued invoice.';
     end if;
   end loop;
@@ -284,17 +321,19 @@ begin
   for v_line in select value from jsonb_array_elements(p_payload->'lines') loop
     v_ordered := (v_line->>'orderedQty')::numeric;
     v_shipped := (v_line->>'shippedQty')::numeric;
+    if v_shipped <= 0 then
+      v_pos := v_pos + 1;
+      continue;
+    end if;
     select coalesce(sum(saved.shipped_qty), 0) into v_already
     from logistics.commercial_invoice_lines saved
     join logistics.commercial_invoices invoice on invoice.id = saved.invoice_id
     where invoice.status = 'issued'
-      and saved.cin7_sale_id = v_line->>'cin7SaleId'
-      and saved.sku = v_line->>'sku';
+      and saved.line_key = v_line->>'id';
     select coalesce(sum((item.value->>'shippedQty')::numeric), 0) into v_seen
     from jsonb_array_elements(p_payload->'lines') with ordinality as item(value, ord)
     where item.ord <= v_pos
-      and item.value->>'cin7SaleId' = v_line->>'cin7SaleId'
-      and item.value->>'sku' = v_line->>'sku';
+      and item.value->>'id' = v_line->>'id';
     v_already := v_already + v_seen;
     v_pence := 0;
     if v_ordered = trunc(v_ordered) and v_shipped = trunc(v_shipped) and v_already = trunc(v_already) then
@@ -330,6 +369,10 @@ begin
     ));
   end loop;
 
+  if jsonb_array_length(v_doc_lines) < 1 then
+    raise exception 'app: No goods selected for shipment.';
+  end if;
+
   v_number := logistics.next_invoice_number(v_year);
   v_filename := 'Commercial Invoice - ' || regexp_replace(coalesce(p_payload#>>'{buyer,name}', 'Buyer'), '[/\\:*?"<>|]', '', 'g') || ' - ' || v_number || ' - ' || regexp_replace(coalesce(p_payload->>'incoterm', ''), '[/\\:*?"<>|]', '', 'g') || '.pdf';
   v_document := coalesce(p_payload->'document', '{}'::jsonb)
@@ -348,11 +391,11 @@ begin
   for v_line in select value from jsonb_array_elements(v_doc_lines) loop
     v_pos := v_pos + 1;
     insert into logistics.commercial_invoice_lines (
-      invoice_id, position, order_number, cin7_sale_id, sku, description,
+      invoice_id, position, order_number, cin7_sale_id, line_key, sku, description,
       ordered_qty, shipped_qty, line_net_pence, shipped_pence, hs_code, origin,
       unit_weight_kg, line_weight_kg
     ) values (
-      v_id, v_pos, v_line->>'orderNumber', v_line->>'cin7SaleId',
+      v_id, v_pos, v_line->>'orderNumber', v_line->>'cin7SaleId', v_line->>'id',
       v_line->>'sku', v_line->>'productName',
       (v_line->>'orderedQuantity')::numeric, (v_line->>'shippedQuantity')::numeric,
       (v_line->>'lineNetPence')::integer, (v_line->>'shippedPence')::integer,
@@ -404,17 +447,18 @@ as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'cin7SaleId', saved.cin7_sale_id,
     'sku', saved.sku,
+    'lineKey', saved.line_key,
     'qty', saved.qty,
     'pence', saved.pence
   )), '[]'::jsonb)
   from (
-    select line.cin7_sale_id, line.sku, sum(line.shipped_qty) as qty, sum(line.shipped_pence) as pence
+    select line.cin7_sale_id, line.sku, line.line_key, sum(line.shipped_qty) as qty, sum(line.shipped_pence) as pence
     from logistics.commercial_invoice_lines line
     join logistics.commercial_invoices invoice on invoice.id = line.invoice_id
     where logistics.can_use()
       and invoice.status = 'issued'
       and line.cin7_sale_id = any (p_sales)
-    group by line.cin7_sale_id, line.sku
+    group by line.cin7_sale_id, line.sku, line.line_key
   ) saved;
 $$;
 

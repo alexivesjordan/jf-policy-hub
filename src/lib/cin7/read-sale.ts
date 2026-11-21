@@ -264,6 +264,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     const product = products.get(productId ?? sku ?? "") ?? {};
     return {
       sku: text(product.SKU) ?? sku,
+      lineId: text(line.ID),
       productName: text(line.Name) ?? text(product.Name) ?? sku ?? "Item",
       category: null,
       cin7Category: text(product.Category),

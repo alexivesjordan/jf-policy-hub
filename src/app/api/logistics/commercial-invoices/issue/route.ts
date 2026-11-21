@@ -5,6 +5,7 @@ import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invo
 import { applyLineEdits, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
+import type { Profile } from "@/lib/types";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -24,12 +25,17 @@ const bodySchema = z.object({
   lines: z.array(z.object({
     orderNumber: z.string(),
     sku: z.string(),
+    lineId: z.string().min(1).max(80),
     shippedQuantity: z.number().finite().nonnegative(),
     hsCode: z.string(),
     originCountry: z.string(),
     unitWeightKg: z.number().finite().nonnegative().nullable(),
   })).max(200),
 }).strict();
+
+function mayOpenIssued(profile: Profile, issuedBy: string) {
+  return issuedBy === profile.id || profile.role === "admin" || profile.workspace_role === "owner" || profile.workspace_role === "admin";
+}
 
 function storedFromRpc(data: {
   id: string;
@@ -63,8 +69,11 @@ export async function POST(request: Request) {
     .eq("idempotency_key", input.idempotencyKey)
     .maybeSingle();
   if (existing.data) {
+    const row = existing.data as { id: string; number: string; document: InvoiceDraft; pdf_path: string | null; pdf_filename: string | null; issued_by: string };
+    if (!mayOpenIssued(gate.profile, row.issued_by)) {
+      return Response.json({ error: "You cannot open that invoice." }, { status: 403 });
+    }
     try {
-      const row = existing.data as { id: string; number: string; document: InvoiceDraft; pdf_path: string | null; pdf_filename: string | null; issued_by: string };
       const filename = await storeInvoicePdf({
         id: row.id,
         number: row.number,
@@ -124,7 +133,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return Response.json({ error: clientError(error, "The PDF could not be generated.") }, { status: 422 });
   }
-  const lines = draft.lines.filter((line) => line.shippedQuantity > 0).map((line) => {
+  const lines = draft.lines.map((line) => {
     const sale = orders.find((order) => order.orderNumber === line.orderNumber);
     return {
       id: line.id,

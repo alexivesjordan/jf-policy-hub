@@ -22,6 +22,7 @@ const bodySchema = z.object({
   lines: z.array(z.object({
     orderNumber: z.string(),
     sku: z.string(),
+    lineId: z.string().min(1).max(80),
     shippedQuantity: z.number().finite().nonnegative(),
     hsCode: z.string(),
     originCountry: z.string(),

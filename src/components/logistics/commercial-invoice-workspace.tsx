@@ -86,6 +86,7 @@ export function CommercialInvoiceWorkspace() {
       buyerVat: draft.buyer.vat,
       buyerEori: draft.buyer.eori,
       lines: draft.lines.map((line) => ({
+        lineId: line.id,
         orderNumber: line.orderNumber,
         sku: line.sku,
         shippedQuantity: line.shippedQuantity,
