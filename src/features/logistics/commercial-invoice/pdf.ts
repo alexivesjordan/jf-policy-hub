@@ -295,10 +295,30 @@ function pieceHeight(piece: SummaryPiece, metrics: SummaryMetrics) {
   return metrics.boxH + SUMMARY_GAP + metrics.signH;
 }
 
-function sourcePieces(metrics: SummaryMetrics): SummaryPiece[] {
+function closingHeight(metrics: SummaryMetrics) {
+  return metrics.boxH + SUMMARY_GAP + metrics.signH;
+}
+
+/** Lines at the end of the statement that must share a page with the totals and signature. */
+function statementTailLines(metrics: SummaryMetrics, pageRoom: number) {
+  if (!metrics.statementLines.length) return 0;
+  const available = pageRoom - closingHeight(metrics);
+  let lines = 0;
+  for (let next = 1; next <= metrics.statementLines.length; next += 1) {
+    if (next * STATEMENT_LINE + STATEMENT_TAIL > available) break;
+    lines = next;
+  }
+  return lines > 0 ? lines : 1;
+}
+
+function layoutPieces(metrics: SummaryMetrics, pageRoom: number): SummaryPiece[] {
   const pieces: SummaryPiece[] = [];
+  const whole = metrics.total <= pageRoom;
+  const tail = whole ? metrics.statementLines.length : statementTailLines(metrics, pageRoom);
   if (metrics.dimRows) pieces.push({ kind: "dims", from: 0, to: metrics.dimRows });
-  if (metrics.statementLines.length) pieces.push({ kind: "statement", from: 0, to: metrics.statementLines.length });
+  const headEnd = metrics.statementLines.length - tail;
+  if (headEnd > 0) pieces.push({ kind: "statement", from: 0, to: headEnd });
+  if (tail > 0) pieces.push({ kind: "statement", from: headEnd, to: metrics.statementLines.length });
   pieces.push({ kind: "closing" });
   return pieces;
 }
@@ -322,12 +342,25 @@ function takePiece(piece: SummaryPiece, room: number, metrics: SummaryMetrics): 
   return { fit, rest: { kind: "statement", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
 }
 
+function gluedTail(piece: SummaryPiece, next: SummaryPiece | undefined, metrics: SummaryMetrics) {
+  return piece.kind === "statement" && piece.to === metrics.statementLines.length && next?.kind === "closing";
+}
+
 function packPieces(pieces: SummaryPiece[], room: number, metrics: SummaryMetrics) {
   const placed: SummaryPiece[] = [];
   let used = 0;
   let index = 0;
   while (index < pieces.length) {
     const piece = pieces[index]!;
+    const next = pieces[index + 1];
+    if (gluedTail(piece, next, metrics)) {
+      const height = pieceHeight(piece, metrics) + pieceHeight(next!, metrics);
+      if (used + height > room) break;
+      placed.push(piece, next!);
+      used += height;
+      index += 2;
+      continue;
+    }
     const taken = takePiece(piece, room - used, metrics);
     if (!taken.fit) break;
     placed.push(taken.fit);
@@ -364,9 +397,9 @@ export function commercialInvoicePageRoom(draft: InvoiceDraft, role: InvoicePage
 export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): InvoicePagePlan[] {
   const rows = measure(shippedLines(draft), font);
   const metrics = measureSummary(draft, font);
-  const pieces = sourcePieces(metrics);
   const firstRoom = commercialInvoicePageRoom(draft, "first");
   const contRoom = commercialInvoicePageRoom(draft, "continuation");
+  const pieces = layoutPieces(metrics, contRoom);
   const reserve = metrics.total <= contRoom ? metrics.total : 0;
   const built: InvoicePagePlan[] = [];
 
@@ -374,12 +407,39 @@ export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): Invoi
     let rest = pending;
     while (rest.length) {
       const packed = packPieces(rest, contRoom, metrics);
-      const placed = packed.placed.length ? packed.placed : [rest[0]!];
-      const next = packed.placed.length ? packed.rest : rest.slice(1);
-      const height = packed.placed.length ? packed.height : pieceHeight(placed[0]!, metrics);
+      let placed = packed.placed;
+      let next = packed.rest;
+      if (!placed.length) {
+        const pair = gluedTail(rest[0]!, rest[1], metrics);
+        placed = pair ? [rest[0]!, rest[1]!] : [rest[0]!];
+        next = rest.slice(placed.length);
+      }
+      const height = placed.reduce((sum, piece) => sum + pieceHeight(piece, metrics), 0);
       built.push(pageOf("continuation", rows.length, rows.length, placed, summaryAnchor(placed, metrics), height));
       rest = next;
     }
+  };
+
+  const attachOrMove = (leftover: number) => {
+    if (metrics.total <= contRoom) {
+      if (leftover >= metrics.total) {
+        const last = built[built.length - 1]!;
+        last.pieces = pieces;
+        last.summary = true;
+        last.anchor = "bottom";
+        last.used += metrics.total;
+      } else addSummaryPages(pieces);
+      return;
+    }
+    const packed = packPieces(pieces, leftover, metrics);
+    if (packed.placed.length) {
+      const last = built[built.length - 1]!;
+      last.pieces = packed.placed;
+      last.summary = true;
+      last.anchor = summaryAnchor(packed.placed, metrics);
+      last.used += packed.height;
+      addSummaryPages(packed.rest);
+    } else addSummaryPages(pieces);
   };
 
   if (!rows.length) {
@@ -402,15 +462,7 @@ export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): Invoi
     if (!built.some((page) => page.summary)) {
       const last = built[built.length - 1]!;
       const room = last.role === "first" ? firstRoom : contRoom;
-      const leftover = room - last.used;
-      const packed = packPieces(pieces, leftover, metrics);
-      if (packed.placed.length) {
-        last.pieces = packed.placed;
-        last.summary = true;
-        last.anchor = summaryAnchor(packed.placed, metrics);
-        last.used += packed.height;
-        addSummaryPages(packed.rest);
-      } else addSummaryPages(pieces);
+      attachOrMove(room - last.used);
     }
   }
 
@@ -514,7 +566,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         [row.line.orderNumber, "right"],
         [normaliseHsCode(row.line.hsCode) ?? row.line.hsCode, "right"],
         [money(chargedLinePence(row.line)), "right"],
-        [money(0), "right"],
+        [shipment.vatPence > 0 ? "-" : money(0), "right"],
         [kilos(lineWeightKg(row.line)), "right"],
         [row.line.shippedQuantity.toFixed(2), "center"],
       ];

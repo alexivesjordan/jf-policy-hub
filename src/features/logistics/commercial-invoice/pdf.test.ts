@@ -183,8 +183,62 @@ describe("commercial invoice PDF", () => {
     expect(totalsPages[0]).toMatch(/Signed:/);
     expect(pages.filter((page) => /Signed:/.test(page))).toHaveLength(1);
     expect(plan.filter((page) => page.pieces.some((piece) => piece.kind === "closing"))).toHaveLength(1);
+    expect(pages.at(-1)).toMatch(/Signed:/);
+    expect(pages.at(-1)).toMatch(/¶/);
     await saveDraft("invoice-stress.pdf", draft);
   }, 20000);
+
+  it("keeps the customs statement and signature on the last page for every length", async () => {
+    const face = await font();
+    for (let count = 1; count <= 160; count += 1) {
+      const draft = draftFor(count);
+      const plan = planCommercialInvoice(draft, face);
+      const last = plan.at(-1);
+      const maxTo = plan.reduce((max, page) => page.pieces.reduce((inner, piece) => piece.kind === "statement" ? Math.max(inner, piece.to) : inner, max), 0);
+      const lastStatement = last?.pieces.find((piece) => piece.kind === "statement");
+      expect(last?.pieces.some((piece) => piece.kind === "closing"), "closing on last page for " + count).toBe(true);
+      expect(lastStatement?.kind === "statement" ? lastStatement.to : 0, "statement ending on last page for " + count).toBe(maxTo);
+      expect(maxTo, "statement present for " + count).toBeGreaterThan(0);
+      expect(plan.slice(0, -1).every((page) => !page.pieces.some((piece) => piece.kind === "closing")), "closing only on last page for " + count).toBe(true);
+    }
+    for (const count of [1, 40, 80, 120, 160]) {
+      const { text } = await pagesOf(count);
+      expect(text.at(-1), "rendered last page " + count).toMatch(/Signed:/);
+      expect(text.at(-1)).toMatch(/Regime 42/);
+      expect(text.slice(0, -1).some((page) => /Regime 42|Signed:/.test(page))).toBe(false);
+    }
+  }, 30000);
+
+  it("keeps the end of a long statement with the signature", async () => {
+    const { draft } = await planned(8);
+    const lines = Array.from({ length: 45 }, (_, index) => index === 44 ? "STATEMENT-END" : "STATEMENT-LINE-" + index);
+    draft.shipment = {
+      ...draft.shipment!,
+      customsStatementId: "custom",
+      customsStatementText: lines.join("\n"),
+      dimensions: Array.from({ length: 40 }, (_, index) => ({ lengthCm: index + 1, widthCm: 10, heightCm: 12, weightKg: index + 1 })),
+    };
+    const bytes = await renderCommercialInvoicePdf(draft);
+    const extracted = await extractText(bytes, { mergePages: false });
+    const pages = extracted.text;
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.at(-1)).toMatch(/STATEMENT-END/);
+    expect(pages.at(-1)).toMatch(/Signed:/);
+    expect(pages.at(-1)).toMatch(/Goods Net/);
+    expect(pages.slice(0, -1).some((page) => /STATEMENT-END/.test(page))).toBe(false);
+  });
+
+  it("leaves line VAT at 0.00 unless a VAT total was entered", async () => {
+    const { draft } = await planned(1);
+    const zero = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const zeroText = Array.isArray(zero.text) ? zero.text.join("\n") : zero.text;
+    expect(zeroText).toMatch(/20\.00\s+0\.00\s+2\.50/);
+    draft.shipment = { ...draft.shipment!, vatPence: 1234 };
+    const rated = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const ratedText = Array.isArray(rated.text) ? rated.text.join("\n") : rated.text;
+    expect(ratedText).toMatch(/20\.00\s+-\s+2\.50/);
+    expect(ratedText).toMatch(/VAT:\s+12\.34/);
+  });
 });
 
 async function findCount(pages: number, roles?: InvoicePageRole[]) {
