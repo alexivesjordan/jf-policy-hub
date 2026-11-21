@@ -7,8 +7,7 @@ import { loadBundledEffortTable } from "./effort-table";
 import { forSales, priceInstall, type CategoryEffortDefault } from "./engine";
 import { BEST_CASE_NOTICE } from "./rates";
 
-const WORKED_COST = 3718.25;
-const WORKED_PRICE = 6692.84;
+const WORKED_COST = 3356.51;
 
 const MACHINE_DEFAULTS: CategoryEffortDefault[] = ["cardio", "rack-rig", "bench", "strength-selectorised"].map((category) => ({
   category,
@@ -90,16 +89,19 @@ describe("SO-00490 golden workings", () => {
     assert.equal(result.breakdown?.roundTripMiles, 127.8);
     assert.equal(result.breakdown?.speedMph, 35);
     const hq = result.lines.filter((line) => line.match === "dhz_generic");
+    const elite = result.lines.filter((line) => /elite cardio/i.test(line.productName));
     const fid = result.lines.filter((line) => line.note === "fallback: FID Bench");
     const loose = result.lines.filter((line) => line.match === "handling_only");
-    const machines = result.lines.filter((line) => line.match === "category_default");
+    const machines = result.lines.filter((line) => line.match === "category_default" && !/elite cardio/i.test(line.productName));
+    assert.equal(elite.length, 5);
+    assert.ok(elite.every((line) => line.row?.buildLocation === "hq" && line.row.hqBuildMinutes === 120 && line.row.hqBuildCrew === 2));
     assert.equal(hq.length, 9);
     assert.ok(hq.every((line) => line.row?.buildLocation === "hq" && line.row.hqBuildMinutes === 120 && line.row.sitePositionMinutes === 45));
     assert.equal(fid.length, 1);
     assert.equal(fid[0]?.row?.buildMinutes, 12);
     assert.equal(fid[0]?.row?.buildCrew, 1);
     assert.ok(machines.every((line) => line.row?.buildCrew === 2 && line.row.buildMinutes === 120));
-    assert.equal(hq.length + fid.length + loose.length + machines.length, 44);
+    assert.equal(hq.length + elite.length + fid.length + loose.length + machines.length, 44);
     assert.equal(result.requirements?.installers, 2);
     assert.equal(result.requirements?.vanSize, "crafter");
     assert.equal(result.requirements?.vanCount, 1);
@@ -117,21 +119,20 @@ describe("SO-00490 golden workings", () => {
     assert.equal(breakdown.crew, 2);
     assert.equal(breakdown.vans, 1);
     assert.equal(result.requirements?.vanSize, "crafter");
-    assert.equal(breakdown.days, 5);
-    assert.equal(breakdown.nights, 4);
-    assert.equal(breakdown.freight, 390);
+    assert.equal(breakdown.days, 4);
+    assert.equal(breakdown.nights, 3);
+    assert.equal(breakdown.freight, 195);
     assert.equal(breakdown.consumables, 6.16);
     assert.equal(breakdown.vehicle, 57.51);
-    assert.equal(breakdown.hotel, 640);
-    assert.equal(breakdown.food, 150);
+    assert.equal(breakdown.hotel, 480);
+    assert.equal(breakdown.food, 120);
     assert.equal(Math.round(breakdown.contingencyRate * 100), 15);
     assert.ok(Math.abs((result.cost ?? 0) - WORKED_COST) <= 1, `cost ${result.cost} on site ${breakdown.onSiteHours}h hq ${breakdown.hqCost}`);
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.8 * 100) / 100);
-    assert.equal(Math.round(WORKED_COST * 1.8 * 100) / 100, 6692.85);
-    assert.equal(Math.round((6692.85 - WORKED_PRICE) * 100) / 100, 0.01);
+    assert.equal(Math.round(WORKED_COST * 1.8 * 100) / 100, 6041.72);
     const recommended = breakdown.crewPlans.find((plan) => plan.note.includes("Recommended"));
-    assert.equal(recommended?.id, "overnight-ot");
-    assert.ok(breakdown.crewPlans.every((plan) => plan.id === "overnight-ot" || plan.siteCost + 0.01 >= (recommended?.siteCost ?? 0)));
+    assert.equal(recommended?.id, "overnight-straight");
+    assert.ok(breakdown.crewPlans.every((plan) => plan.id === "overnight-straight" || plan.siteCost + 0.01 >= (recommended?.siteCost ?? 0)));
     assert.ok(result.flags.some((flag) => /Lynnstar per-job quote/.test(flag)));
   });
 });

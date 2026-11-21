@@ -139,7 +139,12 @@ export function PriceQuoteForm({ cin7Connected, initialOrder = "" }: { cin7Conne
           <ProposalButton quoteId={quote.service.id} />
         </>
       ) : null}
-      {!sold?.subcontractor && quote?.savedQuoteId ? <BookInstallDialog quoteId={quote.savedQuoteId} warranty={includeService ? warrantyPrices(quote.service) : null} /> : null}
+      {!sold?.subcontractor && quote?.customerPrice != null && !quote.contactEmail ? (
+        <p className="text-sm">{quote.missingCin7Email ? "Cin7 has no customer email on this order. Add one before booking." : "Add the customer's email before booking."}</p>
+      ) : null}
+      {!sold?.subcontractor && quote?.savedQuoteId ? (
+        <BookInstallDialog quoteId={quote.savedQuoteId} contactEmail={quote.contactEmail ?? null} missingCin7Email={quote.missingCin7Email} warranty={includeService ? warrantyPrices(quote.service) : null} />
+      ) : null}
     </div>
   );
 }

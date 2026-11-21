@@ -19,7 +19,7 @@ export function PhotoPicker({
 }: {
   installId: string;
   token: string | null;
-  kind: "concern" | "equipment";
+  kind: "concern" | "equipment" | "hq_photo" | "vehicle_damage";
   photos: StoredPhoto[];
   onChange: (photos: StoredPhoto[]) => void;
   max?: number;
