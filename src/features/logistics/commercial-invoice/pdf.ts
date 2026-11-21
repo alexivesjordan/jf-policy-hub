@@ -158,21 +158,61 @@ function fits(rows: Measured[], from: number, to: number, capacity: number) {
   return used <= capacity;
 }
 
-const FIRST_TOP = 290;
-const CONT_TOP = 78;
+const HEADER_BLOCK = 8 + 2 * 8 + 4;
+/** Footer text plus a gap, so the last item-price line stays clear of it. */
+const ROW_BOTTOM = FOOTER + 12;
 
-function summaryHeight(draft: InvoiceDraft) {
+function addressBoxHeight(draft: InvoiceDraft) {
+  const shipment = shipmentOf(draft);
+  const customer = [
+    draft.buyer.name,
+    ...draft.buyer.address.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
+    draft.buyer.vat ? "vat" : "",
+    draft.buyer.eori ? "eori" : "",
+  ].filter(Boolean).length;
+  const delivery = [
+    shipment.fao ? "fao" : "",
+    ...shipment.deliveryAddress.split(/\n|, /).map((part) => part.trim()).filter(Boolean),
+  ].filter(Boolean).length;
+  return Math.max(118, 30 + Math.max(customer, delivery) * 10);
+}
+
+function rowsTopFirst(draft: InvoiceDraft) {
+  const boxTop = A4[1] - 36 - 132;
+  return boxTop - addressBoxHeight(draft) - 14 - HEADER_BLOCK;
+}
+
+function rowsTopContinuation() {
+  return A4[1] - 28 - 16 - HEADER_BLOCK;
+}
+
+function summaryLayout(draft: InvoiceDraft) {
   const shipment = shipmentOf(draft);
   const statement = resolveCustomsStatement(shipment.customsStatementId, shipment.customsStatementText) || shipment.customsStatementText;
-  const statementLines = statement ? statement.split("\n").reduce((count, part) => count + Math.max(1, Math.ceil(part.length / 100)), 0) : 0;
-  return 20 + shipment.dimensions.length * 11 + statementLines * 12 + 196;
+  const statementLines = statement
+    ? statement.split("\n").reduce((count, part) => count + Math.max(1, Math.ceil(part.length / 100)), 0)
+    : 0;
+  const instructions = [
+    "Country of origin: x",
+    "Country of export: United Kingdom",
+    "Incoterms: " + draft.incoterm,
+    shipment.contactName ? "contact" : "",
+    shipment.contactEmail ? "email" : "",
+    shipment.specialInstructions,
+  ].filter(Boolean);
+  const boxH = Math.max(108, 22 + instructions.length * 11 + 12, 16 + 4 * 14 + 12, 16 + 6 * 13 + 22);
+  const signH = 78;
+  const gap = 12;
+  const dimsH = shipment.dimensions.length ? 14 + shipment.dimensions.length * 11 + 6 : 0;
+  const statementH = statementLines ? statementLines * 12 + 8 : 0;
+  return { boxH, signH, gap, dimsH, statementH, total: dimsH + statementH + boxH + gap + signH };
 }
 
 export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): InvoicePagePlan[] {
   const rows = measure(shippedLines(draft), font);
-  const summary = summaryHeight(draft);
-  const firstRoom = A4[1] - FIRST_TOP - BOTTOM;
-  const contRoom = A4[1] - CONT_TOP - BOTTOM;
+  const summary = summaryLayout(draft).total;
+  const firstRoom = rowsTopFirst(draft) - ROW_BOTTOM;
+  const contRoom = rowsTopContinuation() - ROW_BOTTOM;
   const pages: InvoicePagePlan[] = [];
   if (fits(rows, 0, rows.length, firstRoom - summary)) {
     return [{ role: "first", from: 0, to: rows.length, summary: true }];
@@ -373,25 +413,27 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     return boxTop - boxH - 14;
   };
 
-  const summary = (page: PDFPage, y: number) => {
-    let cursor = y - 14;
+  const summary = (page: PDFPage) => {
+    const layout = summaryLayout(draft);
+    const signTop = ROW_BOTTOM + layout.signH;
+    const boxTop = signTop + layout.gap + layout.boxH;
+    let cursor = boxTop + layout.statementH + layout.dimsH - 12;
     if (shipment.dimensions.length) {
       text(page, "Dimensions:", MARGIN, cursor, 9, bold);
-      cursor -= 12;
+      cursor -= 14;
       for (const item of shipment.dimensions) {
         text(page, `${item.lengthCm} x ${item.widthCm} x ${item.heightCm} = ${item.weightKg}kg`, MARGIN, cursor, 8, regular);
         cursor -= 11;
       }
-      cursor -= 4;
+      cursor -= 6;
     }
     if (statement) {
       for (const part of statement.split("\n")) {
         for (const wrapped of wrap(part, regular, 8, CONTENT_W)) {
           text(page, wrapped, MARGIN, cursor, 8, regular);
-          cursor -= 11;
+          cursor -= 12;
         }
       }
-      cursor -= 6;
     }
     const boxW = (CONTENT_W - 16) / 3;
     const instructions = [
@@ -416,8 +458,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       ["VAT:", money(shipment.vatPence), false],
       ["Total:", money(total), true],
     ];
-    const boxH = Math.max(108, 22 + instructions.length * 11 + 12, 16 + middle.length * 14 + 12, 16 + totals.length * 13 + 22);
-    const boxTop = cursor - 6;
+    const boxH = layout.boxH;
     const labelValue = (x: number, rowY: number, label: string, value: string, strong = false) => {
       text(page, label, x + 8, rowY, 7.5, strong ? bold : regular);
       aligned(page, value, x, rowY, boxW, 7.5, strong ? bold : regular, "right");
@@ -438,8 +479,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     const currency = currencyName(draft.currency);
     text(page, currency, rightX + (boxW - regular.widthOfTextAtSize(currency, 7.5)) / 2, boxTop - boxH + 10, 7.5, regular);
 
-    const signTop = boxTop - boxH - 12;
-    const signH = 78;
+    const signH = layout.signH;
     const stampW = 150;
     const signW = CONTENT_W - stampW - 8;
     roundBox(page, MARGIN, signTop, signW, signH);
@@ -474,7 +514,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       y = tableHeader(page, y);
       y = drawRows(page, y, item.from, item.to);
     }
-    if (item.summary) summary(page, y - 8);
+    if (item.summary) summary(page);
     footer(page, index);
   });
   return pdf.save();
