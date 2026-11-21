@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import fontkit from "@pdf-lib/fontkit";
 import sharp from "sharp";
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
 import { COMMERCIAL_INVOICE_SELLER } from "./seller";
 import {
-  countryName, declaredTotal, goodsTotal, lineWeightKg, normaliseHsCode, shippedLinePence, shippedLines, validateCommercialInvoice,
+  chargedLinePence, countryName, declaredTotal, goodsTotal, lineWeightKg, normaliseHsCode, shippedLines, validateCommercialInvoice,
   type InvoiceDraft,
 } from "./rules";
 
@@ -20,6 +21,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const problems = validateCommercialInvoice(draft);
   if (problems.length) throw new Error("Invoice cannot be rendered: " + problems.join("; "));
   const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
   pdf.setTitle("Commercial Invoice " + draft.reference);
   pdf.setAuthor(draft.seller.name);
   pdf.setSubject(draft.reference === "PREVIEW" ? "Commercial invoice preview — not an issued document" : "Commercial invoice " + draft.reference);
@@ -136,7 +138,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     draw(line.orderNumber, margin, y, 8);
     draw(line.sku.slice(0, 41), 107, y, 8, true);
     draw(String(line.shippedQuantity), 365, y, 8);
-    draw(money(shippedLinePence(line) / 100, draft.currency), 435, y, 8, true, 125);
+    draw(money(chargedLinePence(line) / 100, draft.currency), 435, y, 8, true, 125);
     y -= 13;
     for (const text of descriptions) { draw(text, 107, y, 8); y -= 11; }
     draw("HS " + (normaliseHsCode(line.hsCode) ?? line.hsCode) + " | Origin " + countryName(line.originCountry) + " | " + lineWeightKg(line).toFixed(3) + " kg | Unit " + money(line.unitNetValue, draft.currency), 107, y, 7);

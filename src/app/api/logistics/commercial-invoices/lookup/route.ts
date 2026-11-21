@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
+import { clientError } from "@/features/logistics/commercial-invoice/errors";
 import { customsFromRpc, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
 import { parseOrderNumbers } from "@/features/logistics/commercial-invoice/rules";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "Enter valid order numbers." }, { status: 400 });
   let numbers: string[];
   try { numbers = parseOrderNumbers(parsed.data.orderNumbers); }
-  catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid orders." }, { status: 400 }); }
+  catch (error) { return Response.json({ error: clientError(error, "Enter valid order numbers.") }, { status: 400 }); }
 
   const client = getCin7Client();
   let quotes: Cin7Quote[];
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       return sale;
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Cin7 lookup failed.";
+    const message = clientError(error, "Cin7 lookup failed.");
     return Response.json({ error: message }, { status: message.startsWith("Could not find") ? 404 : 422 });
   }
 

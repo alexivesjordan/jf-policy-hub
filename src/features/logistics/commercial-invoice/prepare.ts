@@ -13,6 +13,17 @@ function asNumber(value: unknown) {
   return null;
 }
 
+export function issuedQuantities(data: unknown): IssuedQuantity[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const item = row as Record<string, unknown>;
+    const qty = typeof item.qty === "number" ? item.qty : Number(item.qty);
+    if (typeof item.cin7SaleId !== "string" || typeof item.sku !== "string" || !Number.isFinite(qty)) return [];
+    return [{ cin7SaleId: item.cin7SaleId, sku: item.sku, qty }];
+  });
+}
+
 export function customsFromRpc(data: unknown): CustomsRow[] {
   if (!Array.isArray(data)) return [];
   return data.flatMap((row) => {
@@ -103,22 +114,43 @@ export function draftFromOrders(orders: InvoiceOrder[], input: { incoterm: strin
   return draft;
 }
 
-export function issueLines(draft: InvoiceDraft, orders: InvoiceOrder[]) {
+export type IssuedQuantity = { cin7SaleId: string; sku: string; qty: number };
+
+export function issueLines(draft: InvoiceDraft, orders: InvoiceOrder[], already: IssuedQuantity[] = []) {
+  const seen = new Map<string, number>();
   return draft.lines.filter((line) => line.shippedQuantity > 0).map((line) => {
     const sale = orders.find((order) => order.orderNumber === line.orderNumber);
+    const saleId = sale?.id ?? "";
+    const key = saleId + "\0" + line.sku;
+    const prior = already.find((row) => row.cin7SaleId === saleId && row.sku === line.sku)?.qty ?? 0;
+    const shippedPence = shippedLinePence(line, prior + (seen.get(key) ?? 0));
+    seen.set(key, (seen.get(key) ?? 0) + line.shippedQuantity);
     return {
+      id: line.id,
       orderNumber: line.orderNumber,
-      cin7SaleId: sale?.id ?? "",
+      cin7SaleId: saleId,
       sku: line.sku,
       description: line.productName,
       orderedQty: line.orderedQuantity,
       shippedQty: line.shippedQuantity,
+      unitNetValue: line.unitNetValue,
       lineNetPence: line.lineNetPence ?? Math.round(line.orderedQuantity * line.unitNetValue * 100),
-      shippedPence: shippedLinePence(line),
+      shippedPence,
       hsCode: normaliseHsCode(line.hsCode),
       origin: line.originCountry,
       unitWeightKg: line.unitWeightKg,
       lineWeightKg: lineWeightKg(line),
     };
   });
+}
+
+export function withShipmentPence(draft: InvoiceDraft, orders: InvoiceOrder[], already: IssuedQuantity[] = []): InvoiceDraft {
+  const priced = new Map(issueLines(draft, orders, already).map((line) => [line.orderNumber + "\0" + line.sku, line.shippedPence]));
+  return {
+    ...draft,
+    lines: draft.lines.map((line) => {
+      const shippedPence = priced.get(line.orderNumber + "\0" + line.sku);
+      return shippedPence == null ? line : { ...line, shippedPence };
+    }),
+  };
 }

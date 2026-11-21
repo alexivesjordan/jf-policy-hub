@@ -98,14 +98,20 @@ describe("Pulse Logistics commercial invoice rules",()=>{
     expect(withinInvoiceTolerance(1001, 0)).toBe(false);
     expect(normaliseHsCode("9506.91")).toBe("9506910000");
   });
-  it("gives the last units the Cin7 remainder", () => {
-    const line = { ...validDraft().lines[0], orderedQuantity: 3, shippedQuantity: 2, lineNetPence: 100, unitNetValue: 100 / 300 };
-    expect(shippedLinePence(line)).toBe(67);
-    expect(shippedLinePence({ ...line, shippedQuantity: 1 }, 2, 67)).toBe(33);
+  it("apportions partial shipments by largest remainder so they sum to the Cin7 total", () => {
+    const base = { ...validDraft().lines[0], orderedQuantity: 3, lineNetPence: 100, unitNetValue: 100 / 300 };
+    const first = shippedLinePence({ ...base, shippedQuantity: 1 }, 0);
+    const second = shippedLinePence({ ...base, shippedQuantity: 1 }, 1);
+    const third = shippedLinePence({ ...base, shippedQuantity: 1 }, 2);
+    expect(first).toBe(34);
+    expect(second).toBe(33);
+    expect(third).toBe(33);
+    expect(first + second + third).toBe(100);
+    expect(shippedLinePence({ ...base, shippedQuantity: 2 }, 0)).toBe(67);
   });
   it("refuses a shipment above the remaining quantity", () => {
     const d = validDraft();
     const line = { ...d.lines[0], shippedQuantity: 1 };
-    expect(() => shippedLinePence(line, 2, 29100)).toThrow(/remaining/);
+    expect(() => shippedLinePence(line, 2)).toThrow(/remaining/);
   });
 });

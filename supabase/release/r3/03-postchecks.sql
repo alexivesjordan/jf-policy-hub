@@ -12,7 +12,9 @@ order by c.relname;
 select
   has_table_privilege('anon', 'logistics.product_customs', 'select') as anon_customs,
   has_table_privilege('anon', 'logistics.commercial_invoices', 'select') as anon_invoices,
-  has_function_privilege('authenticated', 'public.logistics_issue_commercial_invoice(jsonb)', 'execute') as issue_fn,
+  has_function_privilege('authenticated', 'public.logistics_issue_commercial_invoice(jsonb)', 'execute') as issue_authenticated,
+  has_function_privilege('service_role', 'public.logistics_issue_commercial_invoice(jsonb)', 'execute') as issue_service,
+  has_function_privilege('authenticated', 'public.logistics_attach_invoice_pdf(uuid, text, text, uuid)', 'execute') as attach_authenticated,
   has_function_privilege('authenticated', 'public.logistics_product_customs(text[])', 'execute') as customs_fn;
 
 select id, public, file_size_limit

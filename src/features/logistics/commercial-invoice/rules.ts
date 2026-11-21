@@ -22,6 +22,8 @@ export type GoodsLine = {
   unitNetValue: number;
   /** Authoritative line net in pence for the ordered quantity. Totals use this, not a rounded unit price. */
   lineNetPence?: number;
+  /** Pence for this shipment after largest-remainder allocation. Set from the stored invoice. */
+  shippedPence?: number;
   hsCode: string;
   originCountry: string;
   unitWeightKg: number | null;
@@ -126,15 +128,32 @@ export function lineNetPence(line: GoodsLine) {
   return toPence(line.orderedQuantity * line.unitNetValue);
 }
 
-/** Pence for this shipment. The last units take the remainder so full shipments match Cin7. */
-export function shippedLinePence(line: GoodsLine, alreadyQty = 0, alreadyPence = 0) {
+/**
+ * Pence for this shipment. Integer quantities use the largest-remainder method
+ * across the ordered units, so every partial, including the last, sums to the Cin7 line total.
+ */
+export function shippedLinePence(line: GoodsLine, alreadyQty = 0) {
   const ordered = line.orderedQuantity;
   const shipped = line.shippedQuantity;
   if (shipped <= 0) return 0;
-  if (alreadyQty + shipped > ordered) throw new Error("Shipped quantity is above the remaining order quantity.");
+  if (alreadyQty < 0 || alreadyQty + shipped > ordered) throw new Error("Shipped quantity is above the remaining order quantity.");
   const total = lineNetPence(line);
-  if (alreadyQty + shipped === ordered) return total - alreadyPence;
+  if (Number.isInteger(ordered) && Number.isInteger(shipped) && Number.isInteger(alreadyQty)) {
+    const base = Math.floor(total / ordered);
+    const extra = total - base * ordered;
+    let sum = 0;
+    for (let index = alreadyQty; index < alreadyQty + shipped; index += 1) sum += base + (index < extra ? 1 : 0);
+    return sum;
+  }
+  const alreadyShare = alreadyQty <= 0 ? 0 : Math.round((total * alreadyQty) / ordered);
+  if (alreadyQty + shipped === ordered) return total - alreadyShare;
   return Math.round((total * shipped) / ordered);
+}
+
+/** Stored shipment pence when the invoice has already been calculated, otherwise the allocation above. */
+export function chargedLinePence(line: GoodsLine) {
+  if (line.shippedPence != null) return line.shippedPence;
+  return shippedLinePence(line);
 }
 
 export function unitPriceDriftPence(line: GoodsLine) {
@@ -186,7 +205,7 @@ export function mergeInvoiceOrders(orders: InvoiceOrder[], seller: InvoiceParty)
 }
 
 export const shippedLines = (draft: InvoiceDraft) => draft.lines.filter(l => l.shippedQuantity > 0);
-export const goodsTotalPence = (draft: InvoiceDraft) => shippedLines(draft).reduce((sum, line) => sum + shippedLinePence(line), 0);
+export const goodsTotalPence = (draft: InvoiceDraft) => shippedLines(draft).reduce((sum, line) => sum + chargedLinePence(line), 0);
 export const goodsTotal = (draft: InvoiceDraft) => roundMoney(goodsTotalPence(draft) / 100);
 export const declaredTotal = (draft: InvoiceDraft) => roundMoney(goodsTotal(draft) + draft.freightValue + draft.insuranceValue + draft.otherChargesValue);
 

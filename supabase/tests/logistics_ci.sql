@@ -92,13 +92,14 @@ begin
   reset role;
   perform set_config('request.jwt.claim.sub', v_admin::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
-  execute 'set local role authenticated';
 
-  select coalesce(last_number, 0) into v_before from logistics.invoice_counters where year = v_year;
-  v_before := coalesce(v_before, 0);
+  reset role;
+  select coalesce((select last_number from logistics.invoice_counters where year = v_year), 0) into v_before;
+  execute 'set local role service_role';
 
   v_payload := jsonb_build_object(
     'idempotencyKey', gen_random_uuid(),
+    'issuedBy', v_admin,
     'currency', 'GBP',
     'incoterm', 'DAP',
     'grossWeightKg', 2,
@@ -139,7 +140,9 @@ begin
     v_notes := v_notes || ' replay ' || sqlerrm || ';';
   end;
 
+  reset role;
   select last_number into v_after from logistics.invoice_counters where year = v_year;
+  execute 'set local role service_role';
   if v_after = v_before + 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' counter moved on replay;'; end if;
 
   v_payload := jsonb_set(v_payload, '{idempotencyKey}', to_jsonb(gen_random_uuid()::text));
@@ -181,13 +184,35 @@ begin
     v_notes := v_notes || ' filename ' || coalesce(v_filename, 'null') || ';';
   end if;
 
+  reset role;
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
   begin
     update logistics.commercial_invoices set totals_pence = 1 where id = v_id;
     v_fail := v_fail + 1;
     v_notes := v_notes || ' update allowed;';
   exception when others then
-    if sqlerrm ilike '%cannot be changed%' then v_ok := v_ok + 1;
+    if sqlerrm ilike '%cannot be changed%' or sqlerrm ilike '%permission denied%' then v_ok := v_ok + 1;
     else v_fail := v_fail + 1; v_notes := v_notes || ' update ' || sqlerrm || ';'; end if;
+  end;
+
+  reset role;
+  begin
+    update logistics.commercial_invoices set currency = 'USD' where id = v_id;
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' owner update allowed;';
+  exception when others then
+    if sqlerrm ilike '%cannot be changed%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' owner update ' || sqlerrm || ';'; end if;
+  end;
+  begin
+    update logistics.commercial_invoice_lines set description = description where invoice_id = v_id;
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' line update allowed;';
+  exception when others then
+    if sqlerrm ilike '%cannot be changed%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' line update ' || sqlerrm || ';'; end if;
   end;
 
   begin

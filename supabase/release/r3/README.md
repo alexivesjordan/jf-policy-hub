@@ -6,8 +6,8 @@ Apply, in order, on TEST only:
 2. `supabase/migrations/20261121100100_logistics_commercial_invoices.sql`
 
 `01-prechecks.sql` should show both invoice tables as null.
-`03-postchecks.sql` should show RLS on, anon privileges false, and bucket `commercial-invoices` with `public` false.
+`03-postchecks.sql` should show RLS on, anon select false, issue and attach not executable by `authenticated`, and bucket `commercial-invoices` with `public` false.
 
-`supabase/tests/logistics_ci.sql` raises `RESULTS:` and rolls back. It does not need a separate database.
+`supabase/tests/logistics_ci.sql` raises `RESULTS:` and rolls back.
 
-`rollback.sql` drops the invoice tables and the year counter. It refuses while any invoice row exists unless `logistics.allow_invoice_rollback` is `yes`. That drop is permanent.
+`rollback.sql` is **DESTRUCTIVE**. It drops issued invoices, their numbers, and product customs rows, then drops the `logistics` schema and removes the two versions from `supabase_migrations.schema_migrations`. It refuses while any invoice or customs row exists unless `logistics.allow_invoice_rollback` is `yes`. After the guard it sets `storage.allow_delete_query` so the storage tables can be cleared. Delete uploaded files with the Storage API first; leftovers in the storage backend are not removed here.
