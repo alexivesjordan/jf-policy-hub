@@ -4,9 +4,10 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { enGB } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/pulse/ui";
+import { Button, Field, Input } from "@/components/pulse/ui";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { bookInstall, listInstallStartDates } from "@/features/sales/install-actions";
+import { bookingEmailReady } from "@/lib/installs/booking-email";
 import { isWeekend } from "@/lib/pulse/booking-range";
 import type { WarrantyChoice } from "@/lib/pulse/install-booking";
 import { ukDate } from "@/components/install-sales-view";
@@ -48,9 +49,13 @@ function useWideScreen() {
 export function BookInstallDialog({
   quoteId,
   warranty,
+  contactEmail,
+  missingCin7Email = false,
 }: {
   quoteId: string;
   warranty: WarrantyPrices | null;
+  contactEmail: string | null;
+  missingCin7Email?: boolean;
 }) {
   const wide = useWideScreen();
   const [open, setOpen] = useState(false);
@@ -58,6 +63,7 @@ export function BookInstallDialog({
   const [loading, setLoading] = useState(false);
   const [start, setStart] = useState<Date | undefined>();
   const [option, setOption] = useState<WarrantyChoice>("none");
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [booked, setBooked] = useState<{ id: string; startOn: string; endOn: string; note: string } | null>(null);
 
@@ -76,7 +82,7 @@ export function BookInstallDialog({
   async function confirm() {
     if (!start || isWeekend(iso(start))) return;
     setLoading(true);
-    const result = await bookInstall(quoteId, iso(start), option);
+    const result = await bookInstall(quoteId, iso(start), option, contactEmail ?? email);
     setLoading(false);
     if (!result.ok) {
       setMessage(result.message);
@@ -127,6 +133,14 @@ export function BookInstallDialog({
                 className="mx-auto [--cell-size:2.75rem]"
               />
             </div>
+            {contactEmail ? null : (
+              <div className="mx-auto w-full max-w-xl space-y-2">
+                <p className="text-sm">{missingCin7Email ? "Cin7 has no customer email on this order. Add one so the access form can be sent." : "Add the customer's email so the access form can be sent."}</p>
+                <Field label="Customer email">
+                  <Input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+                </Field>
+              </div>
+            )}
             {choices.length > 1 ? (
               <fieldset className="mx-auto w-full max-w-xl space-y-1">
                 <legend className="text-sm font-semibold">Maintenance and warranty</legend>
@@ -145,7 +159,7 @@ export function BookInstallDialog({
         )}
         {booked ? null : (
           <DialogFooter>
-            <Button type="button" disabled={!start || loading} onClick={() => void confirm()}>Confirm booking</Button>
+            <Button type="button" disabled={!start || loading || !bookingEmailReady(contactEmail, email)} onClick={() => void confirm()}>Confirm booking</Button>
           </DialogFooter>
         )}
       </DialogContent>

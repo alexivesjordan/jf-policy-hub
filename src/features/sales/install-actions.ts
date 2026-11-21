@@ -70,12 +70,26 @@ export async function listInstallStartDates(quoteId: string, from: string, to: s
   return { ok: true, message: "", dates: datesFrom(listed.data) };
 }
 
-export async function bookInstall(quoteId: string, startDate: string, warrantyOption = "none"): Promise<InstallActionResult> {
+export async function bookInstall(quoteId: string, startDate: string, warrantyOption = "none", contactEmail = ""): Promise<InstallActionResult> {
   await requireSalesUser();
   if (!ID.test(quoteId) || !DAY.test(startDate)) {
     return { ok: false, message: "Choose a start date.", dates: [] };
   }
   const supabase = await createClient();
+  const prepared = await supabase.rpc("install_prepare_quote_email", {
+    p_quote: quoteId,
+    p_email: contactEmail.trim() || null,
+  });
+  if (prepared.error) {
+    return { ok: false, message: messageFromError(prepared.error, "Could not save that email."), dates: [] };
+  }
+  if (typeof prepared.data !== "string" || !prepared.data.trim()) {
+    return {
+      ok: false,
+      message: "Add the customer's email before booking. Cin7 did not have one, so the access form cannot be sent.",
+      dates: [],
+    };
+  }
   const booked = await supabase.rpc("install_book", {
     p_quote_id: quoteId,
     p_start: startDate,
@@ -89,18 +103,14 @@ export async function bookInstall(quoteId: string, startDate: string, warrantyOp
     return { ok: false, message, dates };
   }
   const install = (booked.data ?? null) as { id?: string; contactEmail?: string | null; endOn?: string | null } | null;
-  const missingEmail = !String(install?.contactEmail ?? "").trim();
   let message = "Install booked.";
   if (install?.id) {
     try {
       const access = await issueInstallAccess({ id: install.id, contactEmail: install.contactEmail, endOn: String(install.endOn ?? "").slice(0, 10) || null });
-      if (missingEmail) message = "Install booked. There is no customer email, so the access form was not sent.";
-      else if (!access.sent) message = "Install booked. The access form was not emailed.";
+      if (!access.sent) message = "Install booked. The access form was not emailed.";
     } catch (error) {
       console.error("Access link was not sent", error);
-      message = missingEmail
-        ? "Install booked. There is no customer email, so the access form was not sent."
-        : "Install booked. The access form was not emailed.";
+      message = "Install booked. The access form was not emailed.";
     }
   }
   return {

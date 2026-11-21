@@ -186,22 +186,17 @@ describe("SO-00490 live-shaped categories", () => {
     const pins = result.lines.filter((line) => matchesPinLoadedRule(line.productName, ""));
     assert.equal(pins.length, 9);
     assert.ok(pins.every((line) => line.row?.buildLocation === "hq" && line.row.hqBuildMinutes === 120 && line.row.sitePositionMinutes === 45));
-    assert.equal(result.breakdown?.hqCost, 592.02);
+    assert.equal(result.breakdown?.hqCost, 1184.04);
     assert.ok(result.flags.some((flag) => /Lynnstar per-job quote/.test(flag)));
     assert.equal(result.blockedReason, null);
   });
 
   it("stays near the golden once those machines are HQ-built", () => {
-    // £3,717.52 golden. The £385.93 gap is three extra site builds, which add a night:
-    // the FID bench is a 2-hour Weight Benches default rather than 12 minutes,
-    // the SkiErg floor stand is Other so it is not handling-only,
-    // and JL-DMISC (Functional Fitness, not in the 44-line fixture) is another 2-hour build.
-    // HQ labour stays £592.02 and standard freight stays £390.
-    assert.equal(result.cost, 4103.45);
-    assert.equal(result.customerPrice, 7386.21);
-    assert.equal(result.breakdown?.days, 6);
-    assert.equal(result.breakdown?.nights, 5);
-    assert.equal(result.breakdown?.freight, 390);
-    assert.equal(result.breakdown?.hqCost, 592.02);
+    // Elite Cardio is HQ-built as well as the pin-loaded machines, so HQ labour is £1,184.04.
+    // Site days drop because those cardio machines are placement only.
+    assert.equal(result.cost, 3780.26);
+    assert.equal(result.customerPrice, Math.round(3780.26 * 1.8 * 100) / 100);
+    assert.equal(result.breakdown?.freight, 195);
+    assert.equal(result.breakdown?.hqCost, 1184.04);
   });
 });

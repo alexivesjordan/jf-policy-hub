@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TaskForm } from "@/components/operations-forms";
 import { PersonFilter } from "@/components/person-filter";
 import { Badge, Card } from "@/components/pulse/ui";
@@ -5,7 +6,7 @@ import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState } from "@/components/pulse/states";
 import { getOfficeContext, listPulseTasks } from "@/features/operations/queries";
 import { listPeople } from "@/features/policies/queries";
-import { formatTimestamp } from "@/lib/format";
+import { formatDate, formatTimestamp } from "@/lib/format";
 import { hasLevel } from "@/lib/module-guard";
 import { requireOperationsUser } from "@/lib/auth";
 import { oneParam } from "@/lib/utils";
@@ -46,7 +47,7 @@ export default async function TasksPage({
       ) : (
         <ul className="space-y-3">
           {visible.map((task) => (
-            <li key={task.id} className="rounded-3xl border border-line bg-card px-5 py-4">
+            <li key={`${task.id}-${task.assignee_id ?? "none"}`} className="rounded-3xl border border-line bg-card px-5 py-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">{task.title}</p>
                 <Badge tone={task.status === "done" ? "neutral" : "active"}>{task.status.replaceAll("_", " ")}</Badge>
@@ -54,8 +55,12 @@ export default async function TasksPage({
               </div>
               {task.body ? <p className="mt-2 text-sm text-ink/80">{task.body}</p> : null}
               <p className="mt-2 text-xs text-grey">
-                {names.get(task.assignee_id ?? "") ?? "Unassigned"} · {task.priority} · {formatTimestamp(task.created_at)}
+                {names.get(task.assignee_id ?? "") ?? "Unassigned"} · {task.priority}
+                {task.due_at ? ` · due ${formatDate(task.due_at)}` : ""} · {formatTimestamp(task.created_at)}
               </p>
+              {task.entity_table === "installs" && task.entity_id ? (
+                <Link href={`/operations/installs/${task.entity_id}`} className="mt-2 inline-flex text-sm font-semibold underline decoration-primary">Open the install</Link>
+              ) : null}
             </li>
           ))}
         </ul>

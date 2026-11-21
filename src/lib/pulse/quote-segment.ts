@@ -73,6 +73,9 @@ export function salesOrderActionResult(input: {
   postcode: string;
   customerPrice: number | null;
   savedQuoteId?: string;
+  contactEmail?: string | null;
+  /** True only when a Cin7 sale was read and it had no customer email. */
+  missingCin7Email?: boolean;
   service?: {
     id: string | null;
     quoteNumber: string;
@@ -113,6 +116,8 @@ export function salesOrderActionResult(input: {
           customerName: input.customerName,
           postcode: input.postcode,
           savedQuoteId: input.savedQuoteId,
+          contactEmail: input.contactEmail?.trim() || null,
+          missingCin7Email: input.missingCin7Email === true && !input.contactEmail?.trim(),
           service,
         },
   };

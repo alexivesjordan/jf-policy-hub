@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
 import { listPulseTasks } from "@/features/operations/queries";
 import { getCurrentProfile } from "@/lib/auth";
-import { formatTimestamp } from "@/lib/format";
+import Link from "next/link";
+import { formatDate, formatTimestamp } from "@/lib/format";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
 export const metadata = { title: "My tasks" };
 
 export default function FieldTasksPage() {
   return (
-    <Suspense fallback={<FieldFrame title="My tasks" back={{ href: "/field", label: "Jobs" }}><p className="text-grey">Loading...</p></FieldFrame>}>
+    <Suspense fallback={<FieldFrame title="My tasks" back={{ href: "/field", label: "My jobs" }}><p className="text-grey">Loading...</p></FieldFrame>}>
       <Tasks />
     </Suspense>
   );
@@ -20,7 +21,7 @@ export default function FieldTasksPage() {
 async function Tasks() {
   await connection();
   if (!isSupabaseConfigured() && !isFixtureMode()) {
-    return <FieldFrame title="My tasks" back={{ href: "/field", label: "Jobs" }}><p>Add the Supabase keys, then open My tasks again.</p></FieldFrame>;
+    return <FieldFrame title="My tasks" back={{ href: "/field", label: "My jobs" }}><p>Add the Supabase keys, then open My tasks again.</p></FieldFrame>;
   }
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login?next=/field/tasks");
@@ -29,14 +30,17 @@ async function Tasks() {
   const tasks = await listPulseTasks().catch(() => []);
   const mine = tasks.filter((task) => task.assignee_id === profile.id && task.status !== "done" && task.status !== "cancelled");
   return (
-    <FieldFrame title="My tasks" back={{ href: "/field", label: "Jobs" }}>
+    <FieldFrame title="My tasks" back={{ href: "/field", label: "My jobs" }}>
       {mine.length === 0 ? <p>No open tasks.</p> : (
         <ul className="space-y-3">
           {mine.map((task) => (
             <li key={task.id} className="rounded-3xl border border-line bg-card px-4 py-3">
               <p className="font-semibold">{task.title}</p>
-              {task.body ? <p className="mt-1 text-sm text-grey">{task.body}</p> : null}
-              <p className="mt-2 text-xs text-grey">{task.status.replaceAll("_", " ")} · {formatTimestamp(task.created_at)}</p>
+              {task.body ? <p className="mt-1 whitespace-pre-line text-sm text-grey">{task.body}</p> : null}
+              <p className="mt-2 text-xs text-grey">{task.status.replaceAll("_", " ")}{task.due_at ? ` · due ${formatDate(task.due_at)}` : ""} · {formatTimestamp(task.created_at)}</p>
+              {task.entity_table === "installs" && task.entity_id ? (
+                <Link href={`/field/${task.entity_id}`} className="mt-2 inline-flex min-h-12 items-center font-semibold underline decoration-red">Open the job</Link>
+              ) : null}
             </li>
           ))}
         </ul>

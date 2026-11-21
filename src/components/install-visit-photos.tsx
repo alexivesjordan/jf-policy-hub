@@ -1,6 +1,8 @@
 const LABELS: Record<string, string> = {
   concern: "Concern",
   equipment: "Equipment",
+  hq_photo: "HQ build",
+  vehicle_damage: "Vehicle damage",
 };
 
 export function InstallVisitPhotos({
