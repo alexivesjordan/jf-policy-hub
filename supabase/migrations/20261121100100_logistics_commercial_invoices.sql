@@ -287,6 +287,17 @@ begin
     then
       raise exception 'app: Shipped quantity is invalid.';
     end if;
+    if v_keyed.shipped > 0 then
+      perform pg_advisory_xact_lock(hashtext(coalesce(v_keyed.sale, '') || ':' || coalesce(v_keyed.sku, '')));
+      select coalesce(sum(saved.shipped_qty), 0) into v_already
+      from logistics.commercial_invoice_lines saved
+      join logistics.commercial_invoices invoice on invoice.id = saved.invoice_id
+      where invoice.status = 'issued'
+        and saved.line_key = v_keyed.line_key;
+      if v_already + v_keyed.shipped > v_keyed.ordered_max then
+        raise exception 'app: That quantity is already on an issued invoice.';
+      end if;
+    end if;
   end loop;
 
   for v_group in

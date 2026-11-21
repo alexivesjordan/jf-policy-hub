@@ -40,38 +40,6 @@ export function customsFromRpc(data: unknown): CustomsRow[] {
 }
 export type LineEdit = { lineId: string; orderNumber: string; sku: string; shippedQuantity: number; hsCode: string; originCountry: string; unitWeightKg: number | null };
 
-/** True when each line stays within its own quantity and the sale+SKU total stays within the summed order quantity. */
-export function skuQuantityFits(
-  lines: { saleId: string; sku: string; lineId: string; orderedQty: number; shippedQty: number }[],
-  already: { saleId: string; sku: string; qty: number }[],
-) {
-  const byLine = new Map<string, { saleId: string; sku: string; orderedQty: number; shippedQty: number }>();
-  for (const line of lines) {
-    if (!line.lineId || line.orderedQty <= 0 || line.shippedQty < 0 || line.shippedQty > line.orderedQty) return false;
-    const key = line.saleId + "\0" + line.lineId;
-    const prev = byLine.get(key);
-    if (prev && (prev.orderedQty !== line.orderedQty || prev.sku !== line.sku)) return false;
-    byLine.set(key, prev ? { ...prev, shippedQty: prev.shippedQty + line.shippedQty } : { saleId: line.saleId, sku: line.sku, orderedQty: line.orderedQty, shippedQty: line.shippedQty });
-  }
-  const groups = new Map<string, { ordered: number; shipped: number }>();
-  for (const line of byLine.values()) {
-    const key = line.saleId + "\0" + line.sku;
-    const group = groups.get(key) ?? { ordered: 0, shipped: 0 };
-    group.ordered += line.orderedQty;
-    group.shipped += line.shippedQty;
-    groups.set(key, group);
-  }
-  for (const [key, group] of groups) {
-    if (group.shipped <= 0) continue;
-    const split = key.indexOf("\0");
-    const saleId = key.slice(0, split);
-    const sku = key.slice(split + 1);
-    const prior = already.reduce((sum, row) => sum + (row.saleId === saleId && row.sku === sku ? row.qty : 0), 0);
-    if (prior + group.shipped > group.ordered) return false;
-  }
-  return true;
-}
-
 export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): InvoiceOrder[] {
   return quotes.map((sale) => {
     return {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyLineEdits, ordersFromCin7, skuQuantityFits, withShipmentPence } from "./prepare";
+import { applyLineEdits, ordersFromCin7, withShipmentPence } from "./prepare";
+import { clientError } from "./errors";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { COMMERCIAL_INVOICE_SELLER } from "./seller";
 import { mergeInvoiceOrders } from "./rules";
@@ -43,19 +44,24 @@ describe("duplicate SKU lines", () => {
     expect(priced.lines.map((line) => line.shippedPence)).toEqual([100, 300]);
   });
 
-  it("allows both lines of one SKU and refuses a shipment past their combined quantity", () => {
-    const lines = [
-      { saleId: "sale-dup", sku: "CI-DUP", lineId: "sale-dup:0", orderedQty: 2, shippedQty: 2 },
-      { saleId: "sale-dup", sku: "CI-DUP", lineId: "sale-dup:1", orderedQty: 3, shippedQty: 3 },
-    ];
-    expect(skuQuantityFits(lines, [])).toBe(true);
-    expect(skuQuantityFits(lines, [{ saleId: "sale-dup", sku: "CI-DUP", qty: 1 }])).toBe(false);
-    expect(skuQuantityFits(
-      [
-        { saleId: "sale-dup", sku: "CI-DUP", lineId: "sale-dup:0", orderedQty: 2, shippedQty: 2 },
-        { saleId: "sale-dup", sku: "CI-DUP", lineId: "sale-dup:1", orderedQty: 3, shippedQty: 4 },
-      ],
-      [],
-    )).toBe(false);
+  it("returns the friendly message when a line is already fully shipped", () => {
+    const orders = ordersFromCin7([duplicateSkuSale()], []);
+    const edited = applyLineEdits(orders, [
+      { lineId: "sale-dup:0", orderNumber: "SO-DUP", sku: "CI-DUP", shippedQuantity: 1, hsCode: "950691", originCountry: "cn", unitWeightKg: 1 },
+      { lineId: "sale-dup:1", orderNumber: "SO-DUP", sku: "CI-DUP", shippedQuantity: 0, hsCode: "950691", originCountry: "cn", unitWeightKg: 1 },
+    ]);
+    const draft = mergeInvoiceOrders(edited, {
+      name: COMMERCIAL_INVOICE_SELLER.name,
+      address: COMMERCIAL_INVOICE_SELLER.address,
+      vat: COMMERCIAL_INVOICE_SELLER.vat,
+      eori: COMMERCIAL_INVOICE_SELLER.eoriGb,
+    });
+    let caught: unknown;
+    try {
+      withShipmentPence(draft, edited, [{ cin7SaleId: "sale-dup", sku: "CI-DUP", lineKey: "sale-dup:0", qty: 2 }]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(clientError(caught, "Shipped quantity is invalid.")).toBe("Shipped quantity is above the remaining order quantity.");
   });
 });

@@ -211,6 +211,36 @@ begin
     else v_fail := v_fail + 1; v_notes := v_notes || ' duplicate sku over-ship ' || sqlerrm || ';'; end if;
   end;
 
+  v_payload := jsonb_build_object(
+    'idempotencyKey', gen_random_uuid(),
+    'issuedBy', v_admin,
+    'currency', 'GBP',
+    'incoterm', 'DAP',
+    'grossWeightKg', 2,
+    'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
+    'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-e', 'number', 'SO-E')),
+    'lines', jsonb_build_array(
+      jsonb_build_object('id', 'sale-e:D', 'orderNumber', 'SO-E', 'cin7SaleId', 'sale-e', 'sku', 'CI-E', 'description', 'Line D', 'orderedQty', 5, 'shippedQty', 0, 'lineNetPence', 500, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 0),
+      jsonb_build_object('id', 'sale-e:E', 'orderNumber', 'SO-E', 'cin7SaleId', 'sale-e', 'sku', 'CI-E', 'description', 'Line E', 'orderedQty', 1, 'shippedQty', 1, 'lineNetPence', 100, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 1)
+    )
+  );
+  begin
+    perform public.logistics_issue_commercial_invoice(v_payload);
+    v_ok := v_ok + 1;
+  exception when others then
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' line E first ' || sqlerrm || ';';
+  end;
+  v_payload := jsonb_set(v_payload, '{idempotencyKey}', to_jsonb(gen_random_uuid()::text));
+  begin
+    perform public.logistics_issue_commercial_invoice(v_payload);
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' line E twice allowed;';
+  exception when others then
+    if sqlerrm ilike '%already on an issued invoice%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' line E twice ' || sqlerrm || ';'; end if;
+  end;
+
   select seller::text, pdf_filename into v_seller, v_filename
   from logistics.commercial_invoices where id = v_id;
   if v_seller like '%GB385438070001%' and v_seller like '%FRGB1215443160001%' and v_seller like '%12798165%' then

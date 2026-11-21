@@ -70,7 +70,12 @@ export async function POST(request: Request) {
     const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
     const orders = applyLineEdits(ordersFromCin7(quotes, customsFromRpc(customs.data)), edits as LineEdit[]);
     const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
-    const draft = withShipmentPence(draftFromOrders(orders, parsed.data), orders, issuedQuantities(prior.data));
+    let draft;
+    try {
+      draft = withShipmentPence(draftFromOrders(orders, parsed.data), orders, issuedQuantities(prior.data));
+    } catch (error) {
+      return Response.json({ error: clientError(error, "Shipped quantity is invalid.") }, { status: 400 });
+    }
     draft.reference = "PREVIEW";
     const errors = validateCommercialInvoice(draft);
     if (errors.length) return Response.json({ error: "Invoice requires review.", details: errors }, { status: 422 });
