@@ -1,5 +1,5 @@
 -- Store a customer email on a quote before it is booked, and give the
--- access-form sender the names it needs. New file only. Do not apply to production.
+-- access-form sender the names it needs. New file only.
 
 create or replace function public.install_prepare_quote_email(p_quote uuid, p_email text)
 returns text

@@ -1,5 +1,5 @@
 -- Jordan Elite Cardio is built at HQ and ships assembled.
--- New file only. Do not apply this to production.
+-- New file only.
 
 create or replace function ops.elite_cardio_item(p_sku text, p_name text)
 returns boolean

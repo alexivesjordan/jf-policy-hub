@@ -1,5 +1,5 @@
 -- Install preparation: one HQ build task, one vehicle check, the engineer
--- briefing, and the Start gate. New file only. Do not apply this to production.
+-- briefing, and the Start gate. New file only.
 -- Weekends are never due dates and never a day a job can be started.
 
 alter table ops.installs
