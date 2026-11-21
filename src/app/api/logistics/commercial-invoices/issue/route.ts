@@ -2,7 +2,8 @@ import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
-import { applyLineEdits, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
+import { applyLineEdits, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
+import { shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
 import type { Profile } from "@/lib/types";
@@ -22,6 +23,7 @@ const bodySchema = z.object({
   grossWeightKg: z.number().finite().positive(),
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
+  shipment: shipmentSchema.optional(),
   lines: z.array(z.object({
     orderNumber: z.string(),
     sku: z.string(),
@@ -127,7 +129,12 @@ export async function POST(request: Request) {
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
   let draft;
   try {
-    draft = withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data));
+    draft = applyShipment(withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data)), {
+      ...input.shipment,
+      buyerVat: input.buyerVat ?? input.shipment?.buyerVat,
+      buyerEori: input.buyerEori ?? input.shipment?.buyerEori,
+      grossWeightKg: input.grossWeightKg,
+    });
   } catch (error) {
     return Response.json({ error: clientError(error, "Shipped quantity is invalid.") }, { status: 400 });
   }
@@ -167,6 +174,7 @@ export async function POST(request: Request) {
       orders: orders.map((order) => ({ cin7Id: order.id, number: order.orderNumber })),
       lines,
       document: draft,
+      shipment: draft.shipment ?? {},
     },
   });
   if (issued.error || !issued.data) {

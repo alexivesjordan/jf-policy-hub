@@ -1,7 +1,7 @@
-import { COMMERCIAL_INVOICE_SELLER } from "./seller";
+import { COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
   isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
-  type GoodsLine, type InvoiceDraft, type InvoiceOrder,
+  type GoodsLine, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment,
 } from "./rules";
 import type { Cin7Quote } from "@/lib/cin7/types";
 
@@ -50,6 +50,9 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): Invo
       country: sale.destinationCountry ?? "",
       currency: sale.currency ?? "",
       warnings: [],
+      deliveryPence: Math.round((sale.additionalCharges ?? [])
+        .filter((charge) => /\b(freight|delivery|carriage|shipping)\b/i.test(charge.description))
+        .reduce((sum, charge) => sum + charge.amountNet, 0) * 100),
       lines: sale.lines.flatMap((line, index) => {
         if (!isGoodsLine({ sku: line.sku, productName: line.productName, category: line.cin7Category })) return [];
         const saved = customs.find((row) => row.sku === (line.sku ?? ""));
@@ -111,7 +114,60 @@ export function draftFromOrders(orders: InvoiceOrder[], input: { incoterm: strin
   draft.signatory = "Jordan Fitness Ltd";
   draft.physicalShipmentConfirmed = true;
   draft.reasonForExport = "Sale of goods";
+  const deliveryPence = orders.reduce((sum, order) => sum + (order.deliveryPence ?? 0), 0);
+  draft.shipment = {
+    fao: "",
+    courier: "",
+    despatchDate: draft.issueDate,
+    deliveryAddress: draft.consignee.address,
+    contactName: "",
+    contactEmail: "",
+    specialInstructions: "",
+    parcels: input.packages,
+    pallets: 0,
+    dimensions: [],
+    deliveryPence,
+    surchargePence: 0,
+    vatPence: 0,
+    customsStatementId: "none",
+    customsStatementText: "",
+    issuedAt: new Date().toISOString(),
+  };
+  draft.freightValue = deliveryPence / 100;
   return draft;
+}
+
+export function applyShipment(draft: InvoiceDraft, input: Partial<InvoiceShipment> & { buyerVat?: string; buyerEori?: string; grossWeightKg?: number }): InvoiceDraft {
+  const current = draft.shipment ?? {
+    fao: "", courier: "", despatchDate: draft.issueDate, deliveryAddress: draft.consignee.address,
+    contactName: "", contactEmail: "", specialInstructions: "", parcels: draft.packages, pallets: 0,
+    dimensions: [], deliveryPence: 0, surchargePence: 0, vatPence: 0, customsStatementId: "none",
+    customsStatementText: "", issuedAt: new Date().toISOString(),
+  };
+  const { buyerVat, buyerEori, grossWeightKg, ...rest } = input;
+  const shipment: InvoiceShipment = {
+    ...current,
+    ...rest,
+    dimensions: rest.dimensions ?? current.dimensions,
+    customsStatementId: rest.customsStatementId ?? current.customsStatementId,
+    customsStatementText: resolveCustomsStatement(rest.customsStatementId ?? current.customsStatementId, rest.customsStatementText ?? current.customsStatementText),
+    issuedAt: current.issuedAt,
+  };
+  const parcels = shipment.parcels;
+  const pallets = shipment.pallets;
+  const packages = parcels > 0 ? parcels : pallets > 0 ? pallets : draft.packages;
+  return {
+    ...draft,
+    shipment,
+    packages: packages > 0 ? packages : 1,
+    packageType: pallets > 0 ? "Pallet" : draft.packageType || "Carton",
+    grossWeightKg: grossWeightKg ?? draft.grossWeightKg,
+    buyer: { ...draft.buyer, vat: buyerVat ?? draft.buyer.vat, eori: buyerEori ?? draft.buyer.eori },
+    consignee: { ...draft.consignee, address: shipment.deliveryAddress || draft.consignee.address },
+    freightValue: shipment.deliveryPence / 100,
+    otherChargesValue: shipment.surchargePence / 100,
+    notes: shipment.specialInstructions,
+  };
 }
 
 export type IssuedQuantity = { cin7SaleId: string; sku: string; lineKey: string; qty: number };

@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
-import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder } from "@/features/logistics/commercial-invoice/rules";
+import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
+import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment, type PackageDimension } from "@/features/logistics/commercial-invoice/rules";
 
 const TERMS = ["DAP", "DDP", "EXW", "FCA", "CPT", "CIP", "DPU", "FOB", "CIF"];
 
@@ -64,6 +65,24 @@ export function CommercialInvoiceWorkspace() {
         notes: "",
         physicalShipmentConfirmed: true,
         lines: found.flatMap((order) => order.lines),
+        shipment: {
+          fao: "",
+          courier: "",
+          despatchDate: new Date().toISOString().slice(0, 10),
+          deliveryAddress: found[0]?.consignee.address ?? "",
+          contactName: "",
+          contactEmail: "",
+          specialInstructions: "",
+          parcels: 1,
+          pallets: 0,
+          dimensions: [],
+          deliveryPence: found.reduce((sum, order) => sum + (order.deliveryPence ?? 0), 0),
+          surchargePence: 0,
+          vatPence: 0,
+          customsStatementId: "none",
+          customsStatementText: "",
+          issuedAt: new Date().toISOString(),
+        },
       });
     } catch (err) {
       setDraft(null);
@@ -85,6 +104,7 @@ export function CommercialInvoiceWorkspace() {
       grossWeightKg: draft.grossWeightKg,
       buyerVat: draft.buyer.vat,
       buyerEori: draft.buyer.eori,
+      shipment: draft.shipment,
       lines: draft.lines.map((line) => ({
         lineId: line.id,
         orderNumber: line.orderNumber,
@@ -164,7 +184,17 @@ export function CommercialInvoiceWorkspace() {
     }
   }
 
+  function patchShipment(patch: Partial<InvoiceShipment>) {
+    setDraft((current) => current?.shipment ? { ...current, shipment: { ...current.shipment, ...patch } } : current);
+  }
+
+  function patchDimension(index: number, patch: Partial<PackageDimension>) {
+    if (!draft?.shipment) return;
+    patchShipment({ dimensions: draft.shipment.dimensions.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) });
+  }
+
   const net = draft ? summedNetWeightKg(draft.lines) : 0;
+  const shipment = draft?.shipment;
   return (
     <div className="space-y-6">
       <section className="space-y-3 rounded-3xl border border-line bg-card p-5">
@@ -200,15 +230,71 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Buyer VAT
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.vat} onChange={(event) => setDraft({ ...draft, buyer: { ...draft.buyer, vat: event.currentTarget.value } })} />
             </label>
-            <label className="text-sm font-semibold">Packages
-              <input type="number" min={1} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.packages} onChange={(event) => setDraft({ ...draft, packages: Number(event.currentTarget.value) })} />
+            <label className="text-sm font-semibold">Buyer EORI
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.eori} onChange={(event) => setDraft({ ...draft, buyer: { ...draft.buyer, eori: event.currentTarget.value } })} />
             </label>
-            <label className="text-sm font-semibold">Package type
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.packageType} onChange={(event) => setDraft({ ...draft, packageType: event.currentTarget.value })} />
+            <label className="text-sm font-semibold">FAO
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.fao ?? ""} onChange={(event) => patchShipment({ fao: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold">Courier
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.courier ?? ""} onChange={(event) => patchShipment({ courier: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold">Despatch date
+              <input type="date" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.despatchDate ?? ""} onChange={(event) => patchShipment({ despatchDate: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold md:col-span-3">Delivery address
+              <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.deliveryAddress ?? ""} onChange={(event) => patchShipment({ deliveryAddress: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold">Contact
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.contactName ?? ""} onChange={(event) => patchShipment({ contactName: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold">Email
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.contactEmail ?? ""} onChange={(event) => patchShipment({ contactEmail: event.currentTarget.value })} />
+            </label>
+            <label className="text-sm font-semibold">Parcels
+              <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.parcels ?? 0} onChange={(event) => patchShipment({ parcels: Number(event.currentTarget.value) })} />
+            </label>
+            <label className="text-sm font-semibold">Pallets
+              <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.pallets ?? 0} onChange={(event) => patchShipment({ pallets: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Gross kg
               <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.grossWeightKg} onChange={(event) => setDraft({ ...draft, grossWeightKg: Number(event.currentTarget.value) })} />
             </label>
+            <label className="text-sm font-semibold">Delivery
+              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />
+            </label>
+            <label className="text-sm font-semibold">Surcharge
+              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.surchargePence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ surchargePence: Math.round(Number(event.currentTarget.value) * 100) })} />
+            </label>
+            <label className="text-sm font-semibold">VAT
+              <input type="number" min={0} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.vatPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ vatPence: Math.round(Number(event.currentTarget.value) * 100) })} />
+            </label>
+            <label className="text-sm font-semibold">Customs statement
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.customsStatementId ?? "none"} onChange={(event) => patchShipment({ customsStatementId: event.currentTarget.value })}>
+                {CUSTOMS_STATEMENTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </label>
+            {shipment?.customsStatementId === "custom" ? (
+              <label className="text-sm font-semibold md:col-span-2">Statement
+                <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment.customsStatementText} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
+              </label>
+            ) : null}
+            <label className="text-sm font-semibold md:col-span-3">Special instructions
+              <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.specialInstructions ?? ""} onChange={(event) => patchShipment({ specialInstructions: event.currentTarget.value })} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Dimensions</p>
+            {shipment?.dimensions.map((item, index) => (
+              <div key={index} className="grid grid-cols-5 gap-2">
+                <input aria-label="Length cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.lengthCm} onChange={(event) => patchDimension(index, { lengthCm: Number(event.currentTarget.value) })} />
+                <input aria-label="Width cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.widthCm} onChange={(event) => patchDimension(index, { widthCm: Number(event.currentTarget.value) })} />
+                <input aria-label="Height cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.heightCm} onChange={(event) => patchDimension(index, { heightCm: Number(event.currentTarget.value) })} />
+                <input aria-label="Weight kg" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.weightKg} onChange={(event) => patchDimension(index, { weightKg: Number(event.currentTarget.value) })} />
+                <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => patchShipment({ dimensions: shipment.dimensions.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
+              </div>
+            ))}
+            <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={() => patchShipment({ dimensions: [...(shipment?.dimensions ?? []), { lengthCm: 0, widthCm: 0, heightCm: 0, weightKg: 0 }] })}>Add</button>
           </div>
           <div className="space-y-3">
             {draft.lines.map((line) => (

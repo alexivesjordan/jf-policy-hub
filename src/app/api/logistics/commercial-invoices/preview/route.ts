@@ -3,7 +3,8 @@ import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/acc
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
 import { commercialInvoiceFileName, contentDisposition } from "@/features/logistics/commercial-invoice/filename";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
-import { applyLineEdits, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
+import { applyLineEdits, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
+import { shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
 import { parseOrderNumbers, validateCommercialInvoice } from "@/features/logistics/commercial-invoice/rules";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -19,6 +20,7 @@ const bodySchema = z.object({
   grossWeightKg: z.number().finite().nonnegative(),
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
+  shipment: shipmentSchema.optional(),
   lines: z.array(z.object({
     orderNumber: z.string(),
     sku: z.string(),
@@ -72,7 +74,12 @@ export async function POST(request: Request) {
     const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
     let draft;
     try {
-      draft = withShipmentPence(draftFromOrders(orders, parsed.data), orders, issuedQuantities(prior.data));
+      draft = applyShipment(withShipmentPence(draftFromOrders(orders, parsed.data), orders, issuedQuantities(prior.data)), {
+        ...parsed.data.shipment,
+        buyerVat: parsed.data.buyerVat ?? parsed.data.shipment?.buyerVat,
+        buyerEori: parsed.data.buyerEori ?? parsed.data.shipment?.buyerEori,
+        grossWeightKg: parsed.data.grossWeightKg,
+      });
     } catch (error) {
       return Response.json({ error: clientError(error, "Shipped quantity is invalid.") }, { status: 400 });
     }

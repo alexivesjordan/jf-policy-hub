@@ -26,7 +26,8 @@ create table logistics.commercial_invoices (
   void_reason text,
   voided_by uuid,
   voided_at timestamptz,
-  document jsonb not null
+  document jsonb not null,
+  shipment jsonb not null default '{}'::jsonb
 );
 
 create table logistics.commercial_invoice_lines (
@@ -142,6 +143,7 @@ begin
      and new.voided_by is not distinct from old.voided_by
      and new.voided_at is not distinct from old.voided_at
      and new.document = old.document
+     and new.shipment = old.shipment
   then
     return new;
   end if;
@@ -164,6 +166,7 @@ begin
      and new.issued_at = old.issued_at
      and new.idempotency_key = old.idempotency_key
      and new.document = old.document
+     and new.shipment = old.shipment
   then
     return new;
   end if;
@@ -390,12 +393,13 @@ begin
     || jsonb_build_object('reference', v_number, 'lines', v_doc_lines);
   insert into logistics.commercial_invoices (
     number, status, seller, buyer, currency, incoterm, totals_pence,
-    net_weight_kg, gross_weight_kg, cin7_orders, pdf_filename, issued_by, idempotency_key, document
+    net_weight_kg, gross_weight_kg, cin7_orders, pdf_filename, issued_by, idempotency_key, document, shipment
   ) values (
     v_number, 'issued', v_seller, p_payload->'buyer',
     p_payload->>'currency', p_payload->>'incoterm', v_total,
     v_net, (p_payload->>'grossWeightKg')::numeric, p_payload->'orders',
-    v_filename, v_actor, v_key, v_document
+    v_filename, v_actor, v_key, v_document,
+    coalesce(p_payload->'shipment', p_payload->'document'->'shipment', '{}'::jsonb)
   ) returning id into v_id;
 
   v_pos := 0;

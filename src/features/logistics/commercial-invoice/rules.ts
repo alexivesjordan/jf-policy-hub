@@ -29,6 +29,27 @@ export type GoodsLine = {
   unitWeightKg: number | null;
 };
 
+export type PackageDimension = { lengthCm: number; widthCm: number; heightCm: number; weightKg: number };
+
+export type InvoiceShipment = {
+  fao: string;
+  courier: string;
+  despatchDate: string;
+  deliveryAddress: string;
+  contactName: string;
+  contactEmail: string;
+  specialInstructions: string;
+  parcels: number;
+  pallets: number;
+  dimensions: PackageDimension[];
+  deliveryPence: number;
+  surchargePence: number;
+  vatPence: number;
+  customsStatementId: string;
+  customsStatementText: string;
+  issuedAt: string;
+};
+
 export type InvoiceOrder = {
   id: string;
   orderNumber: string;
@@ -38,6 +59,8 @@ export type InvoiceOrder = {
   currency: string;
   lines: GoodsLine[];
   warnings: string[];
+  /** Freight and delivery charges from Cin7, in pence. Not a goods line. */
+  deliveryPence?: number;
 };
 
 export type InvoiceDraft = {
@@ -74,6 +97,7 @@ export type InvoiceDraft = {
   notes: string;
   physicalShipmentConfirmed: boolean;
   lines: GoodsLine[];
+  shipment?: InvoiceShipment;
 };
 
 export function blankParty(): InvoiceParty {
