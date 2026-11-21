@@ -1,0 +1,36 @@
+name: Pulse feature checks
+
+on:
+  pull_request:
+    paths:
+      - "src/features/logistics/**"
+      - "src/features/radar/**"
+      - "scripts/radar-collector.ts"
+      - "Dockerfile.radar"
+      - "src/components/logistics/**"
+      - "src/components/radar/**"
+      - "src/app/api/logistics/**"
+      - "src/app/api/radar/**"
+      - "src/app/(sales)/sales/commercial-invoices/**"
+      - "src/app/(sales)/sales/radar/**"
+      - ".github/workflows/pulse-feature-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: New-feature unit tests
+        run: npx vitest run src/features/logistics/commercial-invoice/rules.test.ts src/features/radar/domain.test.ts src/features/radar/feed.test.ts --passWithNoTests
