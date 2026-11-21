@@ -23,6 +23,7 @@ declare
   v_payload jsonb;
   v_goods integer;
   v_full integer;
+  v_case text;
 begin
   perform set_config('orbit.profile_sync', 'on', true);
 
@@ -135,6 +136,30 @@ begin
   from logistics.commercial_invoices where id = v_id;
   if v_goods = 10000 and v_full = 60250 then v_ok := v_ok + 1;
   else v_fail := v_fail + 1; v_notes := v_notes || ' total_pence goods ' || coalesce(v_goods::text, 'null') || ' full ' || coalesce(v_full::text, 'null') || ';'; end if;
+
+  foreach v_case in array array[
+    'negative delivery', 'negative surcharge', 'negative vat', 'negative gross', 'gross over cap'
+  ] loop
+    begin
+      perform public.logistics_issue_commercial_invoice(
+        jsonb_set(
+          case v_case
+            when 'negative delivery' then jsonb_set(v_payload, '{shipment,deliveryPence}', '-1')
+            when 'negative surcharge' then jsonb_set(v_payload, '{shipment,surchargePence}', '-1')
+            when 'negative vat' then jsonb_set(v_payload, '{shipment,vatPence}', '-1')
+            when 'negative gross' then jsonb_set(v_payload, '{grossWeightKg}', '-1')
+            else jsonb_set(v_payload, '{grossWeightKg}', '100001')
+          end,
+          '{idempotencyKey}', to_jsonb(gen_random_uuid()::text)
+        )
+      );
+      v_fail := v_fail + 1;
+      v_notes := v_notes || ' ' || v_case || ' allowed;';
+    exception when others then
+      if sqlerrm ilike '%invalid%' then v_ok := v_ok + 1;
+      else v_fail := v_fail + 1; v_notes := v_notes || ' ' || v_case || ' ' || sqlerrm || ';'; end if;
+    end;
+  end loop;
 
   begin
     v_replay := public.logistics_issue_commercial_invoice(v_payload);

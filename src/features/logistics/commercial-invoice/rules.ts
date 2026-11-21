@@ -284,6 +284,7 @@ export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   if (summedNet <= 0) errors.push("Confirmed net mass must be greater than zero.");
   else if (Math.abs(d.netWeightKg - summedNet) > 0.001) errors.push("Net mass must equal the sum of the line weights.");
   if (!Number.isFinite(d.grossWeightKg) || d.grossWeightKg < d.netWeightKg || d.grossWeightKg <= 0) errors.push("Gross mass must be at least net mass.");
+  else if (d.grossWeightKg > 100000) errors.push("Gross mass is too large.");
   for (const [name,amount] of [["Freight",d.freightValue],["Insurance",d.insuranceValue],["Other charges",d.otherChargesValue]] as const) {
     if (!Number.isFinite(amount) || amount < 0 || amount > 100000000) errors.push(name + " amount is invalid.");
   }

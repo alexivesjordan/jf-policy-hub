@@ -17,7 +17,7 @@ const bodySchema = z.object({
   destinationCountry: z.string().max(8),
   packages: z.number().int().nonnegative(),
   packageType: z.string().max(100),
-  grossWeightKg: z.number().finite().nonnegative(),
+  grossWeightKg: z.number().finite().nonnegative().max(100000),
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
   shipment: shipmentSchema.optional(),

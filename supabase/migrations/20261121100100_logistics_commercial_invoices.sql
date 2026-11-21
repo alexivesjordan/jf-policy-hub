@@ -225,6 +225,10 @@ declare
   v_pos integer := 0;
   v_total integer := 0;
   v_invoice_total integer := 0;
+  v_delivery integer;
+  v_surcharge integer;
+  v_vat integer;
+  v_gross numeric;
   v_net numeric := 0;
   v_ordered numeric;
   v_shipped numeric;
@@ -391,11 +395,15 @@ begin
     raise exception 'app: No goods selected for shipment.';
   end if;
 
+  v_delivery := coalesce((p_payload#>>'{shipment,deliveryPence}')::integer, 0);
+  v_surcharge := coalesce((p_payload#>>'{shipment,surchargePence}')::integer, 0);
+  v_vat := coalesce((p_payload#>>'{shipment,vatPence}')::integer, 0);
+  v_gross := (p_payload->>'grossWeightKg')::numeric;
+  if v_delivery < 0 or v_surcharge < 0 or v_vat < 0 or v_gross is null or v_gross < 0 or v_gross > 100000 then
+    raise exception 'app: Shipment charges or weight are invalid.';
+  end if;
   v_number := logistics.next_invoice_number(v_year);
-  v_invoice_total := v_total
-    + coalesce((p_payload#>>'{shipment,deliveryPence}')::integer, 0)
-    + coalesce((p_payload#>>'{shipment,surchargePence}')::integer, 0)
-    + coalesce((p_payload#>>'{shipment,vatPence}')::integer, 0);
+  v_invoice_total := v_total + v_delivery + v_surcharge + v_vat;
   v_filename := 'Commercial Invoice - ' || regexp_replace(coalesce(p_payload#>>'{buyer,name}', 'Buyer'), '[/\\:*?"<>|]', '', 'g') || ' - ' || v_number || ' - ' || regexp_replace(coalesce(p_payload->>'incoterm', ''), '[/\\:*?"<>|]', '', 'g') || '.pdf';
   v_document := coalesce(p_payload->'document', '{}'::jsonb)
     || jsonb_build_object('reference', v_number, 'lines', v_doc_lines, 'totalPence', v_invoice_total);

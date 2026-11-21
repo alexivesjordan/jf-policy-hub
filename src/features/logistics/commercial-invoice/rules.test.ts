@@ -82,6 +82,11 @@ describe("Pulse Logistics commercial invoice rules",()=>{
     d.importer = { ...d.seller };
     expect(validateCommercialInvoice(d).join(" ")).toMatch(/EU importer/);
   });
+  it("rejects a gross weight above 100000 kg", () => {
+    const d = validDraft();
+    d.grossWeightKg = 100001;
+    expect(validateCommercialInvoice(d).join(" ")).toMatch(/too large/);
+  });
   it("blocks missing currency",()=>{
     const d=validDraft();d.currency="";
     expect(validateCommercialInvoice(d).join(" ")).toMatch(/currency/);

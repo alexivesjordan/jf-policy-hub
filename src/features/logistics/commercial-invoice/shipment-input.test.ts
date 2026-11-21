@@ -19,5 +19,8 @@ describe("shipment input limits", () => {
     expect(shipmentSchema.safeParse({ dimensions: [{ lengthCm: 1001, widthCm: 1, heightCm: 1, weightKg: 1 }] }).success).toBe(false);
     expect(shipmentSchema.safeParse({ dimensions: [{ lengthCm: 1000, widthCm: 1, heightCm: 1, weightKg: 5000 }] }).success).toBe(true);
     expect(shipmentSchema.safeParse({ dimensions: Array.from({ length: 41 }, () => ({ lengthCm: 1, widthCm: 1, heightCm: 1, weightKg: 1 })) }).success).toBe(false);
+    expect(shipmentSchema.safeParse({ grossWeightKg: 100000 }).success).toBe(true);
+    expect(shipmentSchema.safeParse({ grossWeightKg: 100001 }).success).toBe(false);
+    expect(shipmentSchema.safeParse({ grossWeightKg: -1 }).success).toBe(false);
   });
 });

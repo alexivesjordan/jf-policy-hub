@@ -29,8 +29,7 @@ export type InvoicePageRole = "first" | "continuation" | "last";
 export type SummaryPiece =
   | { kind: "dims"; from: number; to: number }
   | { kind: "statement"; from: number; to: number }
-  | { kind: "boxes"; from: number; to: number }
-  | { kind: "sign" };
+  | { kind: "closing" };
 export type InvoicePagePlan = {
   role: InvoicePageRole;
   from: number;
@@ -293,31 +292,21 @@ function pieceHeight(piece: SummaryPiece, metrics: SummaryMetrics) {
     const tail = piece.to === metrics.statementLines.length ? STATEMENT_TAIL : 0;
     return (piece.to - piece.from) * STATEMENT_LINE + tail;
   }
-  return piece.kind === "boxes" ? boxesHeight(piece.from, piece.to) : metrics.signH;
+  return metrics.boxH + SUMMARY_GAP + metrics.signH;
 }
 
 function sourcePieces(metrics: SummaryMetrics): SummaryPiece[] {
   const pieces: SummaryPiece[] = [];
   if (metrics.dimRows) pieces.push({ kind: "dims", from: 0, to: metrics.dimRows });
   if (metrics.statementLines.length) pieces.push({ kind: "statement", from: 0, to: metrics.statementLines.length });
-  pieces.push({ kind: "boxes", from: 0, to: metrics.instructionLines.length }, { kind: "sign" });
+  pieces.push({ kind: "closing" });
   return pieces;
 }
 
 function takePiece(piece: SummaryPiece, room: number, metrics: SummaryMetrics): { fit: SummaryPiece | null; rest: SummaryPiece | null; height: number } {
   const whole = pieceHeight(piece, metrics);
   if (whole <= room) return { fit: piece, rest: null, height: whole };
-  if (piece.kind === "sign") return { fit: null, rest: piece, height: 0 };
-  if (piece.kind === "boxes") {
-    if (room < 108) return { fit: null, rest: piece, height: 0 };
-    const lineCap = Math.max(0, Math.floor((room - 42) / INSTR_LINE));
-    const lines = Math.min(piece.to - piece.from, lineCap);
-    if (lines < 1 && piece.to > piece.from) return { fit: null, rest: piece, height: 0 };
-    const to = piece.from + Math.max(lines, piece.to === piece.from ? 0 : lines);
-    const fit: SummaryPiece = { kind: "boxes", from: piece.from, to };
-    if (fit.to >= piece.to) return { fit: piece, rest: null, height: whole };
-    return { fit, rest: { kind: "boxes", from: fit.to, to: piece.to }, height: pieceHeight(fit, metrics) };
-  }
+  if (piece.kind === "closing") return { fit: null, rest: piece, height: 0 };
   if (piece.kind === "dims") {
     const header = piece.from === 0 ? DIM_HEADER : 0;
     let rows = Math.floor((room - header) / DIM_LINE);
@@ -339,26 +328,23 @@ function packPieces(pieces: SummaryPiece[], room: number, metrics: SummaryMetric
   let index = 0;
   while (index < pieces.length) {
     const piece = pieces[index]!;
-    const gap = piece.kind === "sign" && used > 0 ? SUMMARY_GAP : 0;
-    const taken = takePiece(piece, room - used - gap, metrics);
+    const taken = takePiece(piece, room - used, metrics);
     if (!taken.fit) break;
     placed.push(taken.fit);
-    used += gap + taken.height;
+    used += taken.height;
     if (taken.rest) return { placed, rest: [taken.rest, ...pieces.slice(index + 1)], height: used };
     index += 1;
   }
   return { placed, rest: pieces.slice(index), height: used };
 }
 
-function summaryComplete(pieces: SummaryPiece[], metrics: SummaryMetrics) {
+function summaryAnchor(pieces: SummaryPiece[], metrics: SummaryMetrics): "top" | "bottom" {
+  if (!pieces.some((piece) => piece.kind === "closing")) return "top";
   const dims = pieces.find((piece) => piece.kind === "dims");
   const statement = pieces.find((piece) => piece.kind === "statement");
-  const boxes = pieces.find((piece) => piece.kind === "boxes");
-  if (!pieces.some((piece) => piece.kind === "sign")) return false;
-  if (!(boxes?.kind === "boxes" && boxes.from === 0 && boxes.to === metrics.instructionLines.length)) return false;
-  if (metrics.dimRows && !(dims?.kind === "dims" && dims.from === 0 && dims.to === metrics.dimRows)) return false;
-  if (metrics.statementLines.length && !(statement?.kind === "statement" && statement.from === 0 && statement.to === metrics.statementLines.length)) return false;
-  return true;
+  const dimsPartial = dims?.kind === "dims" && (dims.from !== 0 || dims.to !== metrics.dimRows);
+  const statementPartial = statement?.kind === "statement" && (statement.from !== 0 || statement.to !== metrics.statementLines.length);
+  return dimsPartial || statementPartial ? "top" : "bottom";
 }
 
 function pageOf(role: InvoicePageRole, from: number, to: number, pieces: SummaryPiece[], anchor: "top" | "bottom", used: number): InvoicePagePlan {
@@ -391,7 +377,7 @@ export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): Invoi
       const placed = packed.placed.length ? packed.placed : [rest[0]!];
       const next = packed.placed.length ? packed.rest : rest.slice(1);
       const height = packed.placed.length ? packed.height : pieceHeight(placed[0]!, metrics);
-      built.push(pageOf("continuation", rows.length, rows.length, placed, summaryComplete(placed, metrics) ? "bottom" : "top", height));
+      built.push(pageOf("continuation", rows.length, rows.length, placed, summaryAnchor(placed, metrics), height));
       rest = next;
     }
   };
@@ -421,7 +407,7 @@ export function planCommercialInvoice(draft: InvoiceDraft, font: PDFFont): Invoi
       if (packed.placed.length) {
         last.pieces = packed.placed;
         last.summary = true;
-        last.anchor = summaryComplete(packed.placed, metrics) ? "bottom" : "top";
+        last.anchor = summaryAnchor(packed.placed, metrics);
         last.used += packed.height;
         addSummaryPages(packed.rest);
       } else addSummaryPages(pieces);
@@ -612,10 +598,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const metrics = measureSummary(draft, regular);
   const boxW = (CONTENT_W - 16) / 3;
   const drawSummary = (page: PDFPage, ceiling: number, item: InvoicePagePlan) => {
-    const blockHeight = item.pieces.reduce((sum, piece, index) => {
-      const gap = piece.kind === "sign" && index > 0 ? SUMMARY_GAP : 0;
-      return sum + gap + pieceHeight(piece, metrics);
-    }, 0);
+    const blockHeight = item.pieces.reduce((sum, piece) => sum + pieceHeight(piece, metrics), 0);
     let cursor = item.anchor === "bottom" ? Math.min(ceiling, ROW_BOTTOM + blockHeight) : ceiling;
     const drawDims = (piece: Extract<SummaryPiece, { kind: "dims" }>) => {
       if (piece.from === 0) {
@@ -640,9 +623,9 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       }
       if (piece.to === metrics.statementLines.length) cursor -= STATEMENT_TAIL;
     };
-    const drawBoxes = (piece: Extract<SummaryPiece, { kind: "boxes" }>) => {
+    const drawClosing = () => {
       const boxTop = cursor;
-      const boxH = boxesHeight(piece.from, piece.to);
+      const boxH = metrics.boxH;
       const middle: [string, string][] = [
         ["No. of parcels:", shipment.parcels.toFixed(2)],
         ["No. of pallets:", shipment.pallets.toFixed(2)],
@@ -664,7 +647,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       roundBox(page, MARGIN, boxTop, boxW, boxH);
       text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
       let lineY = boxTop - 30;
-      for (const wrapped of metrics.instructionLines.slice(piece.from, piece.to)) {
+      for (const wrapped of metrics.instructionLines) {
         text(page, wrapped, MARGIN + 8, lineY, 7.5, regular);
         lineY -= INSTR_LINE;
       }
@@ -676,9 +659,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       totals.forEach(([label, value, strong], index) => labelValue(rightX, boxTop - 16 - index * 13, label, value, strong));
       const currency = currencyName(draft.currency);
       text(page, currency, rightX + (boxW - regular.widthOfTextAtSize(currency, 7.5)) / 2, boxTop - boxH + 10, 7.5, regular);
-      cursor -= boxH;
-    };
-    const drawSign = () => {
+      cursor -= boxH + SUMMARY_GAP;
       const signTop = cursor;
       const stampW = 150;
       const signW = CONTENT_W - stampW - 8;
@@ -698,12 +679,10 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - metrics.signH + 10, width: stampW - 24, height: 40 });
       cursor -= metrics.signH;
     };
-    item.pieces.forEach((piece, index) => {
-      if (piece.kind === "sign" && index > 0) cursor -= SUMMARY_GAP;
+    item.pieces.forEach((piece) => {
       if (piece.kind === "dims") drawDims(piece);
       else if (piece.kind === "statement") drawStatement(piece);
-      else if (piece.kind === "boxes") drawBoxes(piece);
-      else drawSign();
+      else drawClosing();
     });
   };
 

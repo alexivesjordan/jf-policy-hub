@@ -36,7 +36,7 @@ export const shipmentSchema = z.object({
   customsStatementText: z.string().max(2000).optional(),
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
-  grossWeightKg: z.number().finite().nonnegative().optional(),
+  grossWeightKg: z.number().finite().nonnegative().max(100000).optional(),
 }).strict();
 
 export const optionalDdpSchema = {

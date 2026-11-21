@@ -315,7 +315,7 @@ export function CommercialInvoiceWorkspace() {
               <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.pallets ?? 0} onChange={(event) => patchShipment({ pallets: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Gross kg
-              <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.grossWeightKg} onChange={(event) => setDraft({ ...draft, grossWeightKg: Number(event.currentTarget.value) })} />
+              <input type="number" min={0} max={100000} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.grossWeightKg} onChange={(event) => setDraft({ ...draft, grossWeightKg: Number(event.currentTarget.value) })} />
             </label>
             <label className="text-sm font-semibold">Delivery
               <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />

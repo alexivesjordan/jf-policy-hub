@@ -178,6 +178,11 @@ describe("commercial invoice PDF", () => {
     expect(pages[0]).toMatch(/COMMERCIAL INVOICE/);
     expect(pages.slice(1).every((page) => /Document No:/.test(page))).toBe(true);
     expect(pages.slice(1).some((page) => /COMMERCIAL INVOICE/.test(page))).toBe(false);
+    const totalsPages = pages.filter((page) => /Goods Net/.test(page));
+    expect(totalsPages).toHaveLength(1);
+    expect(totalsPages[0]).toMatch(/Signed:/);
+    expect(pages.filter((page) => /Signed:/.test(page))).toHaveLength(1);
+    expect(plan.filter((page) => page.pieces.some((piece) => piece.kind === "closing"))).toHaveLength(1);
     await saveDraft("invoice-stress.pdf", draft);
   }, 20000);
 });
