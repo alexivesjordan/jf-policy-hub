@@ -36,6 +36,7 @@ export const CUSTOMS_STATEMENTS = [
 export type CustomsStatementId = (typeof CUSTOMS_STATEMENTS)[number]["id"];
 
 export function resolveCustomsStatement(id: string, custom: string) {
-  if (id === "custom") return custom.trim();
+  if (id === "custom" || id === "matched") return custom.trim();
+  if (id === "none") return "";
   return CUSTOMS_STATEMENTS.find((item) => item.id === id)?.text ?? "";
 }

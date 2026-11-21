@@ -49,6 +49,8 @@ export type Cin7Quote = {
   weightIgnored?: boolean;
   /** Additional charges from the same Order or Quote section as the lines. Ex VAT. */
   additionalCharges?: { description: string; amountNet: number }[];
+  /** Cin7 ShippingNotes. Empty when the order has none. */
+  specialInstructions?: string;
   /** Line Total matched the tax-inclusive order total, so Tax was removed. */
   taxStripped?: boolean;
   /** Money checks. Select these by code; do not match the message text. */

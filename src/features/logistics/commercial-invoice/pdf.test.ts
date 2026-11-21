@@ -55,7 +55,7 @@ function draftFor(count: number) {
     courier: "FedEx",
     parcels: 1,
     pallets: 1,
-    dimensions: [{ lengthCm: 100, widthCm: 120, heightCm: 150, weightKg: 20 }],
+    palletLines: [{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: count * 3 }],
     customsStatementId: "regime42",
     customsStatementText: "",
     issuedAt: "2026-11-19T12:26:00.000Z",
@@ -84,6 +84,10 @@ describe("commercial invoice PDF", () => {
     expect(text[0]).toMatch(/Page:\s+1 of 1/);
     expect(text[0]).toMatch(/Goods Net/);
     expect(text[0]).toMatch(/COMMERCIAL INVOICE/);
+    expect(text[0]).toMatch(/Country of Origin:/);
+    expect(text[0]).toMatch(/Country of Export: United Kingdom/);
+    expect(text[0]).toMatch(/Incoterms: DAP/);
+    expect(text[0]).not.toMatch(/Position:/);
   });
 
   it("renders first, continuation and last pages", async () => {
@@ -115,6 +119,7 @@ describe("commercial invoice PDF", () => {
     expect(text.slice(0, -1).some((page) => /Goods Net/.test(page))).toBe(false);
     await saveSample("invoice-1.pdf", 1);
     await saveSample("invoice-8.pdf", found);
+    await saveSample("invoice-10-pallets.pdf", 4, 10);
   }, 20000);
 
   it("prints a DDP invoice that only carries the customs statement", async () => {
@@ -135,10 +140,8 @@ describe("commercial invoice PDF", () => {
     draft.clearanceCountry = "FR";
     const filled = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
     const filledText = Array.isArray(filled.text) ? filled.text.join("\n") : filled.text;
-    expect(filledText).toMatch(/Importer: Frictionless Trade Services SAS/);
-    expect(filledText).toMatch(/Importer address: 70 Rue Mollien/);
-    expect(filledText).toMatch(/Clearance country: FR/);
-    expect(filledText).not.toMatch(/Importer EORI/);
+    expect(filledText).toMatch(/Incoterms: DDP/);
+    expect(filledText).not.toMatch(/Importer:/);
   });
 
   it("keeps the full statement, instructions, description and a 40-line dimension list", async () => {
@@ -155,7 +158,8 @@ describe("commercial invoice PDF", () => {
       customsStatementId: "custom",
       customsStatementText: statement,
       specialInstructions: instructions,
-      dimensions: Array.from({ length: 40 }, (_, index) => ({ lengthCm: index + 1, widthCm: 10, heightCm: 12, weightKg: index + 1 })),
+      palletLines: Array.from({ length: 10 }, (_, index) => ({ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: index + 1 })),
+      pallets: 10,
     };
     const face = await font();
     const plan = planCommercialInvoice(draft, face);
@@ -171,10 +175,10 @@ describe("commercial invoice PDF", () => {
     expect(compact.match(/¶/g)?.length).toBe(2000);
     expect(compact.match(/¤/g)?.length).toBe(2000);
     expect(compact.match(/Ω/g)?.length).toBe(240);
-    expect(compact).toContain("Countryoforigin:China,UnitedKingdom,Poland");
+    expect(compact).toContain("CountryofOrigin:China,Poland,UnitedKingdom");
     const joined = pages.join("\n");
-    expect(joined).toContain("1 x 10 x 12 = 1kg");
-    expect(joined).toContain("40 x 10 x 12 = 40kg");
+    expect(joined).toContain("Pallet 1:");
+    expect(joined).toContain("Pallet 10:");
     expect(pages[0]).toMatch(/COMMERCIAL INVOICE/);
     expect(pages.slice(1).every((page) => /Document No:/.test(page))).toBe(true);
     expect(pages.slice(1).some((page) => /COMMERCIAL INVOICE/.test(page))).toBe(false);
@@ -209,6 +213,24 @@ describe("commercial invoice PDF", () => {
     }
   }, 30000);
 
+  it("keeps pallets, the statement and the signature together on the last page", async () => {
+    const face = await font();
+    for (let pallets = 1; pallets <= 30; pallets += 1) {
+      for (let count = 1; count <= 160; count += 1) {
+        const draft = withPallets(draftFor(count), pallets);
+        draft.lines.forEach((line) => { line.productName = "Bench"; });
+        const plan = planCommercialInvoice(draft, face);
+        const last = plan.at(-1);
+        const kinds = last?.pieces.map((piece) => piece.kind) ?? [];
+        expect(kinds.indexOf("dims"), pallets + " pallets, " + count + " lines").toBeGreaterThanOrEqual(0);
+        expect(kinds.indexOf("dims")).toBeLessThan(kinds.indexOf("statement"));
+        expect(kinds.indexOf("statement")).toBeLessThan(kinds.indexOf("closing"));
+        expect(plan.slice(0, -1).every((page) => page.pieces.length === 0)).toBe(true);
+        expect(last && last.used).toBeLessThanOrEqual(commercialInvoicePageRoom(draft, last?.role ?? "last") + 0.1);
+      }
+    }
+  }, 120000);
+
   it("keeps the end of a long statement with the signature", async () => {
     const { draft } = await planned(8);
     const lines = Array.from({ length: 45 }, (_, index) => index === 44 ? "STATEMENT-END" : "STATEMENT-LINE-" + index);
@@ -216,7 +238,8 @@ describe("commercial invoice PDF", () => {
       ...draft.shipment!,
       customsStatementId: "custom",
       customsStatementText: lines.join("\n"),
-      dimensions: Array.from({ length: 40 }, (_, index) => ({ lengthCm: index + 1, widthCm: 10, heightCm: 12, weightKg: index + 1 })),
+      palletLines: Array.from({ length: 10 }, (_, index) => ({ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: index + 1 })),
+      pallets: 10,
     };
     const bytes = await renderCommercialInvoicePdf(draft);
     const extracted = await extractText(bytes, { mergePages: false });
@@ -251,9 +274,20 @@ async function findCount(pages: number, roles?: InvoicePageRole[]) {
   throw new Error("No invoice length produced " + pages + " pages.");
 }
 
-async function saveSample(name: string, count: number) {
+function withPallets(draft: ReturnType<typeof draftFor>, count: number) {
+  const each = Math.max(1, Math.ceil((draft.grossWeightKg / count) * 10) / 10);
+  draft.shipment = {
+    ...draft.shipment!,
+    pallets: count,
+    palletLines: Array.from({ length: count }, () => ({ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: each })),
+  };
+  draft.grossWeightKg = Math.round(each * count * 10) / 10;
+  return draft;
+}
+
+async function saveSample(name: string, count: number, pallets = 2) {
   const { draft } = await planned(count);
-  await saveDraft(name, draft);
+  await saveDraft(name, withPallets(draft, pallets));
 }
 
 async function saveDraft(name: string, draft: Awaited<ReturnType<typeof planned>>["draft"]) {

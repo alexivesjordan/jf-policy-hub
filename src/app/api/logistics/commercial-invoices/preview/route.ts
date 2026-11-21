@@ -5,7 +5,9 @@ import { commercialInvoiceFileName, contentDisposition } from "@/features/logist
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
 import { applyLineEdits, applyOptionalDdp, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
 import { optionalDdpSchema, shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
+import { acceptedPallets } from "@/features/logistics/commercial-invoice/pallets";
 import { parseOrderNumbers, validateCommercialInvoice } from "@/features/logistics/commercial-invoice/rules";
+import { matchCustomsStatement, rulesFromRows } from "@/features/logistics/commercial-invoice/statements";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +19,7 @@ const bodySchema = z.object({
   destinationCountry: z.string().max(8),
   packages: z.number().int().nonnegative(),
   packageType: z.string().max(100),
-  grossWeightKg: z.number().finite().nonnegative().max(100000),
+  grossWeightKg: z.number().finite().nonnegative().max(100000).optional(),
   buyerVat: z.string().max(80).optional(),
   buyerEori: z.string().max(80).optional(),
   shipment: shipmentSchema.optional(),
@@ -73,10 +75,19 @@ export async function POST(request: Request) {
     const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
     const orders = applyLineEdits(ordersFromCin7(quotes, customsFromRpc(customs.data)), edits as LineEdit[]);
     const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
+    const rules = rulesFromRows((await supabase.schema("logistics").from("customs_statement_rules").select("incoterm, destination_country, carrier, statement_text, extra_line, priority, active").eq("active", true)).data);
+    const checked = acceptedPallets(parsed.data.shipment?.palletLines ?? []);
+    if (checked.invalid) return Response.json({ error: "A pallet is invalid." }, { status: 422 });
+    const statementId = parsed.data.shipment?.customsStatementId ?? "matched";
     let draft;
     try {
       draft = applyOptionalDdp(applyShipment(withShipmentPence(draftFromOrders(orders, parsed.data), orders, issuedQuantities(prior.data)), {
         ...parsed.data.shipment,
+        palletLines: checked.pallets,
+        customsStatementId: statementId,
+        customsStatementText: statementId === "matched"
+          ? matchCustomsStatement(rules, { incoterm: parsed.data.incoterm, destinationCountry: parsed.data.destinationCountry, carrier: parsed.data.shipment?.courier ?? "" })
+          : parsed.data.shipment?.customsStatementText,
         buyerVat: parsed.data.buyerVat ?? parsed.data.shipment?.buyerVat,
         buyerEori: parsed.data.buyerEori ?? parsed.data.shipment?.buyerEori,
         grossWeightKg: parsed.data.grossWeightKg,

@@ -16,6 +16,7 @@ begin
      and (
        (to_regclass('logistics.commercial_invoices') is not null and exists (select 1 from logistics.commercial_invoices))
        or (to_regclass('logistics.product_customs') is not null and exists (select 1 from logistics.product_customs))
+       or (to_regclass('logistics.customs_statement_rules') is not null and exists (select 1 from logistics.customs_statement_rules))
      )
   then
     raise exception 'Refusing to roll back: commercial invoices or saved customs data exist. Set logistics.allow_invoice_rollback to yes to drop issued invoices, numbers and product customs permanently.';
@@ -45,6 +46,7 @@ drop function if exists logistics.block_invoice_change();
 drop function if exists logistics.block_child_change();
 
 drop function if exists public.logistics_product_customs(text[]);
+drop table if exists logistics.customs_statement_rules;
 drop table if exists logistics.product_customs;
 drop function if exists logistics.can_use();
 drop schema if exists logistics;

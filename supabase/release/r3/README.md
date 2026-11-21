@@ -10,4 +10,4 @@ Apply, in order, on TEST only:
 
 `supabase/tests/logistics_ci.sql` raises `RESULTS:` and rolls back.
 
-`rollback.sql` is **DESTRUCTIVE**. It drops issued invoices, their numbers, and product customs rows, then drops the `logistics` schema and removes the two versions from `supabase_migrations.schema_migrations`. It refuses while any invoice or customs row exists unless `logistics.allow_invoice_rollback` is `yes`. After the guard it sets `storage.allow_delete_query` so the storage tables can be cleared. Delete uploaded files with the Storage API first; leftovers in the storage backend are not removed here.
+`rollback.sql` is **DESTRUCTIVE**. It drops issued invoices, their numbers, product customs rows and customs statement rules, then drops the `logistics` schema and removes the two versions from `supabase_migrations.schema_migrations`. It refuses while any invoice, customs row or statement rule exists unless `logistics.allow_invoice_rollback` is `yes`. After the guard it sets `storage.allow_delete_query` so the storage tables can be cleared. Delete uploaded files with the Storage API first; leftovers in the storage backend are not removed here.

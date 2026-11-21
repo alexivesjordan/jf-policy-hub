@@ -2,6 +2,8 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { degrees, PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { originSummary } from "./origin";
+import { palletLineText, palletTotalText } from "./pallets";
 import { COMMERCIAL_INVOICE_MARKS, COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
   chargedLinePence, countryName, lineWeightKg, normaliseHsCode, shippedLines, validateCommercialInvoice,
@@ -101,7 +103,7 @@ function shipmentOf(draft: InvoiceDraft): InvoiceShipment {
     specialInstructions: draft.notes,
     parcels: draft.packages,
     pallets: 0,
-    dimensions: [],
+    palletLines: [],
     deliveryPence: Math.round((draft.freightValue || 0) * 100),
     surchargePence: Math.round((draft.otherChargesValue || 0) * 100),
     vatPence: 0,
@@ -109,7 +111,7 @@ function shipmentOf(draft: InvoiceDraft): InvoiceShipment {
     customsStatementText: draft.approvedStatement,
     issuedAt: new Date().toISOString(),
   };
-  return { ...base, ...draft.shipment, dimensions: draft.shipment?.dimensions ?? base.dimensions };
+  return { ...base, ...draft.shipment, palletLines: draft.shipment?.palletLines ?? base.palletLines };
 }
 
 function wrap(text: string, font: PDFFont, size: number, width: number) {
@@ -217,40 +219,15 @@ type SummaryMetrics = {
   total: number;
 };
 
-function dimensionColumns(count: number) {
-  if (count > 16) return 3;
-  if (count > 8) return 2;
-  return 1;
+function instructionParts(shipment: InvoiceShipment) {
+  const note = shipment.specialInstructions.trim();
+  return note ? [note] : [];
 }
 
-function ddpLines(draft: InvoiceDraft) {
-  if (draft.incoterm !== "DDP") return [];
-  const models: Record<string, string> = {
-    importers_signature: "Importer's signature",
-    own_french_vat: "Own French VAT",
-  };
-  return [
-    draft.importer.name ? "Importer: " + draft.importer.name : "",
-    draft.importer.address ? "Importer address: " + draft.importer.address : "",
-    draft.importer.vat ? "Importer VAT: " + draft.importer.vat : "",
-    draft.importer.eori ? "Importer EORI: " + draft.importer.eori : "",
-    draft.clearanceCountry ? "Clearance country: " + draft.clearanceCountry : "",
-    draft.procedure !== "unconfirmed" ? "Customs procedure: " + draft.procedure : "",
-    models[draft.ddpModel] ? "DDP model: " + models[draft.ddpModel] : "",
-    draft.ddpModel === "own_french_vat" && draft.frenchVatNumber ? "French VAT: " + draft.frenchVatNumber : "",
-  ].filter(Boolean);
-}
-
-function instructionParts(draft: InvoiceDraft, shipment: InvoiceShipment, origins: string) {
-  return [
-    "Country of origin: " + origins,
-    "Country of export: United Kingdom",
-    "Incoterms: " + draft.incoterm,
-    ...ddpLines(draft),
-    shipment.contactName ? "Contact: " + shipment.contactName : "",
-    shipment.contactEmail ? "Email: " + shipment.contactEmail : "",
-    shipment.specialInstructions,
-  ].filter(Boolean);
+function signBlockHeight(origin: string, font: PDFFont) {
+  const width = (CONTENT_W - 150 - 8) / 2 - 16;
+  const originLines = Math.max(1, wrap(origin || "—", font, 7.5, width).length);
+  return Math.max(SIGN_H, 16 + (originLines + 2) * 12 + 10);
 }
 
 function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
@@ -262,18 +239,18 @@ function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
       return wrapped.length ? wrapped : [""];
     })
     : [];
-  const origins = [...new Set(shippedLines(draft).map((row) => countryName(row.originCountry)).filter(Boolean))].join(", ");
   const boxW = (CONTENT_W - 16) / 3;
-  const parts = instructionParts(draft, shipment, origins);
+  const parts = instructionParts(shipment);
   const instructionLines = parts.flatMap((part) => wrap(part, font, 7.5, boxW - 16));
-  const boxH = boxesHeight(0, instructionLines.length);
-  const columns = dimensionColumns(shipment.dimensions.length);
-  const dimRows = shipment.dimensions.length ? Math.ceil(shipment.dimensions.length / columns) : 0;
+  const boxH = instructionLines.length ? boxesHeight(0, instructionLines.length) : Math.max(108, 16 + 4 * 14 + 12, 16 + 6 * 13 + 22);
+  const columns = 1;
+  const dimRows = shipment.palletLines.length ? shipment.palletLines.length + 1 : 0;
+  const signH = signBlockHeight(originSummary(shippedLines(draft)), font);
   const dimsH = dimRows ? DIM_HEADER + dimRows * DIM_LINE + DIM_TAIL : 0;
   const statementH = statementLines.length ? statementLines.length * STATEMENT_LINE + STATEMENT_TAIL : 0;
   return {
-    columns, dimRows, statementLines, instructionLines, boxH, signH: SIGN_H, gap: SUMMARY_GAP,
-    total: dimsH + statementH + boxH + SUMMARY_GAP + SIGN_H,
+    columns, dimRows, statementLines, instructionLines, boxH, signH, gap: SUMMARY_GAP,
+    total: dimsH + statementH + boxH + SUMMARY_GAP + signH,
   };
 }
 
@@ -657,13 +634,11 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         text(page, "Dimensions:", MARGIN, cursor - 11, 9, bold);
         cursor -= DIM_HEADER;
       }
-      const colW = CONTENT_W / metrics.columns;
       for (let row = piece.from; row < piece.to; row += 1) {
-        for (let column = 0; column < metrics.columns; column += 1) {
-          const dim = shipment.dimensions[row * metrics.columns + column];
-          if (!dim) continue;
-          text(page, `${dim.lengthCm} x ${dim.widthCm} x ${dim.heightCm} = ${dim.weightKg}kg`, MARGIN + column * colW, cursor - 9, 8, regular);
-        }
+        const label = row < shipment.palletLines.length
+          ? palletLineText(row, shipment.palletLines[row]!)
+          : palletTotalText(shipment.palletLines);
+        text(page, label, MARGIN, cursor - 9, 8, regular);
         cursor -= DIM_LINE;
       }
       if (piece.to === metrics.dimRows) cursor -= DIM_TAIL;
@@ -696,12 +671,14 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         text(page, label, x + 8, rowY, 7.5, strong ? bold : regular);
         aligned(page, value, x, rowY, boxW, 7.5, strong ? bold : regular, "right");
       };
-      roundBox(page, MARGIN, boxTop, boxW, boxH);
-      text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
-      let lineY = boxTop - 30;
-      for (const wrapped of metrics.instructionLines) {
-        text(page, wrapped, MARGIN + 8, lineY, 7.5, regular);
-        lineY -= INSTR_LINE;
+      if (metrics.instructionLines.length) {
+        roundBox(page, MARGIN, boxTop, boxW, boxH);
+        text(page, "Special Instructions", MARGIN + 8, boxTop - 16, 8, bold);
+        let lineY = boxTop - 30;
+        for (const wrapped of metrics.instructionLines) {
+          text(page, wrapped, MARGIN + 8, lineY, 7.5, regular);
+          lineY -= INSTR_LINE;
+        }
       }
       const midX = MARGIN + boxW + 8;
       roundBox(page, midX, boxTop, boxW, boxH);
@@ -724,8 +701,16 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       underline("Signed:", MARGIN + 8, signTop - 18, signW / 2 - 16);
       if (signature) page.drawImage(signature, { x: MARGIN + 58, y: signTop - 28, width: 80, height: 22 });
       underline("Name:", MARGIN + 8, signTop - 40, signW / 2 - 20);
-      underline("Position:", MARGIN + signW / 2, signTop - 40, signW / 2 - 16);
       underline("Date:", MARGIN + 8, signTop - 62, signW / 2 - 20);
+      const origin = originSummary(shippedLines(draft));
+      const termsX = MARGIN + signW / 2;
+      const termsW = signW / 2 - 12;
+      const originLines = wrap(origin || "—", regular, 7.5, termsW);
+      text(page, "Country of Origin:", termsX, signTop - 16, 7.5, bold);
+      originLines.forEach((line, index) => text(page, line, termsX, signTop - 28 - index * 10, 7.5, regular));
+      const termsY = signTop - 28 - originLines.length * 10 - 6;
+      text(page, "Country of Export: United Kingdom", termsX, termsY, 7.5, regular);
+      text(page, "Incoterms: " + draft.incoterm, termsX, termsY - 12, 7.5, regular);
       roundBox(page, MARGIN + signW + 8, signTop, stampW, metrics.signH);
       text(page, "Company stamp", MARGIN + signW + 16, signTop - 16, 8, regular, grey);
       if (stamp) page.drawImage(stamp, { x: MARGIN + signW + 20, y: signTop - metrics.signH + 10, width: stampW - 24, height: 40 });

@@ -29,7 +29,7 @@ export type GoodsLine = {
   unitWeightKg: number | null;
 };
 
-export type PackageDimension = { lengthCm: number; widthCm: number; heightCm: number; weightKg: number };
+export type PalletLine = { lengthCm: number; widthCm: number; depthCm: number; weightKg: number };
 
 export type InvoiceShipment = {
   fao: string;
@@ -41,7 +41,7 @@ export type InvoiceShipment = {
   specialInstructions: string;
   parcels: number;
   pallets: number;
-  dimensions: PackageDimension[];
+  palletLines: PalletLine[];
   deliveryPence: number;
   surchargePence: number;
   vatPence: number;
@@ -59,6 +59,7 @@ export type InvoiceOrder = {
   currency: string;
   lines: GoodsLine[];
   warnings: string[];
+  specialInstructions?: string;
   /** Freight and delivery charges from Cin7, in pence. Not a goods line. */
   deliveryPence?: number;
 };
@@ -234,6 +235,9 @@ export const goodsTotal = (draft: InvoiceDraft) => roundMoney(goodsTotalPence(dr
 export const declaredTotal = (draft: InvoiceDraft) => roundMoney(goodsTotal(draft) + draft.freightValue + draft.insuranceValue + draft.otherChargesValue);
 
 const eu = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+export function isEuCountry(iso: string) {
+  return eu.has(iso.trim().toUpperCase());
+}
 
 export function validateCommercialInvoice(d: InvoiceDraft): string[] {
   const errors: string[] = [];

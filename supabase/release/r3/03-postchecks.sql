@@ -6,11 +6,12 @@ select
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'logistics'
-  and c.relname in ('product_customs', 'commercial_invoices', 'commercial_invoice_lines', 'commercial_invoice_events', 'invoice_counters')
+  and c.relname in ('product_customs', 'customs_statement_rules', 'commercial_invoices', 'commercial_invoice_lines', 'commercial_invoice_events', 'invoice_counters')
 order by c.relname;
 
 select
   has_table_privilege('anon', 'logistics.product_customs', 'select') as anon_customs,
+  has_table_privilege('anon', 'logistics.customs_statement_rules', 'select') as anon_rules,
   has_table_privilege('anon', 'logistics.commercial_invoices', 'select') as anon_invoices,
   has_function_privilege('authenticated', 'public.logistics_issue_commercial_invoice(jsonb)', 'execute') as issue_authenticated,
   has_function_privilege('service_role', 'public.logistics_issue_commercial_invoice(jsonb)', 'execute') as issue_service,

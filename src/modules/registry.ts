@@ -121,6 +121,7 @@ export const pulseModules: PulseModule[] = [
     paths: ["/logistics"],
     nav: [
       { href: "/logistics/commercial-invoices", label: "Commercial invoices" },
+      { href: "/logistics/customs-statements", label: "Customs statements" },
     ],
   },
   {

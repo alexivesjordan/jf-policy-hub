@@ -2,8 +2,13 @@
 
 import { useRef, useState } from "react";
 import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
+import { acceptedPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
-import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment, type PackageDimension } from "@/features/logistics/commercial-invoice/rules";
+import { matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
+import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
+
+type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string };
+const emptyPallet = (): PalletInput => ({ lengthCm: "", widthCm: "", depthCm: "", weightKg: "" });
 
 const TERMS = ["DAP", "DDP", "EXW", "FCA", "CPT", "CIP", "DPU", "FOB", "CIF"];
 
@@ -15,8 +20,15 @@ export function CommercialInvoiceWorkspace() {
   const [error, setError] = useState("");
   const [details, setDetails] = useState<string[]>([]);
   const [issued, setIssued] = useState("");
+  const [palletRows, setPalletRows] = useState<PalletInput[]>([emptyPallet()]);
+  const [rules, setRules] = useState<StatementRule[]>([]);
 
   async function lookup() {
+    void fetch("/api/logistics/customs-statements").then(async (res) => {
+      if (!res.ok) return;
+      const json = await res.json();
+      setRules(Array.isArray(json.rules) ? json.rules : []);
+    }).catch(() => undefined);
     setError("");
     setDetails([]);
     setIssued("");
@@ -75,11 +87,11 @@ export function CommercialInvoiceWorkspace() {
           specialInstructions: "",
           parcels: 1,
           pallets: 0,
-          dimensions: [],
+          palletLines: [],
           deliveryPence: found.reduce((sum, order) => sum + (order.deliveryPence ?? 0), 0),
           surchargePence: 0,
           vatPence: 0,
-          customsStatementId: "none",
+          customsStatementId: "matched",
           customsStatementText: "",
           issuedAt: new Date().toISOString(),
         },
@@ -92,8 +104,18 @@ export function CommercialInvoiceWorkspace() {
     }
   }
 
+  function enteredPallets() {
+    return acceptedPallets(palletRows.map((row) => ({
+      lengthCm: row.lengthCm === "" ? 0 : Number(row.lengthCm),
+      widthCm: row.widthCm === "" ? 0 : Number(row.widthCm),
+      depthCm: row.depthCm === "" ? 0 : Number(row.depthCm),
+      weightKg: row.weightKg === "" ? 0 : Number(row.weightKg),
+    })));
+  }
+
   function payload() {
     if (!draft) return null;
+    const pallets = enteredPallets();
     return {
       orderNumbers: draft.orders,
       incoterm: draft.incoterm,
@@ -101,10 +123,10 @@ export function CommercialInvoiceWorkspace() {
       destinationCountry: draft.destinationCountry,
       packages: draft.packages,
       packageType: draft.packageType,
-      grossWeightKg: draft.grossWeightKg,
+      grossWeightKg: palletGrossKg(pallets.pallets),
       buyerVat: draft.buyer.vat,
       buyerEori: draft.buyer.eori,
-      shipment: draft.shipment,
+      shipment: { ...draft.shipment, palletLines: pallets.pallets, pallets: pallets.pallets.length },
       ...(draft.incoterm === "DDP" ? {
         importerName: draft.importer.name,
         importerAddress: draft.importer.address,
@@ -199,19 +221,29 @@ export function CommercialInvoiceWorkspace() {
     setDraft((current) => current?.shipment ? { ...current, shipment: { ...current.shipment, ...patch } } : current);
   }
 
-  function patchDimension(index: number, patch: Partial<PackageDimension>) {
-    if (!draft?.shipment) return;
-    patchShipment({ dimensions: draft.shipment.dimensions.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) });
-  }
-
   const net = draft ? summedNetWeightKg(draft.lines) : 0;
   const shipment = draft?.shipment;
+  const gross = palletGrossKg(enteredPallets().pallets);
+  const suggested = draft ? matchCustomsStatement(rules, { incoterm: draft.incoterm, destinationCountry: draft.destinationCountry, carrier: shipment?.courier ?? "" }) : "";
   return (
     <div className="space-y-6">
       <section className="space-y-3 rounded-3xl border border-line bg-card p-5">
         <h2 className="text-lg font-semibold">Orders</h2>
         <label className="block text-sm font-semibold" htmlFor="invoice-orders">Order numbers</label>
         <textarea id="invoice-orders" rows={2} value={numbers} onChange={(event) => setNumbers(event.currentTarget.value)} className="w-full rounded-xl border border-line bg-paper p-3" />
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Pallets</p>
+          {palletRows.map((row, index) => (
+            <div key={index} className="grid grid-cols-5 gap-2">
+              <input aria-label="Length cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.lengthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, lengthCm: event.currentTarget.value } : item))} />
+              <input aria-label="Width cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.widthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, widthCm: event.currentTarget.value } : item))} />
+              <input aria-label="Depth cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.depthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, depthCm: event.currentTarget.value } : item))} />
+              <input aria-label="Weight kg" inputMode="decimal" type="number" min={0.1} max={2000} step={0.1} className="rounded-xl border border-line px-2 py-2" value={row.weightKg} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, weightKg: event.currentTarget.value } : item))} />
+              {index > 0 ? <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => setPalletRows(palletRows.filter((_, itemIndex) => itemIndex !== index))}>Remove</button> : <span />}
+            </div>
+          ))}
+          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add pallet</button>
+        </div>
         <button type="button" onClick={() => void lookup()} disabled={!numbers.trim() || working !== null} className="rounded-xl bg-red px-4 py-2 font-semibold text-white disabled:opacity-50">
           {working === "lookup" ? "Retrieving orders…" : "Retrieve orders"}
         </button>
@@ -311,12 +343,7 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Parcels
               <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.parcels ?? 0} onChange={(event) => patchShipment({ parcels: Number(event.currentTarget.value) })} />
             </label>
-            <label className="text-sm font-semibold">Pallets
-              <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.pallets ?? 0} onChange={(event) => patchShipment({ pallets: Number(event.currentTarget.value) })} />
-            </label>
-            <label className="text-sm font-semibold">Gross kg
-              <input type="number" min={0} max={100000} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.grossWeightKg} onChange={(event) => setDraft({ ...draft, grossWeightKg: Number(event.currentTarget.value) })} />
-            </label>
+            <p className="text-sm font-semibold">Gross {gross.toFixed(1)} kg</p>
             <label className="text-sm font-semibold">Delivery
               <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
@@ -327,10 +354,13 @@ export function CommercialInvoiceWorkspace() {
               <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.vatPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ vatPence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
             <label className="text-sm font-semibold">Customs statement
-              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.customsStatementId ?? "none"} onChange={(event) => patchShipment({ customsStatementId: event.currentTarget.value })}>
-                {CUSTOMS_STATEMENTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.customsStatementId ?? "matched"} onChange={(event) => patchShipment({ customsStatementId: event.currentTarget.value })}>
+                <option value="matched">Suggested</option>
+                {CUSTOMS_STATEMENTS.filter((item) => item.id !== "none").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                <option value="none">None</option>
               </select>
             </label>
+            {shipment?.customsStatementId === "matched" ? <p className="text-sm md:col-span-2">{suggested || "None"}</p> : null}
             {shipment?.customsStatementId === "custom" ? (
               <label className="text-sm font-semibold md:col-span-2">Statement
                 <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment.customsStatementText} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
@@ -339,19 +369,6 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold md:col-span-3">Special instructions
               <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.specialInstructions ?? ""} onChange={(event) => patchShipment({ specialInstructions: event.currentTarget.value })} />
             </label>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm font-semibold">Dimensions</p>
-            {shipment?.dimensions.map((item, index) => (
-              <div key={index} className="grid grid-cols-5 gap-2">
-                <input aria-label="Length cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.lengthCm} onChange={(event) => patchDimension(index, { lengthCm: Number(event.currentTarget.value) })} />
-                <input aria-label="Width cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.widthCm} onChange={(event) => patchDimension(index, { widthCm: Number(event.currentTarget.value) })} />
-                <input aria-label="Height cm" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.heightCm} onChange={(event) => patchDimension(index, { heightCm: Number(event.currentTarget.value) })} />
-                <input aria-label="Weight kg" type="number" min={0} className="rounded-xl border border-line px-2 py-2" value={item.weightKg} onChange={(event) => patchDimension(index, { weightKg: Number(event.currentTarget.value) })} />
-                <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => patchShipment({ dimensions: shipment.dimensions.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
-              </div>
-            ))}
-            <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={() => patchShipment({ dimensions: [...(shipment?.dimensions ?? []), { lengthCm: 0, widthCm: 0, heightCm: 0, weightKg: 0 }] })}>Add</button>
           </div>
           <div className="space-y-3">
             {draft.lines.map((line) => (

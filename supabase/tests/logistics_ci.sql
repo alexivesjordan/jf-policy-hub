@@ -63,6 +63,11 @@ begin
 
   if logistics.can_use() then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' admin can_use false;'; end if;
 
+  select count(*) into v_count from logistics.customs_statement_rules where active and incoterm = 'DDP' and destination_country = 'EU';
+  if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' ddp rule;'; end if;
+  select count(*) into v_count from logistics.customs_statement_rules where not active and statement_text like 'Regime 42%';
+  if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' regime 42 inactive;'; end if;
+
   reset role;
   perform set_config('request.jwt.claim.sub', v_engineer::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', v_engineer, 'role', 'authenticated')::text, true);
@@ -107,7 +112,10 @@ begin
     'incoterm', 'DAP',
     'grossWeightKg', 2,
     'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
-    'shipment', jsonb_build_object('deliveryPence', 45000, 'surchargePence', 3250, 'vatPence', 2000),
+    'shipment', jsonb_build_object(
+      'deliveryPence', 45000, 'surchargePence', 3250, 'vatPence', 2000,
+      'palletLines', jsonb_build_array(jsonb_build_object('lengthCm', 120, 'widthCm', 100, 'depthCm', 150, 'weightKg', 2))
+    ),
     'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-ci', 'number', 'SO-CI')),
     'lines', jsonb_build_array(jsonb_build_object(
       'id', 'sale-ci:0',
@@ -160,6 +168,29 @@ begin
       else v_fail := v_fail + 1; v_notes := v_notes || ' ' || v_case || ' ' || sqlerrm || ';'; end if;
     end;
   end loop;
+
+  begin
+    perform public.logistics_issue_commercial_invoice(jsonb_set(
+      jsonb_set(v_payload, '{idempotencyKey}', to_jsonb(gen_random_uuid()::text)),
+      '{shipment,palletLines,0,lengthCm}', '1001'
+    ));
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' long pallet allowed;';
+  exception when others then
+    if sqlerrm ilike '%invalid%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' long pallet ' || sqlerrm || ';'; end if;
+  end;
+  begin
+    perform public.logistics_issue_commercial_invoice(jsonb_set(
+      jsonb_set(v_payload, '{idempotencyKey}', to_jsonb(gen_random_uuid()::text)),
+      '{shipment,palletLines,0,weightKg}', '1.25'
+    ));
+    v_fail := v_fail + 1;
+    v_notes := v_notes || ' pallet decimal allowed;';
+  exception when others then
+    if sqlerrm ilike '%invalid%' then v_ok := v_ok + 1;
+    else v_fail := v_fail + 1; v_notes := v_notes || ' pallet decimal ' || sqlerrm || ';'; end if;
+  end;
 
   begin
     v_replay := public.logistics_issue_commercial_invoice(v_payload);
@@ -219,6 +250,7 @@ begin
     'incoterm', 'DAP',
     'grossWeightKg', 6,
     'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
+    'shipment', jsonb_build_object('palletLines', jsonb_build_array(jsonb_build_object('lengthCm', 120, 'widthCm', 100, 'depthCm', 120, 'weightKg', 6))),
     'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-dup', 'number', 'SO-DUP')),
     'lines', jsonb_build_array(
       jsonb_build_object('id', 'sale-dup:0', 'orderNumber', 'SO-DUP', 'cin7SaleId', 'sale-dup', 'sku', 'CI-DUP', 'description', 'Bench A', 'orderedQty', 2, 'shippedQty', 2, 'lineNetPence', 200, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 2),
@@ -251,6 +283,7 @@ begin
     'incoterm', 'DAP',
     'grossWeightKg', 2,
     'buyer', jsonb_build_object('name', 'Acme Gyms Ltd', 'address', '1 Road', 'vat', '', 'eori', ''),
+    'shipment', jsonb_build_object('palletLines', jsonb_build_array(jsonb_build_object('lengthCm', 80, 'widthCm', 60, 'depthCm', 40, 'weightKg', 2))),
     'orders', jsonb_build_array(jsonb_build_object('cin7Id', 'sale-e', 'number', 'SO-E')),
     'lines', jsonb_build_array(
       jsonb_build_object('id', 'sale-e:D', 'orderNumber', 'SO-E', 'cin7SaleId', 'sale-e', 'sku', 'CI-E', 'description', 'Line D', 'orderedQty', 5, 'shippedQty', 0, 'lineNetPence', 500, 'hsCode', '9506910000', 'origin', 'CN', 'unitWeightKg', 1, 'lineWeightKg', 0),
@@ -342,6 +375,8 @@ begin
   execute 'set local role authenticated';
   select count(*) into v_count from logistics.commercial_invoices;
   if v_count = 0 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' installer saw invoices;'; end if;
+  select count(*) into v_count from logistics.customs_statement_rules;
+  if v_count = 0 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' installer saw rules;'; end if;
   begin
     perform public.logistics_void_commercial_invoice(v_id, 'Not allowed');
     v_fail := v_fail + 1;

@@ -297,6 +297,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     customerId,
     lines: quoteLines,
     additionalCharges: money.charges,
+    specialInstructions: text(sale.ShippingNotes) ?? "",
     usedQuoteLines: fromQuote && quoteLines.length > 0,
     taxStripped: money.taxStripped,
     moneyFlags: money.flags,

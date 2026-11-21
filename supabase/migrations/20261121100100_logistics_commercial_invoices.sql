@@ -229,6 +229,10 @@ declare
   v_surcharge integer;
   v_vat integer;
   v_gross numeric;
+  v_pallet jsonb;
+  v_pallet_kg numeric := 0;
+  v_pallet_count integer := 0;
+  v_w numeric;
   v_net numeric := 0;
   v_ordered numeric;
   v_shipped numeric;
@@ -399,9 +403,38 @@ begin
   v_surcharge := coalesce((p_payload#>>'{shipment,surchargePence}')::integer, 0);
   v_vat := coalesce((p_payload#>>'{shipment,vatPence}')::integer, 0);
   v_gross := (p_payload->>'grossWeightKg')::numeric;
-  if v_delivery < 0 or v_surcharge < 0 or v_vat < 0 or v_gross is null or v_gross < 0 or v_gross > 100000 then
+  if v_delivery < 0 or v_surcharge < 0 or v_vat < 0 or v_gross is null or v_gross < 0 then
     raise exception 'app: Shipment charges or weight are invalid.';
   end if;
+  if jsonb_typeof(p_payload->'shipment'->'palletLines') = 'array' then
+    v_pallet_count := jsonb_array_length(p_payload->'shipment'->'palletLines');
+  end if;
+  if v_pallet_count < 1 or v_pallet_count > 30 then
+    raise exception 'app: Shipment charges or weight are invalid.';
+  end if;
+  for v_pallet in select value from jsonb_array_elements(p_payload->'shipment'->'palletLines') loop
+    if (v_pallet->>'lengthCm')::numeric is null
+       or (v_pallet->>'lengthCm')::numeric < 1 or (v_pallet->>'lengthCm')::numeric > 1000
+       or (v_pallet->>'lengthCm')::numeric <> trunc((v_pallet->>'lengthCm')::numeric)
+       or (v_pallet->>'widthCm')::numeric is null
+       or (v_pallet->>'widthCm')::numeric < 1 or (v_pallet->>'widthCm')::numeric > 1000
+       or (v_pallet->>'widthCm')::numeric <> trunc((v_pallet->>'widthCm')::numeric)
+       or (v_pallet->>'depthCm')::numeric is null
+       or (v_pallet->>'depthCm')::numeric < 1 or (v_pallet->>'depthCm')::numeric > 1000
+       or (v_pallet->>'depthCm')::numeric <> trunc((v_pallet->>'depthCm')::numeric)
+    then
+      raise exception 'app: Shipment charges or weight are invalid.';
+    end if;
+    v_w := (v_pallet->>'weightKg')::numeric;
+    if v_w is null or v_w <= 0 or v_w > 2000 or v_w * 10 <> trunc(v_w * 10) then
+      raise exception 'app: Shipment charges or weight are invalid.';
+    end if;
+    v_pallet_kg := v_pallet_kg + v_w;
+  end loop;
+  if v_pallet_kg > 100000 or abs(v_gross - v_pallet_kg) > 0.05 then
+    raise exception 'app: Shipment charges or weight are invalid.';
+  end if;
+  v_gross := v_pallet_kg;
   v_number := logistics.next_invoice_number(v_year);
   v_invoice_total := v_total + v_delivery + v_surcharge + v_vat;
   v_filename := 'Commercial Invoice - ' || regexp_replace(coalesce(p_payload#>>'{buyer,name}', 'Buyer'), '[/\\:*?"<>|]', '', 'g') || ' - ' || v_number || ' - ' || regexp_replace(coalesce(p_payload->>'incoterm', ''), '[/\\:*?"<>|]', '', 'g') || '.pdf';
@@ -413,7 +446,7 @@ begin
   ) values (
     v_number, 'issued', v_seller, p_payload->'buyer',
     p_payload->>'currency', p_payload->>'incoterm', v_total, v_invoice_total,
-    v_net, (p_payload->>'grossWeightKg')::numeric, p_payload->'orders',
+    v_net, v_gross, p_payload->'orders',
     v_filename, v_actor, v_key, v_document,
     coalesce(p_payload->'shipment', p_payload->'document'->'shipment', '{}'::jsonb)
   ) returning id into v_id;
@@ -548,3 +581,52 @@ grant execute on function public.logistics_attach_invoice_pdf(uuid, text, text, 
 grant execute on function public.logistics_void_commercial_invoice(uuid, text) to authenticated, service_role;
 grant execute on function public.logistics_invoice_file(uuid) to authenticated, service_role;
 grant execute on function public.logistics_issued_quantities(text[]) to authenticated, service_role;
+
+create table logistics.customs_statement_rules (
+  id uuid primary key default gen_random_uuid(),
+  incoterm text,
+  destination_country text,
+  carrier text,
+  statement_text text not null,
+  extra_line text,
+  priority integer not null default 0,
+  active boolean not null default true,
+  created_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (incoterm is null or incoterm ~ '^[A-Z0-9]{2,12}$'),
+  check (destination_country is null or destination_country ~ '^[A-Z]{2}$' or destination_country = 'EU'),
+  check (char_length(statement_text) between 1 and 2000),
+  check (extra_line is null or char_length(extra_line) between 1 and 200)
+);
+
+alter table logistics.customs_statement_rules enable row level security;
+revoke all on logistics.customs_statement_rules from public, anon;
+grant select, insert, update on logistics.customs_statement_rules to authenticated;
+grant all on logistics.customs_statement_rules to service_role;
+
+create policy customs_statement_rules_logistics
+on logistics.customs_statement_rules
+for all
+to authenticated
+using (logistics.can_use())
+with check (logistics.can_use());
+
+-- DDP to any EU country uses the VAT-postponed wording. Regime 42 needs French
+-- clearance and a different EU destination, which these columns cannot express,
+-- so that preset is seeded inactive until the full rule list arrives.
+insert into logistics.customs_statement_rules
+  (incoterm, destination_country, carrier, statement_text, extra_line, priority, active)
+values
+  (
+    'DDP', 'EU', null,
+    'Goods cleared regime 40 00 DDP VAT postponed by Frictionless Trade Services SAS, 70 Rue Mollien 62100 Calais, France',
+    'DDP – VAT Postponed',
+    10, true
+  ),
+  (
+    null, 'EU', null,
+    'Regime 42 Statement: ''Goods transported under Regime 42-00, intra-community supply, Article 138 EU VAT Directive''',
+    null,
+    0, false
+  );
