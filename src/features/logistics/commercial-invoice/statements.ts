@@ -18,8 +18,16 @@ function filled(value: string | null | undefined) {
   return Boolean(value?.trim());
 }
 
-function specificity(rule: StatementRule) {
-  return [rule.incoterm, rule.destinationCountry, rule.carrier].filter(filled).length;
+function destinationRank(rule: StatementRule, country: string) {
+  if (!filled(rule.destinationCountry)) return 0;
+  const destination = rule.destinationCountry!.trim().toUpperCase();
+  if (destination === country) return 2;
+  if (destination === "EU" && isEuCountry(country)) return 1;
+  return -1;
+}
+
+function otherFields(rule: StatementRule) {
+  return [rule.incoterm, rule.carrier].filter(filled).length;
 }
 
 function matches(rule: StatementRule, input: { incoterm: string; destinationCountry: string; carrier: string }) {
@@ -51,8 +59,12 @@ export function rulesFromRows(data: unknown): StatementRule[] {
   });
 }
 
-/** More filled conditions win, then the higher priority. No match returns an empty statement. */
+/** An exact country beats EU, which beats any destination. Then the other filled fields, then priority. */
 export function matchCustomsStatement(rules: StatementRule[], input: { incoterm: string; destinationCountry: string; carrier: string }) {
-  const found = rules.filter((rule) => matches(rule, input)).sort((a, b) => specificity(b) - specificity(a) || b.priority - a.priority);
+  const country = input.destinationCountry.trim().toUpperCase();
+  const found = rules.filter((rule) => matches(rule, input)).sort((a, b) =>
+    destinationRank(b, country) - destinationRank(a, country)
+    || otherFields(b) - otherFields(a)
+    || b.priority - a.priority);
   return found[0] ? statementRuleText(found[0]) : "";
 }

@@ -150,6 +150,7 @@ export function applyShipment(draft: InvoiceDraft, input: Partial<InvoiceShipmen
   const shipment: InvoiceShipment = {
     ...current,
     ...rest,
+    specialInstructions: current.specialInstructions,
     palletLines: rest.palletLines ?? current.palletLines,
     customsStatementId: rest.customsStatementId ?? current.customsStatementId,
     customsStatementText: resolveCustomsStatement(rest.customsStatementId ?? current.customsStatementId, rest.customsStatementText ?? current.customsStatementText),

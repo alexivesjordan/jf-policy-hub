@@ -11,16 +11,24 @@
 -- first. Anything left in the storage backend is not removed by this script.
 
 do $$
+declare
+  v_rel regclass;
+  v_exists boolean;
+  v_name text;
 begin
-  if coalesce(current_setting('logistics.allow_invoice_rollback', true), '') is distinct from 'yes'
-     and (
-       (to_regclass('logistics.commercial_invoices') is not null and exists (select 1 from logistics.commercial_invoices))
-       or (to_regclass('logistics.product_customs') is not null and exists (select 1 from logistics.product_customs))
-       or (to_regclass('logistics.customs_statement_rules') is not null and exists (select 1 from logistics.customs_statement_rules))
-     )
-  then
-    raise exception 'Refusing to roll back: commercial invoices or saved customs data exist. Set logistics.allow_invoice_rollback to yes to drop issued invoices, numbers and product customs permanently.';
+  if coalesce(current_setting('logistics.allow_invoice_rollback', true), '') = 'yes' then
+    return;
   end if;
+  foreach v_name in array array['logistics.commercial_invoices', 'logistics.product_customs', 'logistics.customs_statement_rules'] loop
+    v_rel := to_regclass(v_name);
+    if v_rel is null then
+      continue;
+    end if;
+    execute format('select exists (select 1 from %s)', v_rel) into v_exists;
+    if v_exists then
+      raise exception 'Refusing to roll back: commercial invoices or saved customs data exist. Set logistics.allow_invoice_rollback to yes to drop issued invoices, numbers and product customs permanently.';
+    end if;
+  end loop;
 end $$;
 
 select set_config('storage.allow_delete_query', 'true', true);

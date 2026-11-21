@@ -50,9 +50,13 @@ export async function POST(request: Request) {
     updated_at: new Date().toISOString(),
   };
   const supabase = await createClient();
-  const saved = parsed.data.id
-    ? await supabase.schema("logistics").from("customs_statement_rules").update(row).eq("id", parsed.data.id)
-    : await supabase.schema("logistics").from("customs_statement_rules").insert({ ...row, created_by: gate.profile.id });
+  if (parsed.data.id) {
+    const saved = await supabase.schema("logistics").from("customs_statement_rules").update(row).eq("id", parsed.data.id).select("id");
+    if (saved.error) return Response.json({ error: "That rule could not be saved." }, { status: 422 });
+    if (!saved.data?.length) return Response.json({ error: "That rule could not be found." }, { status: 404 });
+    return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  }
+  const saved = await supabase.schema("logistics").from("customs_statement_rules").insert({ ...row, created_by: gate.profile.id });
   if (saved.error) return Response.json({ error: "That rule could not be saved." }, { status: 422 });
   return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

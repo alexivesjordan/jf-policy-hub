@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
-import { acceptedPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
+import { inspectPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
 import { matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
 import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
@@ -84,7 +84,7 @@ export function CommercialInvoiceWorkspace() {
           deliveryAddress: found[0]?.consignee.address ?? "",
           contactName: "",
           contactEmail: "",
-          specialInstructions: "",
+          specialInstructions: [...new Set(found.map((order) => order.specialInstructions?.trim()).filter((note): note is string => Boolean(note)))].join("\n"),
           parcels: 1,
           pallets: 0,
           palletLines: [],
@@ -104,13 +104,17 @@ export function CommercialInvoiceWorkspace() {
     }
   }
 
+  function rawPallets() {
+    return palletRows.map((row) => ({
+      lengthCm: row.lengthCm === "" ? null : Number(row.lengthCm),
+      widthCm: row.widthCm === "" ? null : Number(row.widthCm),
+      depthCm: row.depthCm === "" ? null : Number(row.depthCm),
+      weightKg: row.weightKg === "" ? null : Number(row.weightKg),
+    }));
+  }
+
   function enteredPallets() {
-    return acceptedPallets(palletRows.map((row) => ({
-      lengthCm: row.lengthCm === "" ? 0 : Number(row.lengthCm),
-      widthCm: row.widthCm === "" ? 0 : Number(row.widthCm),
-      depthCm: row.depthCm === "" ? 0 : Number(row.depthCm),
-      weightKg: row.weightKg === "" ? 0 : Number(row.weightKg),
-    })));
+    return inspectPallets(rawPallets(), "issue");
   }
 
   function payload() {
@@ -126,7 +130,7 @@ export function CommercialInvoiceWorkspace() {
       grossWeightKg: palletGrossKg(pallets.pallets),
       buyerVat: draft.buyer.vat,
       buyerEori: draft.buyer.eori,
-      shipment: { ...draft.shipment, palletLines: pallets.pallets, pallets: pallets.pallets.length },
+      shipment: { ...draft.shipment, palletLines: rawPallets(), pallets: pallets.pallets.length },
       ...(draft.incoterm === "DDP" ? {
         importerName: draft.importer.name,
         importerAddress: draft.importer.address,
@@ -153,6 +157,12 @@ export function CommercialInvoiceWorkspace() {
   async function preview() {
     const body = payload();
     if (!body || !draft) return;
+    const palletErrors = inspectPallets(rawPallets(), "preview").problems;
+    if (palletErrors.length) {
+      setError("A pallet is invalid.");
+      setDetails(palletErrors);
+      return;
+    }
     setWorking("preview");
     setError("");
     setDetails([]);
@@ -184,6 +194,12 @@ export function CommercialInvoiceWorkspace() {
   async function issue() {
     const body = payload();
     if (!body || !draft) return;
+    const palletErrors = enteredPallets().problems;
+    if (palletErrors.length) {
+      setError("A pallet is invalid.");
+      setDetails(palletErrors);
+      return;
+    }
     setWorking("issue");
     setError("");
     setDetails([]);
@@ -233,6 +249,12 @@ export function CommercialInvoiceWorkspace() {
         <textarea id="invoice-orders" rows={2} value={numbers} onChange={(event) => setNumbers(event.currentTarget.value)} className="w-full rounded-xl border border-line bg-paper p-3" />
         <div className="space-y-2">
           <p className="text-sm font-semibold">Pallets</p>
+          <div className="grid grid-cols-5 gap-2 text-sm font-semibold">
+            <span>L (cm)</span>
+            <span>W (cm)</span>
+            <span>D (cm)</span>
+            <span>Weight (kg)</span>
+          </div>
           {palletRows.map((row, index) => (
             <div key={index} className="grid grid-cols-5 gap-2">
               <input aria-label="Length cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.lengthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, lengthCm: event.currentTarget.value } : item))} />
@@ -242,7 +264,7 @@ export function CommercialInvoiceWorkspace() {
               {index > 0 ? <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => setPalletRows(palletRows.filter((_, itemIndex) => itemIndex !== index))}>Remove</button> : <span />}
             </div>
           ))}
-          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add pallet</button>
+          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={palletRows.length >= 30} onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add pallet</button>
         </div>
         <button type="button" onClick={() => void lookup()} disabled={!numbers.trim() || working !== null} className="rounded-xl bg-red px-4 py-2 font-semibold text-white disabled:opacity-50">
           {working === "lookup" ? "Retrieving orders…" : "Retrieve orders"}
@@ -366,9 +388,8 @@ export function CommercialInvoiceWorkspace() {
                 <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment.customsStatementText} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
               </label>
             ) : null}
-            <label className="text-sm font-semibold md:col-span-3">Special instructions
-              <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.specialInstructions ?? ""} onChange={(event) => patchShipment({ specialInstructions: event.currentTarget.value })} />
-            </label>
+            <p className="text-sm font-semibold md:col-span-3">Special instructions</p>
+            <p className="text-sm md:col-span-3">{shipment?.specialInstructions || "None"}</p>
           </div>
           <div className="space-y-3">
             {draft.lines.map((line) => (

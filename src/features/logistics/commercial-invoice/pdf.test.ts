@@ -4,7 +4,7 @@ import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { extractText } from "unpdf";
-import { draftFromOrders } from "./prepare";
+import { applyShipment, draftFromOrders } from "./prepare";
 import { commercialInvoicePageRoom, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
 import type { InvoiceOrder } from "./rules";
 
@@ -76,6 +76,33 @@ async function pagesOf(count: number) {
 }
 
 describe("commercial invoice PDF", () => {
+  it("prints the Cin7 shipping note even when the form sends a blank", async () => {
+    const source = orders(1);
+    source[0]!.specialInstructions = "Tail lift required";
+    const built = draftFromOrders(source, {
+      incoterm: "DAP",
+      namedPlace: "Αθήνα",
+      destinationCountry: "GR",
+      packages: 1,
+      packageType: "Pallet",
+      grossWeightKg: 10,
+    });
+    built.reference = "CI-2026-0001";
+    const applied = applyShipment(built, {
+      specialInstructions: "",
+      fao: "Alex",
+      courier: "FedEx",
+      parcels: 1,
+      palletLines: [{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: 10 }],
+      customsStatementId: "regime42",
+      customsStatementText: "",
+    });
+    const extracted = await extractText(await renderCommercialInvoicePdf(applied), { mergePages: true });
+    const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    expect(text).toMatch(/Tail lift required/);
+    expect(text).toMatch(/Special Instructions/);
+  });
+
   it("renders a one-page invoice with the summary on that page", async () => {
     const { plan, text } = await pagesOf(1);
     expect(plan.map((page) => page.role)).toEqual(["first"]);

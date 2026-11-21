@@ -5,7 +5,7 @@ import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invo
 import { applyLineEdits, applyOptionalDdp, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
 import { optionalDdpSchema, shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
-import { acceptedPallets } from "@/features/logistics/commercial-invoice/pallets";
+import { inspectPallets } from "@/features/logistics/commercial-invoice/pallets";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
 import { matchCustomsStatement, rulesFromRows } from "@/features/logistics/commercial-invoice/statements";
 import type { Profile } from "@/lib/types";
@@ -131,9 +131,8 @@ export async function POST(request: Request) {
   const orders = applyLineEdits(ordersFromCin7(loaded, customsFromRpc(customs.data)), edits as LineEdit[]);
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
   const rules = rulesFromRows((await supabase.schema("logistics").from("customs_statement_rules").select("incoterm, destination_country, carrier, statement_text, extra_line, priority, active").eq("active", true)).data);
-  const checked = acceptedPallets(input.shipment?.palletLines ?? []);
-  if (checked.invalid) return Response.json({ error: "A pallet is invalid." }, { status: 422 });
-  if (!checked.pallets.length) return Response.json({ error: "Enter at least one pallet." }, { status: 422 });
+  const checked = inspectPallets(input.shipment?.palletLines ?? [], "issue");
+  if (checked.problems.length) return Response.json({ error: "A pallet is invalid.", details: checked.problems }, { status: 422 });
   const statementId = input.shipment?.customsStatementId ?? "matched";
   let draft;
   try {

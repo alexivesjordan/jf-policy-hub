@@ -261,9 +261,8 @@ function boxesHeight(from: number, to: number) {
 
 function pieceHeight(piece: SummaryPiece, metrics: SummaryMetrics) {
   if (piece.kind === "dims") {
-    const header = piece.from === 0 ? DIM_HEADER : 0;
     const tail = piece.to === metrics.dimRows ? DIM_TAIL : 0;
-    return header + (piece.to - piece.from) * DIM_LINE + tail;
+    return DIM_HEADER + (piece.to - piece.from) * DIM_LINE + tail;
   }
   if (piece.kind === "statement") {
     const tail = piece.to === metrics.statementLines.length ? STATEMENT_TAIL : 0;
@@ -305,7 +304,7 @@ function takePiece(piece: SummaryPiece, room: number, metrics: SummaryMetrics): 
   if (whole <= room) return { fit: piece, rest: null, height: whole };
   if (piece.kind === "closing") return { fit: null, rest: piece, height: 0 };
   if (piece.kind === "dims") {
-    const header = piece.from === 0 ? DIM_HEADER : 0;
+    const header = DIM_HEADER;
     let rows = Math.floor((room - header) / DIM_LINE);
     if (piece.from + rows >= piece.to && whole > room) rows = piece.to - piece.from - 1;
     if (rows < 1) return { fit: null, rest: piece, height: 0 };
@@ -630,10 +629,8 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     const blockHeight = item.pieces.reduce((sum, piece) => sum + pieceHeight(piece, metrics), 0);
     let cursor = item.anchor === "bottom" ? Math.min(ceiling, ROW_BOTTOM + blockHeight) : ceiling;
     const drawDims = (piece: Extract<SummaryPiece, { kind: "dims" }>) => {
-      if (piece.from === 0) {
-        text(page, "Dimensions:", MARGIN, cursor - 11, 9, bold);
-        cursor -= DIM_HEADER;
-      }
+      text(page, piece.from === 0 ? "Dimensions:" : "Dimensions (cont.)", MARGIN, cursor - 11, 9, bold);
+      cursor -= DIM_HEADER;
       for (let row = piece.from; row < piece.to; row += 1) {
         const label = row < shipment.palletLines.length
           ? palletLineText(row, shipment.palletLines[row]!)
@@ -654,8 +651,8 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       const boxTop = cursor;
       const boxH = metrics.boxH;
       const middle: [string, string][] = [
-        ["No. of parcels:", shipment.parcels.toFixed(2)],
-        ["No. of pallets:", shipment.pallets.toFixed(2)],
+        ["No. of parcels:", String(Math.trunc(shipment.parcels))],
+        ["No. of pallets:", String(Math.trunc(shipment.pallets))],
         ["Total net weight:", kilos(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0))],
         ["Total gross weight:", grossKilos(draft.grossWeightKg)],
       ];

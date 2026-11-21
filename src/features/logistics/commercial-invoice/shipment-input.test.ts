@@ -17,9 +17,8 @@ describe("shipment input limits", () => {
     expect(shipmentSchema.safeParse({ parcels: 1000 }).success).toBe(false);
     expect(shipmentSchema.safeParse({ pallets: 30 }).success).toBe(true);
     expect(shipmentSchema.safeParse({ pallets: 31 }).success).toBe(false);
-    expect(shipmentSchema.safeParse({ palletLines: [{ lengthCm: 1001, widthCm: 1, depthCm: 1, weightKg: 1 }] }).success).toBe(false);
-    expect(shipmentSchema.safeParse({ palletLines: [{ lengthCm: 1000, widthCm: 1, depthCm: 1, weightKg: 2000 }] }).success).toBe(true);
-    expect(shipmentSchema.safeParse({ palletLines: [{ lengthCm: 10, widthCm: 10, depthCm: 10, weightKg: 1.15 }] }).success).toBe(false);
+    expect(shipmentSchema.safeParse({ palletLines: [{ lengthCm: 1001, widthCm: 1, depthCm: 1, weightKg: 1 }] }).success).toBe(true);
+    expect(shipmentSchema.safeParse({ palletLines: [{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }] }).success).toBe(true);
     expect(shipmentSchema.safeParse({ palletLines: Array.from({ length: 31 }, () => ({ lengthCm: 1, widthCm: 1, depthCm: 1, weightKg: 1 })) }).success).toBe(false);
     expect(shipmentSchema.safeParse({ grossWeightKg: 100000 }).success).toBe(true);
     expect(shipmentSchema.safeParse({ grossWeightKg: 100001 }).success).toBe(false);

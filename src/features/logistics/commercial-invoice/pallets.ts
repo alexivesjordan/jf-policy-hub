@@ -29,21 +29,54 @@ export function completePallet(row: Partial<PalletLine> | null | undefined): Pal
   return { lengthCm, widthCm, depthCm, weightKg };
 }
 
-export function classifyPallet(row: Partial<PalletLine> | null | undefined): "empty" | "invalid" | PalletLine {
-  if (!row) return "empty";
-  const values = [row.lengthCm, row.widthCm, row.depthCm, row.weightKg];
-  if (values.some((value) => value == null || Number(value) === 0)) return "empty";
-  return completePallet(row) ?? "invalid";
+const PALLET_FIELDS = [
+  ["lengthCm", "length"],
+  ["widthCm", "width"],
+  ["depthCm", "depth"],
+  ["weightKg", "weight"],
+] as const;
+
+function blankPalletValue(value: unknown) {
+  return value == null || value === "" || Number(value) === 0;
 }
 
-export function acceptedPallets(rows: Partial<PalletLine>[]) {
-  const accepted: PalletLine[] = [];
-  for (const row of rows) {
-    const classified = classifyPallet(row);
-    if (classified === "invalid") return { pallets: [] as PalletLine[], invalid: true };
-    if (classified !== "empty") accepted.push(classified);
-  }
-  return { pallets: accepted, invalid: false };
+type PalletDraft = { lengthCm?: number | null; widthCm?: number | null; depthCm?: number | null; weightKg?: number | null };
+
+export function inspectPallets(rows: PalletDraft[], mode: "issue" | "preview") {
+  const problems: string[] = [];
+  const pallets: PalletLine[] = [];
+  if (rows.length > 30) problems.push("At most 30 pallets.");
+  rows.forEach((row, index) => {
+    const name = "Pallet " + (index + 1);
+    const missing = PALLET_FIELDS.filter(([key]) => blankPalletValue(row?.[key]));
+    if (missing.length === PALLET_FIELDS.length) return;
+    if (missing.length) {
+      missing.forEach(([, label]) => problems.push(`${name}: enter ${label}`));
+      return;
+    }
+    const lengthCm = Number(row.lengthCm);
+    const widthCm = Number(row.widthCm);
+    const depthCm = Number(row.depthCm);
+    const weightKg = Number(row.weightKg);
+    if (![lengthCm, widthCm, depthCm].every((value) => Number.isInteger(value) && value >= 1 && value <= 1000)) {
+      problems.push(`${name}: length, width and depth must be whole centimetres from 1 to 1000`);
+      return;
+    }
+    if (!(weightKg > 0) || weightKg > 2000 || !oneDecimal(weightKg)) {
+      problems.push(`${name}: weight must be greater than 0, at most 2000 kg, with one decimal`);
+      return;
+    }
+    pallets.push({ lengthCm, widthCm, depthCm, weightKg });
+  });
+  if (mode === "issue" && pallets.length < 1 && problems.length === 0) problems.push("Enter at least one pallet.");
+  const gross = palletGrossKg(pallets);
+  if (pallets.length && gross > 100000) problems.push("Gross weight is invalid.");
+  return { pallets, problems };
+}
+
+export function acceptedPallets(rows: PalletDraft[]) {
+  const checked = inspectPallets(rows, "preview");
+  return { pallets: checked.pallets, invalid: checked.problems.length > 0 };
 }
 
 export function palletProblems(rows: PalletLine[], mode: "issue" | "preview") {
