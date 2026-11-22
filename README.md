@@ -144,7 +144,7 @@ Apply 6 and 7 on a **preview** Supabase project first. Do not run them on the pr
 
 There is no Cin7 connection in these migrations. Customer segment, customer type, and quote/order numbers are stored as empty columns until that integration is specified.
 
-`supabase/config.toml` exposes the `core` and `ops` schemas for the local CLI. On a hosted preview project, add those same names under Project Settings → API → Exposed schemas before querying the tables directly. The M0 routes call `public` functions, so they work before that setting is changed.
+`supabase/config.toml` exposes the `core`, `ops` and `logistics` schemas for the local CLI. On a hosted project, add those same names under Project Settings → API → Exposed schemas (Integrations → Data API) before querying the tables directly. The M0 routes call `public` functions, so they work before that setting is changed. The commercial invoice routes query `logistics` directly, so they do not.
 
 Hosted preview project, Supabase CLI (link the preview ref, not production):
 

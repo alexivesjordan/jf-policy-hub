@@ -5,6 +5,8 @@ Apply, in order, on TEST only:
 1. `supabase/migrations/20261121100000_logistics_product_customs.sql`
 2. `supabase/migrations/20261121100100_logistics_commercial_invoices.sql`
 
+The invoice pages and the statement editor call `supabase.schema("logistics")`. On each hosted project, TEST and production, add `logistics` under Supabase → Integrations → Data API → Exposed schemas before those screens are used. Table grants and RLS do not expose the schema. `supabase/config.toml` lists it for the local CLI only and does not change a hosted project. This repository cannot read that dashboard setting.
+
 `01-prechecks.sql` should show both invoice tables as null.
 `03-postchecks.sql` should show RLS on, anon select false, issue and attach not executable by `authenticated`, and bucket `commercial-invoices` with `public` false.
 
