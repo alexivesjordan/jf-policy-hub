@@ -1,4 +1,4 @@
-import { Box, Cog, FileText, Headset, TrendingUp, Users } from "lucide-react";
+import { Box, Cog, FileText, Headset, Truck, TrendingUp, Users } from "lucide-react";
 import type { ModuleIcon } from "@/modules/registry";
 
 const icons = {
@@ -8,6 +8,7 @@ const icons = {
   operations: Cog,
   sales: TrendingUp,
   finance: FileText,
+  logistics: Truck,
 } as const;
 
 export function ModuleGlyph({ name, className }: { name: ModuleIcon; className?: string }) {

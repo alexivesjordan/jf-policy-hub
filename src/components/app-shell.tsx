@@ -27,6 +27,7 @@ export function AppShell({
   isOwner = false,
   nav,
   notifications = [],
+  showLogistics = false,
   children,
 }: {
   profile: Profile;
@@ -35,6 +36,7 @@ export function AppShell({
   isOwner?: boolean;
   nav?: ModuleNavItem[];
   notifications?: BellItem[];
+  showLogistics?: boolean;
   children: ReactNode;
 }) {
   const path = usePathname();
@@ -48,7 +50,7 @@ export function AppShell({
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
       <aside className="hidden flex-col border-line bg-pine text-ink md:sticky md:top-0 md:flex md:h-screen md:border-r">
         <div className="px-3 py-4">
-          <PulseSwitcher profile={profile} heading={heading} currentId={inWorkspace ? "workspace" : current?.id} />
+          <PulseSwitcher profile={profile} heading={heading} currentId={inWorkspace ? "workspace" : current?.id} showLogistics={showLogistics} />
         </div>
         <SideNav items={items} counts={counts} />
         <div className="mt-auto border-t border-line px-3 py-3">
@@ -63,6 +65,7 @@ export function AppShell({
             title={heading}
             profile={profile}
             currentId={inWorkspace ? "workspace" : current?.id}
+            showLogistics={showLogistics}
           />
           <p className="mr-auto text-sm font-semibold md:hidden">{heading}</p>
           <div className="ml-auto flex items-center gap-2">
@@ -80,12 +83,15 @@ function PulseSwitcher({
   profile,
   heading,
   currentId,
+  showLogistics = false,
 }: {
   profile: Profile;
   heading: string;
   currentId?: string;
+  showLogistics?: boolean;
 }) {
   const choices = pulseModules.filter((module) => {
+    if (module.id === "logistics" && !showLogistics) return false;
     const level = profile.levels?.[module.id as keyof NonNullable<Profile["levels"]>];
     if (level === "none") return false;
     return true;
@@ -156,12 +162,14 @@ export function MobileNav({
   title,
   profile,
   currentId,
+  showLogistics = false,
 }: {
   items: ModuleNavItem[];
   counts: { pending: number; unread: number };
   title: string;
   profile: Profile;
   currentId?: string;
+  showLogistics?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -191,7 +199,7 @@ export function MobileNav({
         <SheetHeader>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <SheetDescription className="sr-only">{title}</SheetDescription>
-          <PulseSwitcher profile={profile} heading={title} currentId={currentId} />
+          <PulseSwitcher profile={profile} heading={title} currentId={currentId} showLogistics={showLogistics} />
         </SheetHeader>
         <SideNav items={items} counts={counts} onNavigate={() => setOpen(false)} />
         <SheetFooter>

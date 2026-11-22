@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Launcher } from "@/components/launcher";
-import { homeRedirect } from "@/lib/access";
+import { fieldRole } from "@/features/field/queries";
+import { canUseLogistics, homeRedirect } from "@/lib/access";
 import { getCurrentProfile } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
@@ -24,7 +25,13 @@ async function HomeGate() {
   const profile = await getCurrentProfile();
   const destination = homeRedirect(profile);
   if (destination) redirect(destination);
-  return <Launcher profile={profile} />;
+  let engineer = false;
+  try {
+    engineer = (await fieldRole()) === "engineer";
+  } catch {
+    engineer = false;
+  }
+  return <Launcher profile={profile} showLogistics={Boolean(profile && canUseLogistics(profile) && !engineer)} />;
 }
 
 function HomeFallback() {

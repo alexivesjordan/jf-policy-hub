@@ -6,6 +6,8 @@ export type Cin7Segment = "independent" | "franchisee" | "trade" | "big_corporat
 /** A quote as Pulse needs it. Field names are ours. They are not a Cin7 payload map. */
 export type Cin7QuoteLine = {
   sku: string | null;
+  /** Cin7 sale-line ID when the payload has one. */
+  lineId?: string | null;
   productName: string;
   category: string | null;
   /** Cin7 product Category text. Not a Pulse category slug. */
@@ -34,6 +36,10 @@ export type Cin7Quote = {
   segment: Cin7Segment;
   customerType: Cin7CustomerType;
   postcode?: string | null;
+  currency?: string | null;
+  buyerAddress?: string | null;
+  consigneeAddress?: string | null;
+  destinationCountry?: string | null;
   /** Cin7 CustomerID. Not a name or address. */
   customerId?: string | null;
   lines: Cin7QuoteLine[];
@@ -43,6 +49,8 @@ export type Cin7Quote = {
   weightIgnored?: boolean;
   /** Additional charges from the same Order or Quote section as the lines. Ex VAT. */
   additionalCharges?: { description: string; amountNet: number }[];
+  /** Cin7 ShippingNotes. Empty when the order has none. */
+  specialInstructions?: string;
   /** Line Total matched the tax-inclusive order total, so Tax was removed. */
   taxStripped?: boolean;
   /** Money checks. Select these by code; do not match the message text. */

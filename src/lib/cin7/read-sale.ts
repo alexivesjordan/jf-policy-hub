@@ -73,6 +73,45 @@ function shippingPostcode(customer: Record<string, unknown> | null, sale: Record
   return raw ? normaliseUkPostcode(raw) : null;
 }
 
+const COUNTRY_ISO: Record<string, string> = {
+  "united kingdom": "GB",
+  uk: "GB",
+  "great britain": "GB",
+  england: "GB",
+  france: "FR",
+  germany: "DE",
+  netherlands: "NL",
+  holland: "NL",
+  ireland: "IE",
+  spain: "ES",
+  italy: "IT",
+  belgium: "BE",
+  greece: "GR",
+  poland: "PL",
+  portugal: "PT",
+  sweden: "SE",
+  norway: "NO",
+  switzerland: "CH",
+  "united states": "US",
+  usa: "US",
+};
+
+function isoCountry(value: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^[A-Za-z]{2}$/.test(trimmed)) {
+    const code = trimmed.toUpperCase();
+    return code === "EL" ? "GR" : code;
+  }
+  return COUNTRY_ISO[trimmed.toLowerCase()] ?? null;
+}
+
+function billingAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+  const onSale = filledAddress(record(sale.BillingAddress));
+  if (onSale) return onSale;
+  return list(customer?.Addresses).find((address) => text(address.Type) === "Billing" && address.DefaultForType === true) ?? null;
+}
+
 function addressLines(address: Record<string, unknown> | null) {
   if (!address) return null;
   const postcode = text(address.Postcode);
@@ -194,16 +233,28 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     { beforeTax: amount(document?.TotalBeforeTax), includingTax: amount(document?.Total) },
   );
   const products = new Map<string, Record<string, unknown>>();
-  for (const line of priced) {
+  const productJobs = priced.flatMap((line) => {
     const productId = text(line.ProductID);
     const sku = text(line.SKU);
     const key = productId ?? sku;
-    if (!key || products.has(key)) continue;
+    if (!key || products.has(key)) return [];
+    products.set(key, {});
     const query: Record<string, string> = { Limit: "1", IncludeDeprecated: "true" };
     if (productId) query.ID = productId;
     else if (sku) query.Sku = sku;
-    products.set(key, productsOf(await get("product", query))[0] ?? {});
+    return [{ key, query }];
+  });
+  let productCursor = 0;
+  async function loadProduct() {
+    for (;;) {
+      const index = productCursor;
+      productCursor += 1;
+      const job = productJobs[index];
+      if (!job) return;
+      products.set(job.key, productsOf(await get("product", job.query))[0] ?? {});
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(3, productJobs.length) }, () => loadProduct()));
 
   const customerId = text(sale.CustomerID) ?? text(listed?.CustomerID);
   const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
@@ -213,6 +264,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     const product = products.get(productId ?? sku ?? "") ?? {};
     return {
       sku: text(product.SKU) ?? sku,
+      lineId: text(line.ID),
       productName: text(line.Name) ?? text(product.Name) ?? sku ?? "Item",
       category: null,
       cin7Category: text(product.Category),
@@ -238,9 +290,14 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     segment: null,
     customerType: null,
     postcode: shippingPostcode(customer, sale),
+    currency: text(sale.Currency) ?? text(customer?.Currency) ?? text(record(sale.Order)?.Currency),
+    buyerAddress: addressLines(billingAddress(customer, sale)),
+    consigneeAddress: addressLines(deliveryAddress(customer, sale)),
+    destinationCountry: isoCountry(text(deliveryAddress(customer, sale)?.Country) ?? text(billingAddress(customer, sale)?.Country)),
     customerId,
     lines: quoteLines,
     additionalCharges: money.charges,
+    specialInstructions: text(sale.ShippingNotes) ?? "",
     usedQuoteLines: fromQuote && quoteLines.length > 0,
     taxStripped: money.taxStripped,
     moneyFlags: money.flags,

@@ -3,6 +3,8 @@ import { AppShell } from "@/components/app-shell";
 import type { BellItem } from "@/components/notification-bell";
 import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
 import { listMyNotifications } from "@/features/policies/queries";
+import { fieldRole } from "@/features/field/queries";
+import { canUseLogistics } from "@/lib/access";
 import { requireSalesUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
@@ -30,6 +32,12 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
 async function SalesShell({ children }: { children: React.ReactNode }) {
   await connection();
   const profile = await requireSalesUser();
+  let engineer = false;
+  try {
+    engineer = (await fieldRole()) === "engineer";
+  } catch {
+    engineer = false;
+  }
   let isOwner = false;
   let notifications: BellItem[] = [];
   try {
@@ -67,7 +75,7 @@ async function SalesShell({ children }: { children: React.ReactNode }) {
   }
   const nav = (pulseModules.find((module) => module.id === "sales")?.nav ?? []).filter((item) => !item.ownerOnly || isOwner);
   return (
-    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications}>
+    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer}>
       {children}
     </AppShell>
   );

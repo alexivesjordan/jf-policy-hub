@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
+import { canUseLogistics } from "@/lib/access";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
@@ -32,7 +33,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 async function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const profile = await requireWorkspaceAdmin();
   return (
-    <AppShell profile={profile} pending={0} unread={0} nav={nav}>
+    <AppShell profile={profile} pending={0} unread={0} nav={nav} showLogistics={canUseLogistics(profile)}>
       {children}
     </AppShell>
   );

@@ -89,9 +89,9 @@ describe("Cin7 sale read", () => {
     const dumped = JSON.stringify(quote);
     assert.equal(dumped.includes("hidden@example.com"), false);
     assert.equal(dumped.includes("07000000000"), false);
-    assert.equal(dumped.includes("Secret Road"), false);
+    assert.equal(quote.consigneeAddress?.includes("Secret Road"), true);
+    assert.equal(quote.buyerAddress?.includes("Accounts lane"), true);
     assert.equal(dumped.includes("Anonymised Road"), false);
-    assert.equal(dumped.includes("Accounts lane"), false);
     const details = await readCin7BookingDetails("SO-00490", get);
     assert.equal(details?.siteAddress, "1 Secret Road, Ipswich, PE30 4JJ");
     assert.equal(details?.siteAddress?.includes("1 Anonymised Road"), false);
