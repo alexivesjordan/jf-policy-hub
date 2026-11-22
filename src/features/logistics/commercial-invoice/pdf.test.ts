@@ -5,7 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { extractText } from "unpdf";
 import { applyShipment, draftFromOrders } from "./prepare";
-import { commercialInvoicePageRoom, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
+import { commercialInvoicePageRoom, commercialInvoiceTrio, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
 import type { InvoiceOrder } from "./rules";
 
 function orders(count: number): InvoiceOrder[] {
@@ -100,7 +100,7 @@ describe("commercial invoice PDF", () => {
     const extracted = await extractText(await renderCommercialInvoicePdf(applied), { mergePages: true });
     const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
     expect(text).toMatch(/Tail lift required/);
-    expect(text).toMatch(/Special Instructions/);
+    expect(text).toMatch(/SPECIAL INSTRUCTIONS/);
   });
 
   it("renders a one-page invoice with the summary on that page", async () => {
@@ -109,11 +109,15 @@ describe("commercial invoice PDF", () => {
     expect(plan[0]?.summary).toBe(true);
     expect(text).toHaveLength(1);
     expect(text[0]).toMatch(/Page:\s+1 of 1/);
-    expect(text[0]).toMatch(/Goods Net/);
+    expect(text[0]).toMatch(/Goods net/);
     expect(text[0]).toMatch(/COMMERCIAL INVOICE/);
-    expect(text[0]).toMatch(/Country of Origin: China/);
-    expect(text[0]).toMatch(/Country of Export: United Kingdom/);
-    expect(text[0]).toMatch(/Incoterms: DAP/);
+    expect(text[0]).toMatch(/Country of origin/);
+    expect(text[0]).toMatch(/China/);
+    expect(text[0]).toMatch(/Country of export/);
+    expect(text[0]).toMatch(/United Kingdom/);
+    expect(text[0]).toMatch(/Incoterms/);
+    expect(text[0]).toMatch(/TOTALS \(EUR\)/);
+    expect(text[0]).not.toMatch(/\bEuro\b/);
     expect(text[0]).not.toMatch(/Position:/);
   });
 
@@ -127,7 +131,7 @@ describe("commercial invoice PDF", () => {
     expect(text[0]).toMatch(/COMMERCIAL INVOICE/);
     expect(text[1]).toMatch(/Document No:/);
     expect(text[1]).not.toMatch(/COMMERCIAL INVOICE/);
-    expect(text[2]).toMatch(/Goods Net/);
+    expect(text[2]).toMatch(/Goods net/);
     expect(text[2]).toMatch(/Page:\s+3 of 3/);
     await saveSample("invoice-3.pdf", found);
   });
@@ -142,8 +146,8 @@ describe("commercial invoice PDF", () => {
     expect(plan[7]?.summary).toBe(true);
     expect(text[0]).toMatch(/Page:\s+1 of 8/);
     expect(text[7]).toMatch(/Page:\s+8 of 8/);
-    expect(text[7]).toMatch(/Goods Net/);
-    expect(text.slice(0, -1).some((page) => /Goods Net/.test(page))).toBe(false);
+    expect(text[7]).toMatch(/Goods net/);
+    expect(text.slice(0, -1).some((page) => /Goods net/.test(page))).toBe(false);
     await saveSample("invoice-1.pdf", 1);
     await saveSample("invoice-8.pdf", found);
     await saveSample("invoice-10-pallets.pdf", 4, 10);
@@ -167,7 +171,8 @@ describe("commercial invoice PDF", () => {
     draft.clearanceCountry = "FR";
     const filled = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
     const filledText = Array.isArray(filled.text) ? filled.text.join("\n") : filled.text;
-    expect(filledText).toMatch(/Incoterms: DDP/);
+    expect(filledText).toMatch(/Incoterms/);
+    expect(filledText).toMatch(/DDP/);
     expect(filledText).not.toMatch(/Importer:/);
   });
 
@@ -202,14 +207,17 @@ describe("commercial invoice PDF", () => {
     expect(compact.match(/¶/g)?.length).toBe(2000);
     expect(compact.match(/¤/g)?.length).toBe(2000);
     expect(compact.match(/Ω/g)?.length).toBe(240);
-    expect(compact).toContain("CountryofOrigin:China,Poland,UnitedKingdom");
+    expect(compact).toContain("China");
+    expect(compact).toContain("Poland");
+    expect(compact).toContain("UnitedKingdom");
     const joined = pages.join("\n");
-    expect(joined).toContain("Pallet 1:");
-    expect(joined).toContain("Pallet 10:");
+    expect(joined).toContain("10 pallets");
+    expect(joined).toContain("1.0");
+    expect(joined).toContain("10.0");
     expect(pages[0]).toMatch(/COMMERCIAL INVOICE/);
     expect(pages.slice(1).every((page) => /Document No:/.test(page))).toBe(true);
     expect(pages.slice(1).some((page) => /COMMERCIAL INVOICE/.test(page))).toBe(false);
-    const totalsPages = pages.filter((page) => /Goods Net/.test(page));
+    const totalsPages = pages.filter((page) => /Goods net/.test(page));
     expect(totalsPages).toHaveLength(1);
     expect(totalsPages[0]).toMatch(/Signed:/);
     expect(pages.filter((page) => /Signed:/.test(page))).toHaveLength(1);
@@ -250,7 +258,8 @@ describe("commercial invoice PDF", () => {
         const last = plan.at(-1);
         const kinds = last?.pieces.map((piece) => piece.kind) ?? [];
         expect(kinds.indexOf("dims"), pallets + " pallets, " + count + " lines").toBeGreaterThanOrEqual(0);
-        expect(kinds.indexOf("dims")).toBeLessThan(kinds.indexOf("statement"));
+        expect(kinds.indexOf("dims")).toBeLessThan(kinds.indexOf("boxes"));
+        expect(kinds.indexOf("boxes")).toBeLessThan(kinds.indexOf("statement"));
         expect(kinds.indexOf("statement")).toBeLessThan(kinds.indexOf("closing"));
         expect(plan.slice(0, -1).every((page) => page.pieces.length === 0)).toBe(true);
         expect(last && last.used).toBeLessThanOrEqual(commercialInvoicePageRoom(draft, last?.role ?? "last") + 0.1);
@@ -274,7 +283,7 @@ describe("commercial invoice PDF", () => {
     expect(pages.length).toBeGreaterThan(1);
     expect(pages.at(-1)).toMatch(/STATEMENT-END/);
     expect(pages.at(-1)).toMatch(/Signed:/);
-    expect(pages.at(-1)).toMatch(/Goods Net/);
+    expect(pages.at(-1)).toMatch(/Goods net/);
     expect(pages.slice(0, -1).some((page) => /STATEMENT-END/.test(page))).toBe(false);
   });
 
@@ -303,9 +312,9 @@ describe("commercial invoice PDF", () => {
     draft.lines.forEach((line, index) => { line.originCountry = codes[index]!; });
     const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
     const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
-    expect(text).toMatch(/Country of Origin: Austria, Belgium, China/);
-    expect(text).toMatch(/Country of Export: United Kingdom/);
-    expect(text).toMatch(/Incoterms: DAP/);
+    expect(text).toMatch(/Country of origin\s+Austria, Belgium,/);
+    expect(text).toMatch(/Country of export[\s\S]{0,40}United Kingdom/);
+    expect(text).toMatch(/Incoterms[\s\S]{0,20}DAP/);
     await saveDraft("invoice-origins.pdf", draft);
   });
 
@@ -318,7 +327,43 @@ describe("commercial invoice PDF", () => {
     const rated = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
     const ratedText = Array.isArray(rated.text) ? rated.text.join("\n") : rated.text;
     expect(ratedText).toMatch(/20\.00\s+-\s+2\.50/);
-    expect(ratedText).toMatch(/VAT:\s+12\.34/);
+    expect(ratedText).toMatch(/VAT[\s\S]{0,20}12\.34/);
+    await saveDraft("invoice-vat.pdf", draft);
+  });
+
+  it("omits the statement and the note when both are absent", async () => {
+    const draft = withPallets(draftFor(2), 12);
+    const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    expect(text).toMatch(/12 pallets/);
+    expect(text).toMatch(/12\.0 kg/);
+    expect(text).toMatch(/CUSTOMS STATEMENT/);
+    await saveDraft("invoice-12-pallets.pdf", draft);
+    const plain = draftFor(1);
+    plain.shipment = { ...plain.shipment!, customsStatementId: "none", customsStatementText: "", specialInstructions: "" };
+    const plainExtract = await extractText(await renderCommercialInvoicePdf(plain), { mergePages: true });
+    const plainText = Array.isArray(plainExtract.text) ? plainExtract.text.join("\n") : plainExtract.text;
+    expect(plainText).not.toMatch(/CUSTOMS STATEMENT/);
+    expect(plainText).not.toMatch(/SPECIAL INSTRUCTIONS/);
+    expect(plainText).toMatch(/DECLARATION/);
+    await saveDraft("invoice-plain.pdf", plain);
+  });
+
+  it("gives the shipment, export and totals boxes one height and one row", async () => {
+    const face = await font();
+    const short = commercialInvoiceTrio(draftFor(1), face);
+    expect(new Set(short.map((box) => box.h)).size).toBe(1);
+    expect(new Set(short.map((box) => box.w)).size).toBe(1);
+    expect(short[1]!.x - (short[0]!.x + short[0]!.w)).toBeCloseTo(6);
+    expect(short[2]!.x - (short[1]!.x + short[1]!.w)).toBeCloseTo(6);
+    const codes = ["CN", "ES", "TW", "PL", "DE", "FR", "IT", "NL", "BE", "PT", "SE", "AT"];
+    const long = draftFor(codes.length);
+    long.lines.forEach((line, index) => { line.originCountry = codes[index]!; });
+    const wrapped = commercialInvoiceTrio(long, face);
+    expect(wrapped[0]!.h).toBeGreaterThan(short[0]!.h);
+    expect(new Set(wrapped.map((box) => box.h)).size).toBe(1);
+    expect(wrapped[0]!.x).toBe(short[0]!.x);
+    expect(wrapped[2]!.x + wrapped[2]!.w).toBeCloseTo(short[2]!.x + short[2]!.w);
   });
 });
 
