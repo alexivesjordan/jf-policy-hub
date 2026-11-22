@@ -63,8 +63,8 @@ begin
 
   if logistics.can_use() then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' admin can_use false;'; end if;
 
-  select count(*) into v_count from logistics.customs_statement_rules where active and incoterm = 'DDP' and destination_country = 'EU';
-  if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' ddp rule;'; end if;
+  select count(*) into v_count from logistics.customs_statement_rules where not active and incoterm = 'DDP' and destination_country = 'EU';
+  if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' ddp template inactive pending broker approval;'; end if;
   select count(*) into v_count from logistics.customs_statement_rules where not active and statement_text like 'Regime 42%';
   if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' regime 42 inactive;'; end if;
 
