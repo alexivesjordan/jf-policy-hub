@@ -612,9 +612,10 @@ to authenticated
 using (logistics.can_use())
 with check (logistics.can_use());
 
--- DDP to any EU country uses the VAT-postponed wording. Regime 42 needs French
--- clearance and a different EU destination, which these columns cannot express,
--- so that preset is seeded inactive until the full rule list arrives.
+-- Template statements start inactive until the customs/broker team confirms the
+-- exact carrier, clearance regime and importer for a shipment. A blanket EU DDP
+-- rule must not claim French regime 40 or postponed VAT for every destination.
+-- Regime 42 likewise requires its own explicit customs approval.
 insert into logistics.customs_statement_rules
   (incoterm, destination_country, carrier, statement_text, extra_line, priority, active)
 values
@@ -622,7 +623,7 @@ values
     'DDP', 'EU', null,
     'Goods cleared regime 40 00 DDP VAT postponed by Frictionless Trade Services SAS, 70 Rue Mollien 62100 Calais, France',
     'DDP – VAT Postponed',
-    10, true
+    10, false
   ),
   (
     null, 'EU', null,
