@@ -41,7 +41,19 @@ export function customsFromRpc(data: unknown): CustomsRow[] {
 }
 export type LineEdit = { lineId: string; orderNumber: string; sku: string; shippedQuantity: number; hsCode: string; originCountry: string; unitWeightKg: number | null };
 
-export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): InvoiceOrder[] {
+function usableOrigin(value: string | null | undefined) {
+  const code = value?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(code)) return "";
+  return code === "EL" ? "GR" : code;
+}
+
+function usableHs(value: string | null | undefined) {
+  const raw = value?.trim() ?? "";
+  if (!raw) return "";
+  return normaliseHsCode(raw) ?? "";
+}
+
+export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[], already: IssuedQuantity[] = []): InvoiceOrder[] {
   return quotes.map((sale) => {
     return {
       id: sale.id,
@@ -59,17 +71,19 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[]): Invo
         if (!isGoodsLine({ sku: line.sku, productName: line.productName, category: line.cin7Category })) return [];
         const saved = customs.find((row) => row.sku === (line.sku ?? ""));
         const ordered = line.qty;
+        const id = line.lineId?.trim() || sale.id + ":" + index;
+        const prior = already.filter((row) => row.lineKey === id && row.cin7SaleId === sale.id).reduce((sum, row) => sum + row.qty, 0);
         const goodsLine: GoodsLine = {
-          id: line.lineId?.trim() || sale.id + ":" + index,
+          id,
           orderNumber: sale.number,
           sku: line.sku ?? "",
           productName: line.productName,
           orderedQuantity: ordered,
-          shippedQuantity: 0,
+          shippedQuantity: Math.max(0, ordered - prior),
           unitNetValue: line.lineNet != null && ordered > 0 ? line.lineNet / ordered : 0,
           lineNetPence: line.lineNet == null ? undefined : Math.round(line.lineNet * 100),
-          hsCode: saved?.hsCode ?? "",
-          originCountry: saved?.origin ?? "",
+          hsCode: usableHs(line.hsCode) || usableHs(saved?.hsCode),
+          originCountry: usableOrigin(line.originCountry) || usableOrigin(saved?.origin),
           unitWeightKg: saved?.netWeightKg ?? line.unitWeightKg ?? null,
         };
         return [goodsLine];

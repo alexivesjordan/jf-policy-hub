@@ -1,9 +1,8 @@
-import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
 import { renderCommercialInvoicePdf } from "@/features/logistics/commercial-invoice/pdf";
 import { applyLineEdits, applyOptionalDdp, applyShipment, customsFromRpc, draftFromOrders, issuedQuantities, ordersFromCin7, withShipmentPence, type LineEdit } from "@/features/logistics/commercial-invoice/prepare";
-import { optionalDdpSchema, shipmentSchema } from "@/features/logistics/commercial-invoice/shipment-input";
+import { issueBodySchema, schemaIssuePaths } from "@/features/logistics/commercial-invoice/shipment-input";
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
 import { inspectPallets } from "@/features/logistics/commercial-invoice/pallets";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
@@ -14,29 +13,7 @@ import type { Cin7Quote } from "@/lib/cin7/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const bodySchema = z.object({
-  idempotencyKey: z.string().uuid(),
-  orderNumbers: z.array(z.string().max(40)).min(1).max(10),
-  incoterm: z.string().max(12),
-  namedPlace: z.string().max(200),
-  destinationCountry: z.string().max(8),
-  packages: z.number().int().positive(),
-  packageType: z.string().min(1).max(100),
-  grossWeightKg: z.number().finite().nonnegative().max(100000).optional(),
-  buyerVat: z.string().max(80).optional(),
-  buyerEori: z.string().max(80).optional(),
-  shipment: shipmentSchema.optional(),
-  ...optionalDdpSchema,
-  lines: z.array(z.object({
-    orderNumber: z.string(),
-    sku: z.string(),
-    lineId: z.string().min(1).max(80),
-    shippedQuantity: z.number().finite().nonnegative(),
-    hsCode: z.string(),
-    originCountry: z.string(),
-    unitWeightKg: z.number().finite().nonnegative().nullable(),
-  })).max(200),
-}).strict();
+const bodySchema = issueBodySchema;
 
 function mayOpenIssued(profile: Profile, issuedBy: string) {
   return issuedBy === profile.id || profile.role === "admin" || profile.workspace_role === "owner" || profile.workspace_role === "admin";
@@ -64,7 +41,7 @@ export async function POST(request: Request) {
   const gate = await requireLogisticsApi();
   if (gate.error || !gate.profile) return Response.json({ error: gate.error ?? "Sign in required." }, { status: gate.status });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "That invoice could not be read." }, { status: 400 });
+  if (!parsed.success) return Response.json({ error: "That invoice could not be read.", details: schemaIssuePaths(parsed.error) }, { status: 400 });
   const input = parsed.data;
   const admin = createAdminClient();
   if (!admin) return Response.json({ error: "That invoice could not be saved." }, { status: 500 });

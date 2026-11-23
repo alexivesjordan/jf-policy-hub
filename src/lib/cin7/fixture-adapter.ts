@@ -57,7 +57,7 @@ export const FIXTURE_QUOTES: Cin7Quote[] = [
     customerType: "proforma",
     postcode: "LS1 4DY",
     lines: [
-      { sku: "TREAD-TFT", productName: "Jordan Elite TFT treadmills", category: "cardio", qty: 3, lineNet: 9135 },
+      { sku: "TREAD-TFT", productName: "Jordan Elite TFT treadmills", category: "cardio", qty: 3, lineNet: 9135, hsCode: "9506919000", originCountry: "ES" },
       { sku: "RECUMBENT", productName: "Jordan Elite recumbent cardio bike", category: "cardio", qty: 1, lineNet: 1999 },
       { sku: "UPRIGHT", productName: "Jordan Elite upright cardio bike", category: "cardio", qty: 2, lineNet: 3757 },
       { sku: "AIRBIKE", productName: "Jordan Elite air bike - OEM unverified", category: "cardio", qty: 1, lineNet: 1115 },

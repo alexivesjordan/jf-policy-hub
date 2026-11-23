@@ -1,5 +1,7 @@
 import { resolveCin7LineNets } from "@/lib/cin7/line-nets";
 import { tilesPerPackFromProduct } from "@/lib/pricer/flooring";
+import { normaliseHsCode } from "@/features/logistics/commercial-invoice/rules";
+import { iso2FromIso3 } from "@/lib/iso3166";
 import { normaliseUkPostcode } from "@/lib/quotes/postcode";
 import type { Cin7Quote, Cin7QuoteLine } from "@/lib/cin7/types";
 
@@ -84,6 +86,8 @@ const COUNTRY_ISO: Record<string, string> = {
   holland: "NL",
   ireland: "IE",
   spain: "ES",
+  china: "CN",
+  taiwan: "TW",
   italy: "IT",
   belgium: "BE",
   greece: "GR",
@@ -103,7 +107,17 @@ function isoCountry(value: string | null) {
     const code = trimmed.toUpperCase();
     return code === "EL" ? "GR" : code;
   }
+  if (/^[A-Za-z]{3}$/.test(trimmed)) return iso2FromIso3(trimmed);
   return COUNTRY_ISO[trimmed.toLowerCase()] ?? null;
+}
+
+function productHsCode(product: Record<string, unknown>) {
+  const raw = text(product.HSCode);
+  return raw ? normaliseHsCode(raw) : null;
+}
+
+function productOrigin(product: Record<string, unknown>) {
+  return isoCountry(text(product.CountryOfOriginCode)) ?? isoCountry(text(product.CountryOfOrigin));
 }
 
 function billingAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
@@ -272,6 +286,8 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
       qty: amount(line.Quantity) ?? 0,
       lineNet: money.lineNets[index] ?? null,
       unitWeightKg: weightKg(product),
+      hsCode: productHsCode(product),
+      originCountry: productOrigin(product),
       length: amount(product.Length),
       width: amount(product.Width),
       height: amount(product.Height),

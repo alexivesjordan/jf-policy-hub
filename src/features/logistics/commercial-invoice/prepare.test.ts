@@ -24,6 +24,30 @@ function duplicateSkuSale(): Cin7Quote {
   };
 }
 
+describe("Cin7 line prefill", () => {
+  it("uses the Cin7 HS code and origin ahead of the saved customs row", () => {
+    const sale = duplicateSkuSale();
+    sale.lines[0] = { ...sale.lines[0]!, hsCode: "95069190", originCountry: "ES" };
+    const orders = ordersFromCin7([sale], [{ sku: "CI-DUP", hsCode: "111111", origin: "CN", netWeightKg: null }]);
+    expect(orders[0]?.lines[0]).toMatchObject({ hsCode: "9506919000", originCountry: "ES", shippedQuantity: 2 });
+    expect(orders[0]?.lines[1]).toMatchObject({ hsCode: "1111110000", originCountry: "CN", shippedQuantity: 3 });
+  });
+
+  it("prefills the remaining shipped quantity and floors a fully issued line at 0", () => {
+    const open = ordersFromCin7([duplicateSkuSale()], []);
+    expect(open[0]?.lines.map((line) => line.shippedQuantity)).toEqual([2, 3]);
+    const partial = ordersFromCin7([duplicateSkuSale()], [], [
+      { cin7SaleId: "sale-dup", sku: "CI-DUP", lineKey: "sale-dup:0", qty: 2 },
+      { cin7SaleId: "sale-dup", sku: "CI-DUP", lineKey: "sale-dup:1", qty: 1 },
+    ]);
+    expect(partial[0]?.lines.map((line) => line.shippedQuantity)).toEqual([0, 2]);
+    const otherSale = ordersFromCin7([duplicateSkuSale()], [], [
+      { cin7SaleId: "other-sale", sku: "CI-DUP", lineKey: "sale-dup:0", qty: 2 },
+    ]);
+    expect(otherSale[0]?.lines[0]?.shippedQuantity).toBe(2);
+  });
+});
+
 describe("duplicate SKU lines", () => {
   it("keeps a separate edit and amount on each sale line", () => {
     const orders = ordersFromCin7([duplicateSkuSale()], []);

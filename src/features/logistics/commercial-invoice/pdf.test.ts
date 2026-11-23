@@ -103,6 +103,36 @@ describe("commercial invoice PDF", () => {
     expect(text).toMatch(/SPECIAL INSTRUCTIONS/);
   });
 
+  it("prints a single line whose HS code and origin came from Cin7", async () => {
+    const { draft } = await planned(1);
+    const line = draft.lines[0]!;
+    line.sku = "JF-SFM-BLK-10-1200";
+    line.productName = "Studio functional machine";
+    line.orderedQuantity = 1;
+    line.shippedQuantity = 1;
+    line.hsCode = "9506919000";
+    line.originCountry = "ES";
+    line.unitWeightKg = 12;
+    line.lineNetPence = 1000;
+    line.unitNetValue = 10;
+    draft.netWeightKg = 12;
+    draft.grossWeightKg = 12;
+    draft.shipment = {
+      ...draft.shipment!,
+      palletLines: [{ lengthCm: 120, widthCm: 100, depthCm: 80, weightKg: 12 }],
+      pallets: 1,
+      customsStatementId: "none",
+      customsStatementText: "",
+      specialInstructions: "",
+    };
+    const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    expect(text).toMatch(/JF-SFM-BLK-10-1200/);
+    expect(text).toMatch(/9506919000/);
+    expect(text).toMatch(/Spain/);
+    await saveDraft("invoice-hs-origin.pdf", draft);
+  });
+
   it("renders a one-page invoice with the summary on that page", async () => {
     const { plan, text } = await pagesOf(1);
     expect(plan.map((page) => page.role)).toEqual(["first"]);

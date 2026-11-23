@@ -79,6 +79,8 @@ describe("Cin7 sale read", () => {
     assert.equal(quote.taxStripped, false);
     assert.deepEqual(quote.moneyFlags, []);
     assert.equal(quote.lines[0].unitWeightKg, 26);
+    assert.equal(quote.lines[0].hsCode, null);
+    assert.equal(quote.lines[0].originCountry, null);
     assert.equal(quote.lines[0].cin7Category, "Cardio");
     assert.equal(quote.lines[0].category, null);
     assert.equal(quote.lines[0].length, 120);
@@ -156,6 +158,23 @@ describe("Cin7 sale read", () => {
       "office.example@example.com",
     );
     assert.equal(orderContactEmail({ Email: "" }, { Email: "card.example@example.com", Contacts: [] }), "card.example@example.com");
+  });
+
+  it("maps the product HS code and origin onto the sale line", async () => {
+    const { get } = fixtureGet();
+    const withProduct = (fields: Record<string, unknown>): Cin7Getter => async (path, query) => {
+      const body = await get(path, query);
+      if (path !== "product" || !body || typeof body !== "object") return body;
+      const products = (body as { Products: Record<string, unknown>[] }).Products;
+      products[0] = { ...products[0], ...fields };
+      return { Products: products };
+    };
+    const named = await readCin7Sale("SO-00490", withProduct({ HSCode: "95069190", CountryOfOrigin: "Spain", CountryOfOriginCode: "ESP" }));
+    assert.equal(named?.lines[0].hsCode, "9506919000");
+    assert.equal(named?.lines[0].originCountry, "ES");
+    const coded = await readCin7Sale("SO-00490", withProduct({ HSCode: "9506.91", CountryOfOrigin: "", CountryOfOriginCode: "ESP" }));
+    assert.equal(coded?.lines[0].hsCode, "9506910000");
+    assert.equal(coded?.lines[0].originCountry, "ES");
   });
 
   it("ignores a weight that is not in kilograms", async () => {

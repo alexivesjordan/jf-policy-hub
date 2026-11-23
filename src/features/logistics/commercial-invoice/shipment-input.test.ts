@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { shipmentSchema } from "./shipment-input";
+import { commercialInvoiceBody, issueBodySchema, previewBodySchema, schemaIssuePaths, shipmentSchema } from "./shipment-input";
+import type { InvoiceDraft } from "./rules";
 
 describe("shipment input limits", () => {
   it("accepts an ISO despatch date and a real email", () => {
@@ -23,5 +24,85 @@ describe("shipment input limits", () => {
     expect(shipmentSchema.safeParse({ grossWeightKg: 100000 }).success).toBe(true);
     expect(shipmentSchema.safeParse({ grossWeightKg: 100001 }).success).toBe(false);
     expect(shipmentSchema.safeParse({ grossWeightKg: -1 }).success).toBe(false);
+  });
+
+  it("accepts the form payload for a one-line DAP invoice and rejects issuedAt", () => {
+    const draft: InvoiceDraft = {
+      reference: "PREVIEW",
+      issueDate: "2026-11-23",
+      currency: "GBP",
+      orders: ["SO-00819"],
+      seller: { name: "Jordan Fitness Ltd", address: "", vat: "", eori: "" },
+      buyer: { name: "Alpine Gym", address: "1 Road", vat: "", eori: "" },
+      consignee: { name: "Alpine Gym", address: "1 Road, Geneva", vat: "", eori: "" },
+      importer: { name: "", address: "", vat: "", eori: "" },
+      frenchVatNumber: "",
+      frenchFiscalRepresentativeVat: "",
+      ddpModel: "not_applicable",
+      carrier: "Other",
+      entryCountry: "",
+      clearanceCountry: "",
+      destinationCountry: "CH",
+      incoterm: "DAP",
+      namedPlace: "Geneva",
+      procedure: "unconfirmed",
+      approvedStatement: "",
+      statementApprovedBy: "",
+      reasonForExport: "Sale of goods",
+      packages: 1,
+      packageType: "Pallet",
+      netWeightKg: 12,
+      grossWeightKg: 12,
+      freightValue: 0,
+      insuranceValue: 0,
+      otherChargesValue: 0,
+      shipmentRef: "",
+      signatory: "Jordan Fitness Ltd",
+      notes: "",
+      physicalShipmentConfirmed: true,
+      lines: [{
+        id: "line-1",
+        orderNumber: "SO-00819",
+        sku: "JF-SFM-BLK-10-1200",
+        productName: "Studio functional machine",
+        orderedQuantity: 1,
+        shippedQuantity: 1,
+        unitNetValue: 10,
+        hsCode: "",
+        originCountry: "",
+        unitWeightKg: 12,
+      }],
+      shipment: {
+        fao: "",
+        courier: "",
+        despatchDate: "2026-11-23",
+        deliveryAddress: "1 Road, Geneva",
+        contactName: "",
+        contactEmail: "",
+        specialInstructions: "",
+        parcels: 1,
+        pallets: 0,
+        palletLines: [],
+        deliveryPence: 0,
+        surchargePence: 0,
+        vatPence: 0,
+        customsStatementId: "matched",
+        customsStatementText: "",
+        issuedAt: "2026-11-23T09:00:00.000Z",
+      },
+    };
+    const pallets = [{ lengthCm: 120, widthCm: 80, depthCm: 100, weightKg: 12 }];
+    const body = commercialInvoiceBody(draft, pallets, 1, 12);
+    expect(body.shipment).not.toHaveProperty("issuedAt");
+    expect(previewBodySchema.safeParse(body).success).toBe(true);
+    const issue = issueBodySchema.safeParse({ ...body, idempotencyKey: "00000000-0000-4000-8000-000000000001" });
+    expect(issue.success).toBe(true);
+    const leaked = previewBodySchema.safeParse({ ...body, shipment: { ...body.shipment, issuedAt: draft.shipment?.issuedAt } });
+    expect(leaked.success).toBe(false);
+    if (!leaked.success) {
+      const paths = schemaIssuePaths(leaked.error);
+      expect(paths).toContain("shipment.issuedAt");
+      expect(paths.join(" ")).not.toContain("2026-11-23T09:00:00.000Z");
+    }
   });
 });
