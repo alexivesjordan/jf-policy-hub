@@ -44,4 +44,64 @@ describe("Cin7 product customs fields", () => {
     const codeFirst = await readCin7Sale("SO-00819", getter({ CountryOfOrigin: "Spain", CountryOfOriginCode: "PAK" }));
     expect(codeFirst?.lines[0]?.originCountry).toBe("PK");
   });
+
+  it("prefills contact, FedEx, the delivery city and the tax number", async () => {
+    const quote = await readCin7Sale("SO-00819", async (path) => {
+      if (path === "saleList") return { SaleList: [{ SaleID: saleId, OrderNumber: "SO-00819", CustomerID: customerId }] };
+      if (path === "sale") {
+        return {
+          ID: saleId,
+          Customer: "NonStop Gym SA",
+          CustomerID: customerId,
+          Contact: "Johann",
+          Email: "cornavin@nonstopgym.com",
+          Carrier: "FEDI",
+          Currency: "CHF",
+          BillingAddress: { Line1: "Rue de Cornavin", City: "Genève", Country: "Switzerland" },
+          ShippingAddress: { Line1: "Rue de Cornavin", City: "Genève", Country: "Switzerland", Postcode: "1201" },
+          Order: {
+            SaleOrderNumber: "SO-00819",
+            Lines: [{ ID: "line-1", ProductID: productId, SKU: "JF-SFM-BLK-10-1200", Name: "Studio functional machine", Quantity: 1, Price: 10, Tax: 0, Total: 10 }],
+            TotalBeforeTax: 10, Tax: 0, Total: 10,
+          },
+        };
+      }
+      if (path === "product") return { Products: [{ ID: productId, SKU: "JF-SFM-BLK-10-1200", HSCode: "95069190", CountryOfOriginCode: "ESP", Weight: 12, WeightUnits: "kg" }] };
+      if (path === "customer") {
+        return {
+          CustomerList: [{
+            ID: customerId,
+            Name: "NonStop Gym SA",
+            TaxNumber: "CHE-123.456.789",
+            Carrier: "FedEx",
+            Contacts: [{ Name: "Office", Email: "office@nonstopgym.com", Default: true }],
+            Addresses: [],
+          }],
+        };
+      }
+      throw new Error("unexpected " + path);
+    });
+    expect(quote).toMatchObject({
+      contactName: "Johann",
+      contactEmail: "cornavin@nonstopgym.com",
+      courier: "FedEx",
+      deliveryCity: "Genève",
+      destinationCountry: "CH",
+      buyerVat: "CHE-123.456.789",
+    });
+    const fallback = await readCin7Sale("SO-00819", async (path) => {
+      if (path === "saleList") return { SaleList: [{ SaleID: saleId, OrderNumber: "SO-00819", CustomerID: customerId }] };
+      if (path === "sale") {
+        return {
+          ID: saleId, Customer: "NonStop Gym SA", CustomerID: customerId, Carrier: "ZZZZ", Currency: "CHF",
+          ShippingAddress: { Line1: "Rue de Cornavin", City: "Genève", Country: "Switzerland" },
+          Order: { SaleOrderNumber: "SO-00819", Lines: [{ ProductID: productId, SKU: "JF-SFM-BLK-10-1200", Name: "Machine", Quantity: 1, Total: 10 }], TotalBeforeTax: 10, Tax: 0, Total: 10 },
+        };
+      }
+      if (path === "product") return { Products: [{ ID: productId, SKU: "JF-SFM-BLK-10-1200" }] };
+      if (path === "customer") return { CustomerList: [{ ID: customerId, Name: "NonStop Gym SA", Carrier: "FedEx", Contacts: [{ Name: "Johann", Email: "cornavin@nonstopgym.com", Default: true }], Addresses: [] }] };
+      throw new Error("unexpected " + path);
+    });
+    expect(fallback).toMatchObject({ contactName: "Johann", contactEmail: "cornavin@nonstopgym.com", courier: "FedEx" });
+  });
 });

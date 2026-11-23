@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
-import { customsFromRpc, issuedQuantities, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
+import { buyerTaxFromHistory, customsFromRpc, issuedQuantities, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
 import { parseOrderNumbers } from "@/features/logistics/commercial-invoice/rules";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -55,5 +55,22 @@ export async function POST(request: Request) {
   const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: quotes.map((sale) => sale.id) });
   if (prior.error) return Response.json({ error: "Issued quantities could not be read." }, { status: 500 });
-  return Response.json({ orders: ordersFromCin7(quotes, customsFromRpc(customs.data), issuedQuantities(prior.data)) }, { headers: { "Cache-Control": "no-store" } });
+  const orders = ordersFromCin7(quotes, customsFromRpc(customs.data), issuedQuantities(prior.data));
+  const customerName = orders[0]?.buyer.name ?? "";
+  if (customerName) {
+    const history = await supabase.schema("logistics").from("commercial_invoices")
+      .select("buyer")
+      .eq("status", "issued")
+      .filter("buyer->>name", "eq", customerName)
+      .order("issued_at", { ascending: false })
+      .limit(5);
+    if (!history.error && Array.isArray(history.data)) {
+      const remembered = buyerTaxFromHistory(customerName, orders[0]?.buyer.vat ?? "", history.data.map((row) => {
+        const buyer = row.buyer as { name?: string; vat?: string; eori?: string } | null;
+        return { name: buyer?.name, vat: buyer?.vat, eori: buyer?.eori };
+      }));
+      if (orders[0]) orders[0].buyer = { ...orders[0].buyer, vat: remembered.vat, eori: remembered.eori };
+    }
+  }
+  return Response.json({ orders }, { headers: { "Cache-Control": "no-store" } });
 }

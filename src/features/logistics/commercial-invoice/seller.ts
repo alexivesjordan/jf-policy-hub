@@ -12,10 +12,11 @@ export const COMMERCIAL_INVOICE_SELLER = {
   companyNumber: "12798165",
 } as const;
 
-/** Optional marks. Leave the files absent until a real signature or stamp is supplied. */
+/** Declaration marks. Server files only; they are not served from /public. */
 export const COMMERCIAL_INVOICE_MARKS = {
-  signatureFile: "public/brand/commercial-invoice-signature.png",
-  stampFile: "public/brand/commercial-invoice-stamp.png",
+  signatureFile: "src/features/logistics/commercial-invoice/assets/signature.png",
+  printedNameFile: "src/features/logistics/commercial-invoice/assets/printed-name.png",
+  stampFile: "src/features/logistics/commercial-invoice/assets/stamp.png",
 } as const;
 
 export const CUSTOMS_STATEMENTS = [
