@@ -5,6 +5,7 @@ import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoi
 import { inspectPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
 import { matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
+import { commercialInvoiceBody } from "@/features/logistics/commercial-invoice/shipment-input";
 import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
 
 type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string };
@@ -120,38 +121,7 @@ export function CommercialInvoiceWorkspace() {
   function payload() {
     if (!draft) return null;
     const pallets = enteredPallets();
-    return {
-      orderNumbers: draft.orders,
-      incoterm: draft.incoterm,
-      namedPlace: draft.namedPlace,
-      destinationCountry: draft.destinationCountry,
-      packages: draft.packages,
-      packageType: draft.packageType,
-      grossWeightKg: palletGrossKg(pallets.pallets),
-      buyerVat: draft.buyer.vat,
-      buyerEori: draft.buyer.eori,
-      shipment: { ...draft.shipment, palletLines: rawPallets(), pallets: pallets.pallets.length },
-      ...(draft.incoterm === "DDP" ? {
-        importerName: draft.importer.name,
-        importerAddress: draft.importer.address,
-        importerVat: draft.importer.vat,
-        importerEori: draft.importer.eori,
-        clearanceCountry: draft.clearanceCountry,
-        procedure: draft.procedure,
-        ddpModel: draft.ddpModel,
-        frenchVatNumber: draft.frenchVatNumber,
-        statementApprovedBy: draft.statementApprovedBy,
-      } : {}),
-      lines: draft.lines.map((line) => ({
-        lineId: line.id,
-        orderNumber: line.orderNumber,
-        sku: line.sku,
-        shippedQuantity: line.shippedQuantity,
-        hsCode: line.hsCode,
-        originCountry: line.originCountry,
-        unitWeightKg: line.unitWeightKg,
-      })),
-    };
+    return commercialInvoiceBody(draft, rawPallets(), pallets.pallets.length, palletGrossKg(pallets.pallets));
   }
 
   async function preview() {
