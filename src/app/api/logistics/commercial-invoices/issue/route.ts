@@ -120,7 +120,6 @@ export async function POST(request: Request) {
       ? matchCustomsStatement(rules, { incoterm: input.incoterm, destinationCountry: input.destinationCountry, carrier: input.shipment?.courier ?? "" })
       : input.shipment?.customsStatementText ?? "",
   });
-  if (statement.error) return Response.json({ error: statement.error }, { status: 422 });
   let draft;
   try {
     draft = applyOptionalDdp(applyShipment(withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data)), {

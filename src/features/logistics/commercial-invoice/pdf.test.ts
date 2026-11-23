@@ -5,6 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { extractText } from "unpdf";
 import { DDP_FISCAL_STATEMENTS } from "./ddp-statements";
+import { applyBuyerVat } from "./statements";
 import { applyShipment, draftFromOrders } from "./prepare";
 import { commercialInvoicePageRoom, commercialInvoiceTrio, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
 import type { InvoiceOrder } from "./rules";
@@ -106,7 +107,8 @@ describe("commercial invoice PDF", () => {
 
   it("prints a multi-line DDP statement without a blank line between every row", async () => {
     const eu = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "EU")!.text;
-    const nl = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "NL")!.text.replaceAll("{buyerVat}", "NL863876584B01");
+    const nlSource = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "NL")!.text;
+    const nl = applyBuyerVat(nlSource, "NL863876584B01");
     const german = draftFor(1);
     german.incoterm = "DDP";
     german.destinationCountry = "DE";
@@ -133,7 +135,16 @@ describe("commercial invoice PDF", () => {
     expect(dutchText).toMatch(/Dutch VAT law/);
     expect(dutchText).not.toMatch(/\{buyerVat\}/);
     expect(plainText).not.toMatch(/CUSTOMS STATEMENT/);
+    const blankDutch = draftFor(1);
+    blankDutch.incoterm = "DDP";
+    blankDutch.destinationCountry = "NL";
+    blankDutch.buyer.vat = "";
+    blankDutch.shipment = { ...blankDutch.shipment!, customsStatementId: "matched", customsStatementText: applyBuyerVat(nlSource, "") };
+    const blankText = await read(blankDutch);
+    expect(blankText).toMatch(/Dutch VAT law/);
+    expect(blankText).not.toMatch(/\{buyerVat\}|\(\s*\)/);
     await saveDraft("invoice-nl.pdf", dutch);
+    await saveDraft("invoice-nl-blank.pdf", blankDutch);
     await saveDraft("invoice-de.pdf", german);
   });
 

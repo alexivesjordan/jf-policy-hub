@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
 import { inspectPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
-import { matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
+import { applyBuyerVat, matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
 import { commercialInvoiceBody } from "@/features/logistics/commercial-invoice/shipment-input";
 import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
 
@@ -210,7 +210,7 @@ export function CommercialInvoiceWorkspace() {
   const net = draft ? summedNetWeightKg(draft.lines) : 0;
   const shipment = draft?.shipment;
   const gross = palletGrossKg(enteredPallets().pallets);
-  const suggested = draft ? matchCustomsStatement(rules, { incoterm: draft.incoterm, destinationCountry: draft.destinationCountry, carrier: shipment?.courier ?? "" }) : "";
+  const suggested = draft ? applyBuyerVat(matchCustomsStatement(rules, { incoterm: draft.incoterm, destinationCountry: draft.destinationCountry, carrier: shipment?.courier ?? "" }), draft.buyer.vat) : "";
   return (
     <div className="space-y-6">
       <section className="space-y-3 rounded-3xl border border-line bg-card p-5">

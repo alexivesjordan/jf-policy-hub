@@ -70,10 +70,26 @@ export function matchCustomsStatement(rules: StatementRule[], input: { incoterm:
   return found[0] ? statementRuleText(found[0]) : "";
 }
 
+/** Puts the Buyer VAT into `{buyerVat}`. A blank VAT drops the placeholder and the brackets or comma wrapped around it. */
+export function applyBuyerVat(text: string, buyerVat: string) {
+  const vat = buyerVat.trim();
+  if (!text.includes("{buyerVat}")) return text;
+  if (vat) return text.replaceAll("{buyerVat}", vat);
+  return text
+    .replace(/[ \t]*\([ \t]*\{buyerVat\}[ \t]*\)/g, "")
+    .replace(/,[ \t]*\{buyerVat\}/g, "")
+    .replace(/\{buyerVat\}[ \t]*,[ \t]*/g, "")
+    .replace(/[ \t]?\{buyerVat\}/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.;:])/g, "$1")
+    .replace(/[ \t]+\)/g, ")")
+    .replace(/\([ \t]+/g, "(")
+    .replace(/\(\)/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
 export function prepareCustomsStatement(input: { incoterm: string; statementId: string; text: string; buyerVat: string }) {
-  if (input.incoterm.trim().toUpperCase() !== "DDP") return { id: "none", text: "", error: "" };
-  if (input.text.includes("{buyerVat}") && !input.buyerVat.trim()) {
-    return { id: input.statementId, text: input.text, error: "Buyer VAT is required for this customs statement." };
-  }
-  return { id: input.statementId, text: input.text.replaceAll("{buyerVat}", input.buyerVat.trim()), error: "" };
+  if (input.incoterm.trim().toUpperCase() !== "DDP") return { id: "none", text: "" };
+  return { id: input.statementId, text: applyBuyerVat(input.text, input.buyerVat) };
 }
