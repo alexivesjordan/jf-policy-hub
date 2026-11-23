@@ -255,7 +255,16 @@ export function CommercialInvoiceWorkspace() {
           <p className="text-sm">{draft.currency} · {draft.destinationCountry}</p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="text-sm font-semibold">Incoterm
-              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.incoterm} onChange={(event) => setDraft({ ...draft, incoterm: event.currentTarget.value })}>
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.incoterm} onChange={(event) => {
+                const incoterm = event.currentTarget.value;
+                setDraft({
+                  ...draft,
+                  incoterm,
+                  shipment: draft.shipment && incoterm !== "DDP"
+                    ? { ...draft.shipment, customsStatementId: "none", customsStatementText: "" }
+                    : draft.shipment,
+                });
+              }}>
                 {TERMS.map((term) => <option key={term}>{term}</option>)}
               </select>
             </label>
@@ -345,6 +354,7 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">VAT
               <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.vatPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ vatPence: Math.round(Number(event.currentTarget.value) * 100) })} />
             </label>
+            {draft.incoterm === "DDP" ? (
             <label className="text-sm font-semibold">Customs statement
               <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.customsStatementId ?? "matched"} onChange={(event) => patchShipment({ customsStatementId: event.currentTarget.value })}>
                 <option value="matched">Suggested</option>
@@ -352,8 +362,9 @@ export function CommercialInvoiceWorkspace() {
                 <option value="none">None</option>
               </select>
             </label>
-            {shipment?.customsStatementId === "matched" ? <p className="text-sm md:col-span-2">{suggested || "None"}</p> : null}
-            {shipment?.customsStatementId === "custom" ? (
+            ) : <p className="text-sm font-semibold">Customs statement: None</p>}
+            {draft.incoterm === "DDP" && shipment?.customsStatementId === "matched" ? <p className="text-sm md:col-span-2">{suggested || "None"}</p> : null}
+            {draft.incoterm === "DDP" && shipment?.customsStatementId === "custom" ? (
               <label className="text-sm font-semibold md:col-span-2">Statement
                 <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment.customsStatementText} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
               </label>

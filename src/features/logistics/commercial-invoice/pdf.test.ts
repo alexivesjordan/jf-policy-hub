@@ -4,6 +4,7 @@ import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { extractText } from "unpdf";
+import { DDP_FISCAL_STATEMENTS } from "./ddp-statements";
 import { applyShipment, draftFromOrders } from "./prepare";
 import { commercialInvoicePageRoom, commercialInvoiceTrio, planCommercialInvoice, renderCommercialInvoicePdf, type InvoicePageRole } from "./pdf";
 import type { InvoiceOrder } from "./rules";
@@ -101,6 +102,39 @@ describe("commercial invoice PDF", () => {
     const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
     expect(text).toMatch(/Tail lift required/);
     expect(text).toMatch(/SPECIAL INSTRUCTIONS/);
+  });
+
+  it("prints a multi-line DDP statement without a blank line between every row", async () => {
+    const eu = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "EU")!.text;
+    const nl = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "NL")!.text.replaceAll("{buyerVat}", "NL863876584B01");
+    const german = draftFor(1);
+    german.incoterm = "DDP";
+    german.destinationCountry = "DE";
+    german.shipment = { ...german.shipment!, customsStatementId: "matched", customsStatementText: eu };
+    const dutch = draftFor(1);
+    dutch.incoterm = "DDP";
+    dutch.destinationCountry = "NL";
+    dutch.buyer.vat = "NL863876584B01";
+    dutch.shipment = { ...dutch.shipment!, customsStatementId: "matched", customsStatementText: nl };
+    const plain = draftFor(1);
+    plain.shipment = { ...plain.shipment!, customsStatementId: "none", customsStatementText: "" };
+    const read = async (draft: ReturnType<typeof draftFor>) => {
+      const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+      return Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    };
+    const germanText = await read(german);
+    const dutchText = await read(dutch);
+    const plainText = await read(plain);
+    expect(germanText).toMatch(/Europa Road/);
+    expect(germanText).toMatch(/FRZS 8888 63388/);
+    expect(germanText).toMatch(/Article 138 EU VAT Directive/);
+    expect(germanText).not.toMatch(/Europa Road\s*\n\s*\n\s*Cleared into EU Free Circulation/);
+    expect(dutchText).toMatch(/NL863876584B01/);
+    expect(dutchText).toMatch(/Dutch VAT law/);
+    expect(dutchText).not.toMatch(/\{buyerVat\}/);
+    expect(plainText).not.toMatch(/CUSTOMS STATEMENT/);
+    await saveDraft("invoice-nl.pdf", dutch);
+    await saveDraft("invoice-de.pdf", german);
   });
 
   it("prints a single line whose HS code and origin came from Cin7", async () => {

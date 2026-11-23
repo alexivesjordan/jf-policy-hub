@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { originSummary } from "./origin";
 import { acceptedPallets, inspectPallets, palletGrossKg, palletProblems } from "./pallets";
-import { matchCustomsStatement, type StatementRule } from "./statements";
+import { DDP_FISCAL_STATEMENTS } from "./ddp-statements";
+import { matchCustomsStatement, prepareCustomsStatement, type StatementRule } from "./statements";
+import { readFileSync } from "node:fs";
 
 const ddp: StatementRule = {
   incoterm: "DDP",
@@ -69,5 +71,50 @@ describe("commercial invoice origins, pallets and statements", () => {
     const france: StatementRule = { ...ddp, destinationCountry: "FR", priority: 1, statementText: "France", extraLine: null };
     const europe: StatementRule = { ...ddp, priority: 5 };
     expect(matchCustomsStatement([europe, france], { incoterm: "DDP", destinationCountry: "FR", carrier: "" })).toBe("France");
+  });
+
+  it("matches only a DDP rule, and only when the shipment is DDP", () => {
+    const seeded: StatementRule[] = DDP_FISCAL_STATEMENTS.map((rule) => ({
+      incoterm: "DDP",
+      destinationCountry: rule.destinationCountry,
+      carrier: null,
+      statementText: rule.text,
+      extraLine: null,
+      priority: rule.priority,
+      active: true,
+    }));
+    const open: StatementRule = { incoterm: null, destinationCountry: "EU", carrier: null, statementText: "Any incoterm", extraLine: null, priority: 100, active: true };
+    const exw: StatementRule = { incoterm: "EXW", destinationCountry: "BE", carrier: null, statementText: "Ex works", extraLine: null, priority: 100, active: true };
+    const rules = [...seeded, open, exw];
+    const be = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "BE")!.text;
+    const eu = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "EU")!.text;
+    const nl = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "NL")!.text;
+    for (const country of ["BE", "LU", "NL", "IE", "FR"]) {
+      const expected = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === country)!.text;
+      expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: country, carrier: "" })).toBe(expected);
+      expect(matchCustomsStatement(rules, { incoterm: "EXW", destinationCountry: country, carrier: "" })).toBe("");
+      expect(matchCustomsStatement(rules, { incoterm: "DAP", destinationCountry: country, carrier: "" })).toBe("");
+    }
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "DE", carrier: "" })).toBe(eu);
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "CH", carrier: "" })).toBe("");
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "BE", carrier: "" })).toBe(be);
+    expect(matchCustomsStatement([open, exw], { incoterm: "DDP", destinationCountry: "BE", carrier: "" })).toBe("");
+    const prepared = prepareCustomsStatement({ incoterm: "DDP", statementId: "matched", text: nl, buyerVat: "NL123456789B01" });
+    expect(prepared.error).toBe("");
+    expect(prepared.text).toContain("NL123456789B01");
+    expect(prepared.text).not.toContain("{buyerVat}");
+    expect(prepareCustomsStatement({ incoterm: "DDP", statementId: "matched", text: nl, buyerVat: "  " }).error).toBe("Buyer VAT is required for this customs statement.");
+    expect(prepareCustomsStatement({ incoterm: "DAP", statementId: "matched", text: be, buyerVat: "" })).toEqual({ id: "none", text: "", error: "" });
+    const migration = readFileSync("supabase/migrations/20261123160000_logistics_ddp_fiscal_statements.sql", "utf8");
+    const rollback = readFileSync("supabase/release/r3/ddp-fiscal-statements-rollback.sql", "utf8");
+    for (const rule of DDP_FISCAL_STATEMENTS) {
+      expect(rule.text.length).toBeGreaterThan(0);
+      expect(rule.text.length).toBeLessThanOrEqual(2000);
+      expect(migration).toContain(rule.id);
+      expect(migration).toContain(rule.text);
+      expect(rollback).toContain(rule.id);
+    }
+    expect(migration).toContain("FRZS 8888 63388");
+    expect(migration).not.toMatch(/update logistics\.customs_statement_rules/i);
   });
 });

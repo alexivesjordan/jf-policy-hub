@@ -32,7 +32,8 @@ function otherFields(rule: StatementRule) {
 
 function matches(rule: StatementRule, input: { incoterm: string; destinationCountry: string; carrier: string }) {
   if (!rule.active) return false;
-  if (filled(rule.incoterm) && rule.incoterm!.trim().toUpperCase() !== input.incoterm.trim().toUpperCase()) return false;
+  if (input.incoterm.trim().toUpperCase() !== "DDP") return false;
+  if (rule.incoterm?.trim().toUpperCase() !== "DDP") return false;
   if (filled(rule.carrier) && rule.carrier!.trim().toLowerCase() !== input.carrier.trim().toLowerCase()) return false;
   if (!filled(rule.destinationCountry)) return true;
   const destination = rule.destinationCountry!.trim().toUpperCase();
@@ -67,4 +68,12 @@ export function matchCustomsStatement(rules: StatementRule[], input: { incoterm:
     || otherFields(b) - otherFields(a)
     || b.priority - a.priority);
   return found[0] ? statementRuleText(found[0]) : "";
+}
+
+export function prepareCustomsStatement(input: { incoterm: string; statementId: string; text: string; buyerVat: string }) {
+  if (input.incoterm.trim().toUpperCase() !== "DDP") return { id: "none", text: "", error: "" };
+  if (input.text.includes("{buyerVat}") && !input.buyerVat.trim()) {
+    return { id: input.statementId, text: input.text, error: "Buyer VAT is required for this customs statement." };
+  }
+  return { id: input.statementId, text: input.text.replaceAll("{buyerVat}", input.buyerVat.trim()), error: "" };
 }

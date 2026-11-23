@@ -208,14 +208,17 @@ type SummaryMetrics = {
 };
 
 function boxedLines(text: string, font: PDFFont, width: number) {
-  const source = text.trim();
+  const source = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
   if (!source) return [];
   const lines: string[] = [];
-  source.split("\n").forEach((part, index) => {
-    if (index) lines.push("");
+  for (const part of source.split("\n")) {
+    if (!part.trim()) {
+      lines.push("");
+      continue;
+    }
     const wrapped = wrap(part, font, BODY, width);
     lines.push(...(wrapped.length ? wrapped : [""]));
-  });
+  }
   return lines;
 }
 
