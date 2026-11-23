@@ -6,7 +6,7 @@ import { inspectPallets, palletGrossKg } from "@/features/logistics/commercial-i
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
 import { matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
 import { commercialInvoiceBody } from "@/features/logistics/commercial-invoice/shipment-input";
-import { goodsTotal, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
+import { countryChoices, goodsTotal, incotermPlace, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
 
 type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string };
 const emptyPallet = (): PalletInput => ({ lengthCm: "", widthCm: "", depthCm: "", weightKg: "" });
@@ -61,7 +61,8 @@ export function CommercialInvoiceWorkspace() {
         clearanceCountry: "",
         destinationCountry: found[0]?.country ?? "",
         incoterm: "DAP",
-        namedPlace: "",
+        namedPlace: incotermPlace(found[0]?.deliveryCity ?? "", found[0]?.country ?? ""),
+        deliveryCity: found[0]?.deliveryCity ?? "",
         procedure: "unconfirmed",
         approvedStatement: "",
         statementApprovedBy: "",
@@ -80,11 +81,11 @@ export function CommercialInvoiceWorkspace() {
         lines: found.flatMap((order) => order.lines),
         shipment: {
           fao: "",
-          courier: "",
           despatchDate: new Date().toISOString().slice(0, 10),
           deliveryAddress: found[0]?.consignee.address ?? "",
-          contactName: "",
-          contactEmail: "",
+          contactName: found[0]?.contactName ?? "",
+          contactEmail: found[0]?.contactEmail ?? "",
+          courier: found[0]?.courier ?? "",
           specialInstructions: [...new Set(found.map((order) => order.specialInstructions?.trim()).filter((note): note is string => Boolean(note)))].join("\n"),
           parcels: 1,
           pallets: 0,
@@ -259,9 +260,15 @@ export function CommercialInvoiceWorkspace() {
                 {TERMS.map((term) => <option key={term}>{term}</option>)}
               </select>
             </label>
-            <label className="text-sm font-semibold">Named place
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.namedPlace} onChange={(event) => setDraft({ ...draft, namedPlace: event.currentTarget.value })} />
+            <label className="text-sm font-semibold">Destination country
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.destinationCountry} onChange={(event) => {
+                const destinationCountry = event.currentTarget.value;
+                setDraft({ ...draft, destinationCountry, namedPlace: incotermPlace(draft.deliveryCity ?? "", destinationCountry) });
+              }}>
+                {countryChoices().map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
+              </select>
             </label>
+            <p className="self-end text-sm">Incoterms place: {draft.namedPlace || "—"}</p>
             {draft.incoterm === "DDP" ? (
               <>
                 <label className="text-sm font-semibold">Importer name

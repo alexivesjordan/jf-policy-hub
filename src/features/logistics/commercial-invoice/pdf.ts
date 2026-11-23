@@ -66,6 +66,17 @@ function dmy(iso: string) {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : iso;
 }
 
+function londonDay(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return get("day") + "/" + get("month") + "/" + get("year");
+}
+
 function printedStamp(iso: string) {
   const date = new Date(iso);
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -519,6 +530,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const bold = await pdf.embedFont(await readFile(path.join(fontDir, "NotoSans-Bold.ttf")), { subset: true });
   const logo = await pdf.embedPng(await readFile(path.join(process.cwd(), "public/brand/jordan-wordmark.png")));
   const signature = await optionalImage(pdf, COMMERCIAL_INVOICE_MARKS.signatureFile);
+  const printedName = await optionalImage(pdf, COMMERCIAL_INVOICE_MARKS.printedNameFile);
   const stamp = await optionalImage(pdf, COMMERCIAL_INVOICE_MARKS.stampFile);
   const plan = planCommercialInvoice(draft, regular);
   const rows = measure(shippedLines(draft), regular);
@@ -789,7 +801,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         panel(box.x, top, box.w, box.h, titles[index]!);
         if (index === 1) {
           const labels = exportLabels();
-          const values = [metrics.originLines, ["United Kingdom"], [draft.incoterm]];
+          const values = [metrics.originLines, ["United Kingdom"], [draft.namedPlace ? draft.incoterm + " " + draft.namedPlace : draft.incoterm]];
           const labelW = Math.max(...labels.map((label) => regular.widthOfTextAtSize(label, BODY)));
           const valueX = box.x + PAD + labelW + 8;
           let y = top - STRIP - LEAD;
@@ -821,14 +833,38 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       const labelW = Math.max(...labels.map((label) => regular.widthOfTextAtSize(label, BODY)));
       const lineStart = MARGIN + PAD + labelW + 8;
       const lineEnd = split - PAD;
+      const lineSpan = lineEnd - lineStart - 4;
+      const fit = (image: { width: number; height: number }, maxW: number, maxH: number) => {
+        const scale = Math.min(maxW / image.width, maxH / image.height);
+        return { width: image.width * scale, height: image.height * scale };
+      };
+      const raised = preview ? londonDay(new Date()) : dmy(draft.issueDate);
       labels.forEach((label, index) => {
         const y = top - STRIP - 18 - index * 22;
         text(page, label, MARGIN + PAD, y, BODY, regular);
         page.drawLine({ start: { x: lineStart, y: y - 1 }, end: { x: lineEnd, y: y - 1 }, thickness: 0.4, color: line });
+        if (index === 0 && signature) {
+          const size = fit(signature, Math.min(90, lineSpan), 20);
+          page.drawImage(signature, { x: lineStart, y: y - 2, width: size.width, height: size.height });
+        }
+        if (index === 1 && printedName) {
+          const size = fit(printedName, Math.min(120, lineSpan), 16);
+          page.drawImage(printedName, { x: lineStart, y: y - 2, width: size.width, height: size.height });
+        }
+        if (index === 2) text(page, raised, lineStart + 2, y, BODY, regular);
       });
-      if (signature) page.drawImage(signature, { x: MARGIN + 58, y: top - STRIP - 28, width: 80, height: 22 });
-      text(page, "Company stamp", split + 12, top - STRIP - 16, BODY, regular, grey);
-      if (stamp) page.drawImage(stamp, { x: split + 16, y: top - DECLARATION_H + 12, width: 126, height: 40 });
+      if (stamp) {
+        const areaW = CONTENT_W / 3;
+        const size = fit(stamp, areaW - 20, DECLARATION_H - STRIP - 10);
+        page.drawImage(stamp, {
+          x: split + (areaW - size.width) / 2,
+          y: top - DECLARATION_H + 8,
+          width: size.width,
+          height: size.height,
+        });
+      } else {
+        text(page, "Company stamp", split + 12, top - STRIP - 16, BODY, regular, grey);
+      }
       cursor -= DECLARATION_H;
     };
     item.pieces.forEach((piece) => {

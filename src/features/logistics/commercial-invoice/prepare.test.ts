@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyLineEdits, ordersFromCin7, withShipmentPence } from "./prepare";
+import { applyLineEdits, buyerTaxFromHistory, ordersFromCin7, withShipmentPence } from "./prepare";
+import { incotermPlace, validateCommercialInvoice, mergeInvoiceOrders } from "./rules";
 import { clientError } from "./errors";
 import type { Cin7Quote } from "@/lib/cin7/types";
 import { COMMERCIAL_INVOICE_SELLER } from "./seller";
-import { mergeInvoiceOrders } from "./rules";
 
 function duplicateSkuSale(): Cin7Quote {
   return {
@@ -45,6 +45,68 @@ describe("Cin7 line prefill", () => {
       { cin7SaleId: "other-sale", sku: "CI-DUP", lineKey: "sale-dup:0", qty: 2 },
     ]);
     expect(otherSale[0]?.lines[0]?.shippedQuantity).toBe(2);
+  });
+});
+
+describe("shipment defaults", () => {
+  it("builds the Incoterms place from the delivery city and country", () => {
+    expect(incotermPlace("Genève", "CH")).toBe("Genève, Switzerland");
+    expect(incotermPlace("", "CH")).toBe("Switzerland");
+  });
+
+  it("uses the Cin7 tax number, then the last issued invoice for that customer", () => {
+    const history = [
+      { name: "Other Gym", vat: "GB999", eori: "GB999" },
+      { name: "NonStop Gym SA", vat: "CHE-OLD", eori: "CHE-EORI" },
+    ];
+    expect(buyerTaxFromHistory("NonStop Gym SA", "CHE-123", history)).toEqual({ vat: "CHE-123", eori: "CHE-EORI" });
+    expect(buyerTaxFromHistory("NonStop Gym SA", "", history)).toEqual({ vat: "CHE-OLD", eori: "CHE-EORI" });
+    expect(buyerTaxFromHistory("Nobody", "", history)).toEqual({ vat: "", eori: "" });
+  });
+
+  it("copies contact, courier and tax number onto the order", () => {
+    const sale = duplicateSkuSale();
+    sale.contactName = "Johann";
+    sale.contactEmail = "cornavin@nonstopgym.com";
+    sale.courier = "FedEx";
+    sale.deliveryCity = "Genève";
+    sale.buyerVat = "CHE-123";
+    sale.destinationCountry = "CH";
+    const order = ordersFromCin7([sale], [])[0]!;
+    expect(order.contactName).toBe("Johann");
+    expect(order.courier).toBe("FedEx");
+    expect(order.deliveryCity).toBe("Genève");
+    expect(order.buyer.vat).toBe("CHE-123");
+    expect(incotermPlace(order.deliveryCity ?? "", order.country)).toBe("Genève, Switzerland");
+  });
+
+  it("does not require buyer VAT for a Swiss DAP shipment", () => {
+    const sale = duplicateSkuSale();
+    sale.destinationCountry = "CH";
+    sale.buyerAddress = "Rue de Cornavin, Genève";
+    sale.consigneeAddress = "Rue de Cornavin, Genève";
+    const orders = ordersFromCin7([sale], []);
+    const draft = mergeInvoiceOrders(orders, {
+      name: COMMERCIAL_INVOICE_SELLER.name,
+      address: COMMERCIAL_INVOICE_SELLER.address,
+      vat: COMMERCIAL_INVOICE_SELLER.vat,
+      eori: COMMERCIAL_INVOICE_SELLER.eoriGb,
+    });
+    draft.reference = "CI-1";
+    draft.issueDate = "2026-11-23";
+    draft.incoterm = "DAP";
+    draft.namedPlace = "Genève, Switzerland";
+    draft.destinationCountry = "CH";
+    draft.procedure = "unconfirmed";
+    draft.packages = 1;
+    draft.packageType = "Pallet";
+    draft.netWeightKg = 2;
+    draft.grossWeightKg = 3;
+    draft.signatory = "Jordan Fitness Ltd";
+    draft.physicalShipmentConfirmed = true;
+    draft.lines[0]!.shippedQuantity = 1;
+    draft.lines[0]!.unitWeightKg = 2;
+    expect(validateCommercialInvoice(draft).join(" ")).not.toMatch(/buyer VAT/i);
   });
 });
 

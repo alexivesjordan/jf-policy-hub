@@ -1,7 +1,7 @@
 import { palletGrossKg } from "./pallets";
 import { COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
-  isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
+  incotermPlace, isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
   type CustomsProcedure, type EuropaDdpModel, type GoodsLine, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment,
 } from "./rules";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -12,6 +12,15 @@ function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
   return null;
+}
+
+export function buyerTaxFromHistory(customerName: string, taxNumber: string, history: { name?: string | null; vat?: string | null; eori?: string | null }[]) {
+  const wanted = customerName.trim().toLowerCase();
+  const prior = history.find((row) => (row.name ?? "").trim().toLowerCase() === wanted && Boolean(row.vat?.trim() || row.eori?.trim()));
+  return {
+    vat: taxNumber.trim() || prior?.vat?.trim() || "",
+    eori: prior?.eori?.trim() || "",
+  };
 }
 
 export function issuedQuantities(data: unknown): IssuedQuantity[] {
@@ -58,12 +67,16 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[], alrea
     return {
       id: sale.id,
       orderNumber: sale.number,
-      buyer: { name: sale.customerName, address: sale.buyerAddress ?? "", vat: "", eori: "" },
+      buyer: { name: sale.customerName, address: sale.buyerAddress ?? "", vat: sale.buyerVat?.trim() ?? "", eori: "" },
       consignee: { name: sale.customerName, address: sale.consigneeAddress ?? sale.buyerAddress ?? "", vat: "", eori: "" },
       country: sale.destinationCountry ?? "",
       currency: sale.currency ?? "",
       warnings: [],
       specialInstructions: sale.specialInstructions ?? "",
+      contactName: sale.contactName ?? "",
+      contactEmail: sale.contactEmail ?? "",
+      courier: sale.courier ?? "",
+      deliveryCity: sale.deliveryCity ?? "",
       deliveryPence: Math.round((sale.additionalCharges ?? [])
         .filter((charge) => /\b(freight|delivery|carriage|shipping)\b/i.test(charge.description))
         .reduce((sum, charge) => sum + charge.amountNet, 0) * 100),
@@ -133,11 +146,11 @@ export function draftFromOrders(orders: InvoiceOrder[], input: { incoterm: strin
   const deliveryPence = orders.reduce((sum, order) => sum + (order.deliveryPence ?? 0), 0);
   draft.shipment = {
     fao: "",
-    courier: "",
     despatchDate: draft.issueDate,
     deliveryAddress: draft.consignee.address,
-    contactName: "",
-    contactEmail: "",
+    contactName: orders.find((order) => order.contactName)?.contactName ?? "",
+    contactEmail: orders.find((order) => order.contactEmail)?.contactEmail ?? "",
+    courier: orders.find((order) => order.courier)?.courier ?? "",
     specialInstructions: [...new Set(orders.map((order) => order.specialInstructions?.trim()).filter((note): note is string => Boolean(note)))].join("\n"),
     parcels: input.packages,
     pallets: 0,
