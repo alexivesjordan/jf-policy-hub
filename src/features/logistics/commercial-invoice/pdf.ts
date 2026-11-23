@@ -205,7 +205,7 @@ const LEAD = 12;
 const STRIP = 16;
 const PAD = 8;
 const GAP = 6;
-const DECLARATION_H = 96;
+const DECLARATION_H = 136;
 const PANEL_BORDER = rgb(0.62, 0.62, 0.62);
 const PANEL_FILL = rgb(0.94, 0.94, 0.94);
 
@@ -213,7 +213,7 @@ type SummaryMetrics = {
   dimRows: number;
   noteLines: string[];
   statementLines: string[];
-  originLines: string[];
+  exportRows: string[][];
   trioH: number;
   total: number;
 };
@@ -254,8 +254,14 @@ function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
   const statement = resolveCustomsStatement(shipment.customsStatementId, shipment.customsStatementText) || shipment.customsStatementText;
   const statementLines = boxedLines(statement, font, inner);
   const boxW = (CONTENT_W - GAP * 2) / 3;
-  const originLines = wrap(originSummary(shippedLines(draft)) || "—", font, BODY, exportValueWidth(boxW, font));
-  const trioLines = Math.max(4, originLines.length + 2, 6);
+  const valueWidth = exportValueWidth(boxW, font);
+  const incoterms = draft.namedPlace.trim() ? draft.incoterm + " " + draft.namedPlace.trim() : draft.incoterm;
+  const exportRows = [originSummary(shippedLines(draft)) || "—", "United Kingdom", incoterms]
+    .map((value) => {
+      const lines = wrap(value, font, BODY, valueWidth);
+      return lines.length ? lines : ["—"];
+    });
+  const trioLines = Math.max(4, exportRows.reduce((count, lines) => count + lines.length, 0), 6);
   const trioH = linesBox(trioLines);
   const dimRows = shipment.palletLines.length ? shipment.palletLines.length + 1 : 0;
   const notesH = noteLines.length ? linesBox(noteLines.length) + GAP : 0;
@@ -265,7 +271,7 @@ function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
     dimRows,
     noteLines,
     statementLines,
-    originLines: originLines.length ? originLines : ["—"],
+    exportRows,
     trioH,
     total: notesH + dimsH + trioH + GAP + statementH + DECLARATION_H,
   };
@@ -553,7 +559,7 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
   const footer = (page: PDFPage, index: number) => {
     text(page, "VAT Registration No: " + COMMERCIAL_INVOICE_SELLER.vat.replace(/^GB/, ""), MARGIN, 30, 8, regular);
     text(page, "Company Reg. No: " + COMMERCIAL_INVOICE_SELLER.companyNumber, MARGIN, 18, 8, regular);
-    const printed = "Printed:  " + printedStamp(shipment.issuedAt);
+    const printed = "Printed:  " + printedStamp(new Date().toISOString());
     const pageNo = "Page:  " + (index + 1) + " of " + pages.length;
     text(page, printed, A4[0] - MARGIN - regular.widthOfTextAtSize(printed, 8), 30, 8, regular);
     text(page, pageNo, A4[0] - MARGIN - regular.widthOfTextAtSize(pageNo, 8), 18, 8, regular);
@@ -801,14 +807,13 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         panel(box.x, top, box.w, box.h, titles[index]!);
         if (index === 1) {
           const labels = exportLabels();
-          const values = [metrics.originLines, ["United Kingdom"], [draft.namedPlace ? draft.incoterm + " " + draft.namedPlace : draft.incoterm]];
           const labelW = Math.max(...labels.map((label) => regular.widthOfTextAtSize(label, BODY)));
           const valueX = box.x + PAD + labelW + 8;
           let y = top - STRIP - LEAD;
           labels.forEach((label, row) => {
+            const lines = metrics.exportRows[row] ?? ["—"];
             text(page, label, box.x + PAD, y, BODY, regular);
-            const lines = values[row] ?? ["—"];
-            lines.forEach((part, lineNo) => text(page, part, valueX, y - lineNo * LEAD, BODY, regular, ink, box.x + box.w - PAD - valueX));
+            lines.forEach((part, lineNo) => text(page, part, valueX, y - lineNo * LEAD, BODY, regular));
             y -= lines.length * LEAD;
           });
           return;
@@ -838,21 +843,20 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         const scale = Math.min(maxW / image.width, maxH / image.height);
         return { width: image.width * scale, height: image.height * scale };
       };
+      const signatureSize = signature ? fit(signature, Math.min(160, lineSpan), 40) : { width: 0, height: 0 };
+      const nameSize = printedName ? fit(printedName, Math.min(180, lineSpan), 28) : { width: 0, height: 0 };
+      const signedY = top - STRIP - 8 - Math.max(signatureSize.height, 14);
+      const nameY = signedY - 8 - Math.max(nameSize.height, 14);
+      const dateY = nameY - 22;
       const raised = preview ? londonDay(new Date()) : dmy(draft.issueDate);
-      labels.forEach((label, index) => {
-        const y = top - STRIP - 18 - index * 22;
+      const rows: [string, number][] = [["Signed:", signedY], ["Name:", nameY], ["Date:", dateY]];
+      rows.forEach(([label, y]) => {
         text(page, label, MARGIN + PAD, y, BODY, regular);
         page.drawLine({ start: { x: lineStart, y: y - 1 }, end: { x: lineEnd, y: y - 1 }, thickness: 0.4, color: line });
-        if (index === 0 && signature) {
-          const size = fit(signature, Math.min(90, lineSpan), 20);
-          page.drawImage(signature, { x: lineStart, y: y - 2, width: size.width, height: size.height });
-        }
-        if (index === 1 && printedName) {
-          const size = fit(printedName, Math.min(120, lineSpan), 16);
-          page.drawImage(printedName, { x: lineStart, y: y - 2, width: size.width, height: size.height });
-        }
-        if (index === 2) text(page, raised, lineStart + 2, y, BODY, regular);
       });
+      if (signature) page.drawImage(signature, { x: lineStart, y: signedY - 1, width: signatureSize.width, height: signatureSize.height });
+      if (printedName) page.drawImage(printedName, { x: lineStart, y: nameY - 1, width: nameSize.width, height: nameSize.height });
+      text(page, raised, lineStart + 2, dateY, BODY, regular);
       if (stamp) {
         const areaW = CONTENT_W / 3;
         const size = fit(stamp, areaW - 20, DECLARATION_H - STRIP - 10);
