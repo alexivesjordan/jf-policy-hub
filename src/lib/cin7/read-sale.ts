@@ -1,6 +1,7 @@
 import { resolveCin7LineNets } from "@/lib/cin7/line-nets";
 import { tilesPerPackFromProduct } from "@/lib/pricer/flooring";
 import { normaliseHsCode } from "@/features/logistics/commercial-invoice/rules";
+import { iso2FromIso3 } from "@/lib/iso3166";
 import { normaliseUkPostcode } from "@/lib/quotes/postcode";
 import type { Cin7Quote, Cin7QuoteLine } from "@/lib/cin7/types";
 
@@ -99,12 +100,6 @@ const COUNTRY_ISO: Record<string, string> = {
   usa: "US",
 };
 
-const ISO3_TO_ISO2: Record<string, string> = {
-  ESP: "ES", CHN: "CN", TWN: "TW", GBR: "GB", FRA: "FR", DEU: "DE", NLD: "NL",
-  IRL: "IE", ITA: "IT", BEL: "BE", GRC: "GR", POL: "PL", PRT: "PT", SWE: "SE",
-  NOR: "NO", CHE: "CH", USA: "US", AUT: "AT",
-};
-
 function isoCountry(value: string | null) {
   if (!value) return null;
   const trimmed = value.trim();
@@ -112,7 +107,7 @@ function isoCountry(value: string | null) {
     const code = trimmed.toUpperCase();
     return code === "EL" ? "GR" : code;
   }
-  if (/^[A-Za-z]{3}$/.test(trimmed)) return ISO3_TO_ISO2[trimmed.toUpperCase()] ?? null;
+  if (/^[A-Za-z]{3}$/.test(trimmed)) return iso2FromIso3(trimmed);
   return COUNTRY_ISO[trimmed.toLowerCase()] ?? null;
 }
 
@@ -122,7 +117,7 @@ function productHsCode(product: Record<string, unknown>) {
 }
 
 function productOrigin(product: Record<string, unknown>) {
-  return isoCountry(text(product.CountryOfOrigin)) ?? isoCountry(text(product.CountryOfOriginCode));
+  return isoCountry(text(product.CountryOfOriginCode)) ?? isoCountry(text(product.CountryOfOrigin));
 }
 
 function billingAddress(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {

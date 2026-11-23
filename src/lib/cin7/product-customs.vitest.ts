@@ -41,5 +41,7 @@ describe("Cin7 product customs fields", () => {
     expect(named?.lines[0]).toMatchObject({ sku: "JF-SFM-BLK-10-1200", hsCode: "9506919000", originCountry: "ES", unitWeightKg: 12 });
     const coded = await readCin7Sale("SO-00819", getter({ HSCode: "9506.91", CountryOfOrigin: "", CountryOfOriginCode: "ESP" }));
     expect(coded?.lines[0]).toMatchObject({ hsCode: "9506910000", originCountry: "ES" });
+    const codeFirst = await readCin7Sale("SO-00819", getter({ CountryOfOrigin: "Spain", CountryOfOriginCode: "PAK" }));
+    expect(codeFirst?.lines[0]?.originCountry).toBe("PK");
   });
 });
