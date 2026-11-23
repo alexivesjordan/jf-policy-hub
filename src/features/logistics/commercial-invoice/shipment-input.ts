@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dimensionCounts } from "./pallets";
 import type { InvoiceDraft, InvoiceShipment } from "./rules";
 
 /** £1,000,000 in pence. */
@@ -29,6 +30,7 @@ export const shipmentSchema = z.object({
     widthCm: z.number().finite().nullable().optional(),
     depthCm: z.number().finite().nullable().optional(),
     weightKg: z.number().finite().nullable().optional(),
+    kind: z.enum(["parcel", "pallet"]).optional(),
   })).max(30).optional(),
   deliveryPence: z.number().int().nonnegative().max(MONEY_MAX).optional(),
   surchargePence: z.number().int().nonnegative().max(MONEY_MAX).optional(),
@@ -88,11 +90,17 @@ export const issueBodySchema = z.object({
   packageType: z.string().min(1).max(100),
 }).strict();
 
-export type PalletInput = { lengthCm: number | null; widthCm: number | null; depthCm: number | null; weightKg: number | null };
+export type PalletInput = { lengthCm: number | null; widthCm: number | null; depthCm: number | null; weightKg: number | null; kind?: "parcel" | "pallet" };
+
+function countedRows(rows: PalletInput[]) {
+  return rows.filter((row) => [row.lengthCm, row.widthCm, row.depthCm, row.weightKg].every((value) => typeof value === "number" && value > 0));
+}
 
 /** Keys the strict shipment schema accepts. `issuedAt` is server-owned and is not one of them. */
 export function shipmentBody(shipment: Partial<InvoiceShipment> | undefined, palletLines: PalletInput[], pallets: number) {
-  const source: Record<string, unknown> = { ...shipment, palletLines, pallets };
+  const counted = countedRows(palletLines);
+  const counts = counted.length ? dimensionCounts(counted) : { parcels: shipment?.parcels ?? 0, pallets };
+  const source: Record<string, unknown> = { ...shipment, palletLines, parcels: counts.parcels, pallets: counts.pallets };
   const body: Record<string, unknown> = {};
   for (const key of shipmentSchema.keyof().options) {
     if (source[key] !== undefined) body[key] = source[key];

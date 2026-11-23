@@ -109,7 +109,7 @@ export async function POST(request: Request) {
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
   const rules = rulesFromRows((await supabase.schema("logistics").from("customs_statement_rules").select("incoterm, destination_country, carrier, statement_text, extra_line, priority, active").eq("active", true)).data);
   const checked = inspectPallets(input.shipment?.palletLines ?? [], "issue");
-  if (checked.problems.length) return Response.json({ error: "A pallet is invalid.", details: checked.problems }, { status: 422 });
+  if (checked.problems.length) return Response.json({ error: "A dimension row is invalid.", details: checked.problems }, { status: 422 });
   const buyerVat = input.buyerVat ?? input.shipment?.buyerVat ?? "";
   const requestedId = input.shipment?.customsStatementId ?? "matched";
   const statement = prepareCustomsStatement({

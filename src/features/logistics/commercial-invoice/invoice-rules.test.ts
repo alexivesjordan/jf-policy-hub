@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { originSummary } from "./origin";
-import { acceptedPallets, inspectPallets, palletGrossKg, palletProblems } from "./pallets";
+import { acceptedPallets, dimensionCounts, dimensionSummary, inspectPallets, palletGrossKg, palletProblems } from "./pallets";
 import { DDP_FISCAL_STATEMENTS } from "./ddp-statements";
 import { applyBuyerVat, matchCustomsStatement, prepareCustomsStatement, type StatementRule } from "./statements";
 import { readFileSync } from "node:fs";
@@ -54,10 +54,22 @@ describe("commercial invoice origins, pallets and statements", () => {
     expect(rows.pallets).toHaveLength(2);
     expect(palletGrossKg(rows.pallets)).toBe(255.5);
     expect(palletProblems(rows.pallets, "issue")).toEqual([]);
-    expect(palletProblems([], "issue")).toEqual(["Enter at least one pallet."]);
+    expect(palletProblems([], "issue")).toEqual(["Enter at least one row."]);
+    expect(dimensionCounts([
+      { kind: "parcel" },
+      { kind: "parcel" },
+    ])).toEqual({ parcels: 2, pallets: 0 });
+    expect(dimensionSummary([{ kind: "pallet" }, { kind: "parcel" }, { kind: "parcel" }])).toBe("1 pallet, 2 parcels");
+    expect(dimensionSummary([{ kind: "parcel" }])).toBe("1 parcel");
+    expect(dimensionSummary([{}, {}])).toBe("2 pallets");
+    expect(dimensionCounts([{}])).toEqual({ parcels: 0, pallets: 1 });
     expect(acceptedPallets([{ lengthCm: 1001, widthCm: 10, depthCm: 10, weightKg: 1 }]).invalid).toBe(true);
     expect(acceptedPallets([{ lengthCm: 10, widthCm: 10, depthCm: 10, weightKg: 1.25 }]).invalid).toBe(true);
-    expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "issue").problems).toEqual(["Pallet 1: enter weight"]);
+    expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "issue").problems).toEqual(["1 Pallet: enter weight"]);
+    expect(inspectPallets([{ kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 }, { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 }], "issue").pallets).toEqual([
+      { kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 },
+      { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 },
+    ]);
     expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "preview").pallets).toEqual([]);
     expect(inspectPallets([{ lengthCm: null, widthCm: null, depthCm: null, weightKg: null }, { lengthCm: 120, widthCm: 80, depthCm: 60, weightKg: 10 }], "preview").pallets).toHaveLength(1);
   });

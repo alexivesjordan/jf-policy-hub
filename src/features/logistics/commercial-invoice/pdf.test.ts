@@ -212,8 +212,18 @@ describe("commercial invoice PDF", () => {
     const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
     expect(text).toMatch(/9506919000/);
     expect(text).toMatch(/Spain/);
-    expect(text).toMatch(/DAP Genève/);
-    expect(text).toMatch(/Switzerland/);
+    expect(text).toMatch(/\bDAP\b/);
+    expect(text).not.toMatch(/DAP Genève|Switzerland/);
+    for (const term of ["EXW", "DDP"] as const) {
+      const other = draftFor(1);
+      other.incoterm = term;
+      other.namedPlace = "Genève, Switzerland";
+      other.shipment = { ...other.shipment!, customsStatementId: "none", customsStatementText: "" };
+      const extractedTerm = await extractText(await renderCommercialInvoicePdf(other), { mergePages: true });
+      const termText = Array.isArray(extractedTerm.text) ? extractedTerm.text.join("\n") : extractedTerm.text;
+      expect(termText).toMatch(new RegExp("\\b" + term + "\\b"));
+      expect(termText).not.toMatch(/Genève|Switzerland/);
+    }
     expect(text).toMatch(/23\/11\/2026/);
     expect(text).toMatch(/FedEx/);
     await saveDraft("invoice-ch.pdf", draft);
@@ -223,6 +233,66 @@ describe("commercial invoice PDF", () => {
     many.issueDate = "2026-11-23";
     many.lines.forEach((row, index) => { row.originCountry = ["CN", "ES", "TW", "PL", "DE", "FR", "IT", "GB"][index]!; });
     await saveDraft("invoice-origins.pdf", many);
+  });
+
+  it("prints two Swiss parcels as parcels and a mixed DDP shipment with both types", async () => {
+    const swiss = draftFor(3);
+    swiss.incoterm = "DAP";
+    swiss.destinationCountry = "CH";
+    swiss.namedPlace = "Genève, Switzerland";
+    swiss.buyer.name = "NonStop Gym SA";
+    swiss.grossWeightKg = 43;
+    swiss.shipment = {
+      ...swiss.shipment!,
+      parcels: 1,
+      pallets: 2,
+      palletLines: [
+        { kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 },
+        { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 },
+      ],
+      customsStatementId: "none",
+      customsStatementText: "",
+    };
+    const mixed = draftFor(1);
+    mixed.incoterm = "DDP";
+    mixed.destinationCountry = "DE";
+    mixed.namedPlace = "Berlin, Germany";
+    mixed.grossWeightKg = 63;
+    mixed.shipment = {
+      ...mixed.shipment!,
+      parcels: 99,
+      pallets: 99,
+      palletLines: [
+        { kind: "pallet", lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: 20 },
+        { kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 },
+        { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 },
+      ],
+      customsStatementId: "none",
+      customsStatementText: "",
+    };
+    const read = async (draft: ReturnType<typeof draftFor>) => {
+      const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+      return Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    };
+    const swissText = await read(swiss);
+    const mixedText = await read(mixed);
+    expect(swissText).toMatch(/DIMENSIONS/);
+    expect(swissText).not.toMatch(/PALLETS & DIMENSIONS/);
+    expect(swissText).toMatch(/1 Parcel/);
+    expect(swissText).toMatch(/2 Parcel/);
+    expect(swissText).toMatch(/2 parcels/);
+    expect(swissText).toMatch(/No\. of parcels[\s\S]{0,30}2/);
+    expect(swissText).toMatch(/No\. of pallets[\s\S]{0,30}0/);
+    expect(swissText).not.toMatch(/CUSTOMS STATEMENT|Genève|Switzerland|2 pallets/);
+    expect(swissText).toMatch(/\bDAP\b/);
+    expect(mixedText).toMatch(/1 Pallet/);
+    expect(mixedText).toMatch(/1 pallet, 2 parcels/);
+    expect(mixedText).toMatch(/No\. of parcels[\s\S]{0,30}2/);
+    expect(mixedText).toMatch(/No\. of pallets[\s\S]{0,30}1/);
+    expect(mixedText).toMatch(/\bDDP\b/);
+    expect(mixedText).not.toMatch(/Berlin|Germany/);
+    await saveDraft("invoice-ch-parcels.pdf", swiss);
+    await saveDraft("invoice-ddp-mixed.pdf", mixed);
   });
 
   it("renders a one-page invoice with the summary on that page", async () => {

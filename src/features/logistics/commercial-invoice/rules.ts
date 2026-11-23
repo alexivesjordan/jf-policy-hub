@@ -30,7 +30,10 @@ export type GoodsLine = {
   unitWeightKg: number | null;
 };
 
-export type PalletLine = { lengthCm: number; widthCm: number; depthCm: number; weightKg: number };
+export type DimensionKind = "parcel" | "pallet";
+
+/** `kind` is omitted on invoices issued before the row type existed. Those rows are pallets. */
+export type PalletLine = { lengthCm: number; widthCm: number; depthCm: number; weightKg: number; kind?: DimensionKind };
 
 export type InvoiceShipment = {
   fao: string;
@@ -67,6 +70,8 @@ export type InvoiceOrder = {
   contactEmail?: string;
   courier?: string;
   deliveryCity?: string;
+  /** Distinct Cin7 pack boxes. Empty when the sale has no pack lines. */
+  boxes?: string[];
 };
 
 export type InvoiceDraft = {

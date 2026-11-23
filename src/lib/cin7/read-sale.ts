@@ -33,6 +33,30 @@ function saleId(row: Record<string, unknown>) {
   return text(row.SaleID) ?? text(row.ID);
 }
 
+function boxOrder(left: string, right: string) {
+  const leftNumber = /(\d+)\s*$/.exec(left);
+  const rightNumber = /(\d+)\s*$/.exec(right);
+  if (leftNumber && rightNumber && leftNumber[1] !== rightNumber[1]) return Number(leftNumber[1]) - Number(rightNumber[1]);
+  return left.localeCompare(right);
+}
+
+/** Distinct Box values from Fulfilments[].Pack.Lines[]. Cin7 does not send parcel type or box size. */
+export function packBoxes(sale: Record<string, unknown> | null | undefined) {
+  const seen = new Set<string>();
+  const boxes: string[] = [];
+  for (const fulfilment of list(sale?.Fulfilments)) {
+    const status = text(fulfilment.FulFilmentStatus) ?? text(fulfilment.Status) ?? "";
+    if (/void/i.test(status)) continue;
+    for (const line of list(record(fulfilment.Pack)?.Lines)) {
+      const box = text(line.Box);
+      if (!box || seen.has(box)) continue;
+      seen.add(box);
+      boxes.push(box);
+    }
+  }
+  return boxes.sort(boxOrder);
+}
+
 function weightKg(product: Record<string, unknown>) {
   const units = text(product.WeightUnits)?.toLowerCase();
   if (units && units !== "kg" && units !== "kilogram" && units !== "kilograms") return null;
@@ -342,6 +366,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     contactEmail: emailValue(sale.Email) ?? defaultContactEmail(customer) ?? "",
     courier: saleCourier(text(sale.Carrier), text(customer?.Carrier)),
     buyerVat: text(customer?.TaxNumber) ?? "",
+    boxes: packBoxes(sale),
     lines: quoteLines,
     additionalCharges: money.charges,
     specialInstructions: text(sale.ShippingNotes) ?? "",

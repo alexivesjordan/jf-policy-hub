@@ -1,4 +1,4 @@
-import { palletGrossKg } from "./pallets";
+import { dimensionCounts, palletGrossKg } from "./pallets";
 import { COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
   isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
@@ -77,6 +77,7 @@ export function ordersFromCin7(quotes: Cin7Quote[], customs: CustomsRow[], alrea
       contactEmail: sale.contactEmail ?? "",
       courier: sale.courier ?? "",
       deliveryCity: sale.deliveryCity ?? "",
+      boxes: sale.boxes ?? [],
       deliveryPence: Math.round((sale.additionalCharges ?? [])
         .filter((charge) => /\b(freight|delivery|carriage|shipping)\b/i.test(charge.description))
         .reduce((sum, charge) => sum + charge.amountNet, 0) * 100),
@@ -184,14 +185,19 @@ export function applyShipment(draft: InvoiceDraft, input: Partial<InvoiceShipmen
     issuedAt: current.issuedAt,
   };
   const palletLines = shipment.palletLines;
-  const parcels = shipment.parcels;
-  const pallets = palletLines.length || shipment.pallets;
-  const packages = parcels > 0 ? parcels : pallets > 0 ? pallets : draft.packages;
+  const explicit = palletLines.some((row) => row.kind === "parcel" || row.kind === "pallet");
+  const counts = dimensionCounts(palletLines);
+  const parcels = explicit ? counts.parcels : shipment.parcels;
+  const pallets = explicit ? counts.pallets : (palletLines.length || shipment.pallets);
+  const packages = explicit ? parcels + pallets : parcels > 0 ? parcels : pallets > 0 ? pallets : draft.packages;
+  const packageType = explicit
+    ? counts.parcels && counts.pallets ? "Mixed" : counts.parcels ? "Parcel" : counts.pallets ? "Pallet" : draft.packageType || "Carton"
+    : pallets > 0 ? "Pallet" : draft.packageType || "Carton";
   return {
     ...draft,
-    shipment: { ...shipment, pallets },
+    shipment: { ...shipment, parcels, pallets },
     packages: packages > 0 ? packages : 1,
-    packageType: pallets > 0 ? "Pallet" : draft.packageType || "Carton",
+    packageType,
     grossWeightKg: palletLines.length ? palletGrossKg(palletLines) : (grossWeightKg ?? draft.grossWeightKg),
     buyer: { ...draft.buyer, vat: buyerVat ?? draft.buyer.vat, eori: buyerEori ?? draft.buyer.eori },
     consignee: { ...draft.consignee, address: shipment.deliveryAddress || draft.consignee.address },

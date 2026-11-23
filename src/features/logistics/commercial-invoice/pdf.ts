@@ -3,7 +3,7 @@ import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { degrees, PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { originSummary } from "./origin";
-import { palletGrossKg } from "./pallets";
+import { dimensionCounts, dimensionLabel, dimensionSummary, palletGrossKg } from "./pallets";
 import { COMMERCIAL_INVOICE_MARKS, COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
   chargedLinePence, countryName, lineWeightKg, normaliseHsCode, shippedLines, validateCommercialInvoice,
@@ -258,7 +258,7 @@ function measureSummary(draft: InvoiceDraft, font: PDFFont): SummaryMetrics {
   const statementLines = boxedLines(statement, font, inner);
   const boxW = (CONTENT_W - GAP * 2) / 3;
   const valueWidth = exportValueWidth(boxW, font);
-  const incoterms = draft.namedPlace.trim() ? draft.incoterm + " " + draft.namedPlace.trim() : draft.incoterm;
+  const incoterms = draft.incoterm.trim();
   const exportRows = [originSummary(shippedLines(draft)) || "—", "United Kingdom", incoterms]
     .map((value) => {
       const lines = wrap(value, font, BODY, valueWidth);
@@ -713,25 +713,24 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
       const layout = dimLayout(count, includesTotal);
       const boxH = dimsHeight(count, includesTotal);
       const two = layout.two;
-      panel(MARGIN, cursor, CONTENT_W, boxH, piece.from === 0 ? "PALLETS & DIMENSIONS" : "PALLETS & DIMENSIONS (cont.)");
+      panel(MARGIN, cursor, CONTENT_W, boxH, piece.from === 0 ? "DIMENSIONS" : "DIMENSIONS (cont.)");
       const innerGap = 12;
       const tableW = two ? (CONTENT_W - PAD * 2 - innerGap) / 2 : CONTENT_W - PAD * 2;
       const columnW = (width: number) => {
-        const palletW = Math.min(78, width * 0.22);
+        const labelW = Math.min(two ? 78 : 108, width * (two ? 0.32 : 0.24));
         const weightW = Math.min(72, width * 0.2);
-        const rest = (width - palletW - weightW) / 3;
-        return [palletW, rest, rest, rest, weightW];
+        const rest = (width - labelW - weightW) / 3;
+        return [labelW, rest, rest, rest, weightW];
       };
       const headers = two
-        ? [["Pallet", ""], ["Length", "(cm)"], ["Width", "(cm)"], ["Depth", "(cm)"], ["Weight", "(kg)"]]
-        : [["Pallet", ""], ["Length (cm)", ""], ["Width (cm)", ""], ["Depth (cm)", ""], ["Weight (kg)", ""]];
+        ? [["Pallets/", "Parcels"], ["Length", "(cm)"], ["Width", "(cm)"], ["Depth", "(cm)"], ["Weight", "(kg)"]]
+        : [["Pallets/Parcels", ""], ["Length (cm)", ""], ["Width (cm)", ""], ["Depth (cm)", ""], ["Weight (kg)", ""]];
       const cellsFor = (row: number) => {
         if (row >= shipment.palletLines.length) {
-          const n = shipment.palletLines.length;
-          return [n + " pallet" + (n === 1 ? "" : "s"), "", "", "", palletGrossKg(shipment.palletLines).toFixed(1)];
+          return [dimensionSummary(shipment.palletLines), "", "", "", palletGrossKg(shipment.palletLines).toFixed(1)];
         }
         const pallet = shipment.palletLines[row]!;
-        return [String(row + 1), String(pallet.lengthCm), String(pallet.widthCm), String(pallet.depthCm), pallet.weightKg.toFixed(1)];
+        return [dimensionLabel(row, pallet), String(pallet.lengthCm), String(pallet.widthCm), String(pallet.depthCm), pallet.weightKg.toFixed(1)];
       };
       const atRight = (value: string, x: number, y: number, w: number, font: PDFFont) => {
         text(page, value, x + w - font.widthOfTextAtSize(value, BODY), y, BODY, font);
@@ -757,8 +756,10 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
         let colX = x;
         headers.forEach(([main, unit], index) => {
           const colW = widths[index]!;
-          if (index === 0) text(page, main, colX, headerY, BODY, regular);
-          else {
+          if (index === 0) {
+            text(page, main, colX, headerY, BODY, regular);
+            if (unit) text(page, unit, colX, headerY - LEAD, BODY, regular);
+          } else {
             atRight(main, colX, headerY, colW, regular);
             if (unit) atRight(unit, colX, headerY - LEAD, colW, regular);
           }
@@ -788,10 +789,17 @@ export async function renderCommercialInvoicePdf(draft: InvoiceDraft): Promise<U
     };
     const drawBoxes = () => {
       const top = cursor;
+      const explicit = shipment.palletLines.some((row) => row.kind === "parcel" || row.kind === "pallet");
+      const counted = explicit ? dimensionCounts(shipment.palletLines) : {
+        parcels: Math.max(0, Math.trunc(Number(shipment.parcels) || 0)),
+        pallets: shipment.palletLines.length
+          ? Math.max(0, Math.trunc(Number(shipment.pallets) || shipment.palletLines.length))
+          : Math.max(0, Math.trunc(Number(shipment.pallets) || 0)),
+      };
       const rows: [string, string, boolean][][] = [
         [
-          ["No. of parcels", String(Math.trunc(shipment.parcels)), false],
-          ["No. of pallets", String(Math.trunc(shipment.pallets)), false],
+          ["No. of parcels", String(counted.parcels), false],
+          ["No. of pallets", String(counted.pallets), false],
           ["Net weight", onePlaceKg(shippedLines(draft).reduce((sum, row) => sum + lineWeightKg(row), 0)), false],
           ["Gross weight", onePlaceKg(draft.grossWeightKg), false],
         ],

@@ -2,14 +2,14 @@
 
 import { useRef, useState } from "react";
 import { commercialInvoiceFileName } from "@/features/logistics/commercial-invoice/filename";
-import { inspectPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
+import { dimensionCounts, inspectPallets, palletGrossKg } from "@/features/logistics/commercial-invoice/pallets";
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
 import { applyBuyerVat, matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
 import { commercialInvoiceBody } from "@/features/logistics/commercial-invoice/shipment-input";
 import { countryChoices, goodsTotal, incotermPlace, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
 
-type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string };
-const emptyPallet = (): PalletInput => ({ lengthCm: "", widthCm: "", depthCm: "", weightKg: "" });
+type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string; kind: "parcel" | "pallet"; box?: string };
+const emptyPallet = (): PalletInput => ({ lengthCm: "", widthCm: "", depthCm: "", weightKg: "", kind: "parcel" });
 
 const TERMS = ["DAP", "DDP", "EXW", "FCA", "CPT", "CIP", "DPU", "FOB", "CIF"];
 
@@ -44,6 +44,8 @@ export function CommercialInvoiceWorkspace() {
       if (!res.ok) throw new Error(json.error || "Cin7 lookup failed.");
       const found = json.orders as InvoiceOrder[];
       if (!found.length) throw new Error("No orders.");
+      const boxes = found.flatMap((order) => order.boxes ?? []);
+      if (boxes.length) setPalletRows(boxes.slice(0, 30).map((box) => ({ ...emptyPallet(), box })));
       setDraft({
         reference: "PREVIEW",
         issueDate: new Date().toISOString().slice(0, 10),
@@ -108,6 +110,7 @@ export function CommercialInvoiceWorkspace() {
 
   function rawPallets() {
     return palletRows.map((row) => ({
+      kind: row.kind,
       lengthCm: row.lengthCm === "" ? null : Number(row.lengthCm),
       widthCm: row.widthCm === "" ? null : Number(row.widthCm),
       depthCm: row.depthCm === "" ? null : Number(row.depthCm),
@@ -130,7 +133,7 @@ export function CommercialInvoiceWorkspace() {
     if (!body || !draft) return;
     const palletErrors = inspectPallets(rawPallets(), "preview").problems;
     if (palletErrors.length) {
-      setError("A pallet is invalid.");
+      setError("A dimension row is invalid.");
       setDetails(palletErrors);
       return;
     }
@@ -167,7 +170,7 @@ export function CommercialInvoiceWorkspace() {
     if (!body || !draft) return;
     const palletErrors = enteredPallets().problems;
     if (palletErrors.length) {
-      setError("A pallet is invalid.");
+      setError("A dimension row is invalid.");
       setDetails(palletErrors);
       return;
     }
@@ -219,15 +222,23 @@ export function CommercialInvoiceWorkspace() {
         <label className="block text-sm font-semibold" htmlFor="invoice-orders">Order numbers</label>
         <textarea id="invoice-orders" rows={2} value={numbers} onChange={(event) => setNumbers(event.currentTarget.value)} className="w-full rounded-xl border border-line bg-paper p-3" />
         <div className="space-y-2">
-          <p className="text-sm font-semibold">Pallets</p>
-          <div className="grid grid-cols-5 gap-2 text-sm font-semibold">
+          <p className="text-sm font-semibold">Dimensions</p>
+          <div className="grid grid-cols-6 gap-2 text-sm font-semibold">
+            <span>Pallets/Parcels</span>
             <span>L (cm)</span>
             <span>W (cm)</span>
             <span>D (cm)</span>
             <span>Weight (kg)</span>
           </div>
           {palletRows.map((row, index) => (
-            <div key={index} className="grid grid-cols-5 gap-2">
+            <div key={index} className="grid grid-cols-6 gap-2">
+              <div>
+                {row.box ? <span className="mb-1 block text-xs font-semibold">{row.box}</span> : null}
+                <select aria-label={row.box ? `Pallets/Parcels ${row.box}` : "Pallets/Parcels"} className="w-full rounded-xl border border-line px-2 py-2" value={row.kind} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, kind: event.currentTarget.value === "pallet" ? "pallet" : "parcel" } : item))}>
+                  <option value="parcel">Parcel</option>
+                  <option value="pallet">Pallet</option>
+                </select>
+              </div>
               <input aria-label="Length cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.lengthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, lengthCm: event.currentTarget.value } : item))} />
               <input aria-label="Width cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.widthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, widthCm: event.currentTarget.value } : item))} />
               <input aria-label="Depth cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.depthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, depthCm: event.currentTarget.value } : item))} />
@@ -235,7 +246,7 @@ export function CommercialInvoiceWorkspace() {
               {index > 0 ? <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => setPalletRows(palletRows.filter((_, itemIndex) => itemIndex !== index))}>Remove</button> : <span />}
             </div>
           ))}
-          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={palletRows.length >= 30} onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add pallet</button>
+          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={palletRows.length >= 30} onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add row</button>
         </div>
         <button type="button" onClick={() => void lookup()} disabled={!numbers.trim() || working !== null} className="rounded-xl bg-red px-4 py-2 font-semibold text-white disabled:opacity-50">
           {working === "lookup" ? "Retrieving orders…" : "Retrieve orders"}
@@ -348,9 +359,8 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Email
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.contactEmail ?? ""} onChange={(event) => patchShipment({ contactEmail: event.currentTarget.value })} />
             </label>
-            <label className="text-sm font-semibold">Parcels
-              <input type="number" min={0} max={999} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.parcels ?? 0} onChange={(event) => patchShipment({ parcels: Number(event.currentTarget.value) })} />
-            </label>
+            <p className="text-sm font-semibold">Parcels {dimensionCounts(enteredPallets().pallets).parcels}</p>
+            <p className="text-sm font-semibold">Pallets {dimensionCounts(enteredPallets().pallets).pallets}</p>
             <p className="text-sm font-semibold">Gross {gross.toFixed(1)} kg</p>
             <label className="text-sm font-semibold">Delivery
               <input type="number" min={0} max={1000000} step="0.01" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={((shipment?.deliveryPence ?? 0) / 100).toFixed(2)} onChange={(event) => patchShipment({ deliveryPence: Math.round(Number(event.currentTarget.value) * 100) })} />
