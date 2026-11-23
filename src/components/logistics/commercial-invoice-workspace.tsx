@@ -365,7 +365,8 @@ export function CommercialInvoiceWorkspace() {
             {draft.lines.map((line) => (
               <div key={line.id} className="grid gap-3 rounded-xl border border-line p-3 md:grid-cols-4">
                 <p className="font-semibold md:col-span-4">{line.orderNumber} · {line.sku} — {line.productName}</p>
-                <label className="text-sm font-semibold">Shipped qty
+                <label className="text-sm font-semibold">
+                  <span className="flex items-baseline justify-between gap-2">Shipped qty <span className="text-xs font-normal opacity-70">of {line.orderedQuantity} ordered</span></span>
                   <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.shippedQuantity} onChange={(event) => setDraft({ ...draft, lines: draft.lines.map((item) => item.id === line.id ? { ...item, shippedQuantity: Number(event.currentTarget.value) } : item) })} />
                 </label>
                 <label className="text-sm font-semibold">HS code

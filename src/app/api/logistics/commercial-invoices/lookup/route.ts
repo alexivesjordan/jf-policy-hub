@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireLogisticsApi } from "@/features/logistics/commercial-invoice/access";
 import { clientError } from "@/features/logistics/commercial-invoice/errors";
-import { customsFromRpc, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
+import { customsFromRpc, issuedQuantities, ordersFromCin7 } from "@/features/logistics/commercial-invoice/prepare";
 import { parseOrderNumbers } from "@/features/logistics/commercial-invoice/rules";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -53,5 +53,7 @@ export async function POST(request: Request) {
   const skus = quotes.flatMap((sale) => sale.lines.map((line) => line.sku).filter((sku): sku is string => Boolean(sku)));
   const supabase = await createClient();
   const customs = await supabase.rpc("logistics_product_customs", { p_skus: skus });
-  return Response.json({ orders: ordersFromCin7(quotes, customsFromRpc(customs.data)) }, { headers: { "Cache-Control": "no-store" } });
+  const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: quotes.map((sale) => sale.id) });
+  if (prior.error) return Response.json({ error: "Issued quantities could not be read." }, { status: 500 });
+  return Response.json({ orders: ordersFromCin7(quotes, customsFromRpc(customs.data), issuedQuantities(prior.data)) }, { headers: { "Cache-Control": "no-store" } });
 }

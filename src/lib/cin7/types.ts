@@ -19,6 +19,10 @@ export type Cin7QuoteLine = {
   lineNet?: number | null;
   /** Product.Weight when Cin7 reports kilograms. */
   unitWeightKg?: number | null;
+  /** Product.HSCode, normalised to 6–10 digits and padded to 10. Null when Cin7 has none. */
+  hsCode?: string | null;
+  /** ISO 3166-1 alpha-2. Taken from Product.CountryOfOrigin or CountryOfOriginCode. */
+  originCountry?: string | null;
   length?: number | null;
   width?: number | null;
   height?: number | null;
