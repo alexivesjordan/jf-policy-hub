@@ -44,8 +44,18 @@ export type Cin7Quote = {
   buyerAddress?: string | null;
   consigneeAddress?: string | null;
   destinationCountry?: string | null;
+  /** Delivery-address city, used to build the Incoterms named place. */
+  deliveryCity?: string | null;
   /** Cin7 CustomerID. Not a name or address. */
   customerId?: string | null;
+  /** Sale Contact, or the customer's default contact name. */
+  contactName?: string | null;
+  /** Sale Email, or the customer's default contact email. */
+  contactEmail?: string | null;
+  /** Sale Carrier, mapped from a known code, otherwise the customer Carrier name. */
+  courier?: string | null;
+  /** Customer TaxNumber. Empty when Cin7 has none. */
+  buyerVat?: string | null;
   lines: Cin7QuoteLine[];
   /** Order lines were empty, so quote lines were used. */
   usedQuoteLines?: boolean;

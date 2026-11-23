@@ -2,6 +2,7 @@
  * Pure domain logic for Pulse Logistics, deliberately independent of the
  * existing Pulse modules and of customs declarations submitted by Europa.
  */
+import { ISO3_TO_ISO2 } from "@/lib/iso3166";
 export type EuropaDdpModel = "unspecified" | "importers_signature" | "own_french_vat" | "not_applicable";
 export type CustomsProcedure = "unconfirmed" | "40" | "42" | "transit" | "other";
 
@@ -62,6 +63,10 @@ export type InvoiceOrder = {
   specialInstructions?: string;
   /** Freight and delivery charges from Cin7, in pence. Not a goods line. */
   deliveryPence?: number;
+  contactName?: string;
+  contactEmail?: string;
+  courier?: string;
+  deliveryCity?: string;
 };
 
 export type InvoiceDraft = {
@@ -94,6 +99,8 @@ export type InvoiceDraft = {
   insuranceValue: number;
   otherChargesValue: number;
   shipmentRef: string;
+  /** Delivery-address city. Used only to rebuild the Incoterms place when the country changes. */
+  deliveryCity?: string;
   signatory: string;
   notes: string;
   physicalShipmentConfirmed: boolean;
@@ -146,6 +153,22 @@ export function countryName(iso: string) {
   if (!/^[A-Z]{2}$/.test(code)) return code;
   const name = new Intl.DisplayNames(["en"], { type: "region" }).of(code);
   return name && name !== code ? name : code;
+}
+
+export function countryChoices() {
+  return [...new Set(Object.values(ISO3_TO_ISO2))]
+    .map((code) => ({ code, name: countryName(code) }))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.code.localeCompare(b.code));
+}
+
+/** Incoterms named place: delivery city plus the destination country name. */
+export function incotermPlace(city: string, countryIso: string) {
+  const town = city.trim();
+  const country = countryName(countryIso).trim();
+  const named = /^[A-Z]{2}$/.test(countryIso.trim()) && country !== countryIso.trim().toUpperCase();
+  if (town && named) return town + ", " + country;
+  if (town) return town;
+  return named ? country : "";
 }
 
 export function lineNetPence(line: GoodsLine) {

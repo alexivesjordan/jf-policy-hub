@@ -178,6 +178,53 @@ describe("commercial invoice PDF", () => {
     await saveDraft("invoice-hs-origin.pdf", draft);
   });
 
+  it("prints the declaration marks and a Swiss named place", async () => {
+    const { draft } = await planned(1);
+    const line = draft.lines[0]!;
+    line.sku = "JF-SFM-BLK-10-1200";
+    line.productName = "Studio functional machine";
+    line.orderedQuantity = 1;
+    line.shippedQuantity = 1;
+    line.hsCode = "9506919000";
+    line.originCountry = "ES";
+    line.unitWeightKg = 12;
+    line.lineNetPence = 1000;
+    line.unitNetValue = 10;
+    draft.buyer.name = "NonStop Gym SA";
+    draft.destinationCountry = "CH";
+    draft.namedPlace = "Genève, Switzerland";
+    draft.currency = "CHF";
+    draft.issueDate = "2026-11-23";
+    draft.netWeightKg = 12;
+    draft.grossWeightKg = 12;
+    draft.shipment = {
+      ...draft.shipment!,
+      courier: "FedEx",
+      contactName: "Johann",
+      contactEmail: "cornavin@nonstopgym.com",
+      palletLines: [{ lengthCm: 120, widthCm: 80, depthCm: 100, weightKg: 12 }],
+      pallets: 1,
+      customsStatementId: "none",
+      customsStatementText: "",
+      specialInstructions: "",
+    };
+    const extracted = await extractText(await renderCommercialInvoicePdf(draft), { mergePages: true });
+    const text = Array.isArray(extracted.text) ? extracted.text.join("\n") : extracted.text;
+    expect(text).toMatch(/9506919000/);
+    expect(text).toMatch(/Spain/);
+    expect(text).toMatch(/DAP Genève/);
+    expect(text).toMatch(/Switzerland/);
+    expect(text).toMatch(/23\/11\/2026/);
+    expect(text).toMatch(/FedEx/);
+    await saveDraft("invoice-ch.pdf", draft);
+    const many = draftFor(8);
+    many.destinationCountry = "CH";
+    many.namedPlace = "Genève, Switzerland";
+    many.issueDate = "2026-11-23";
+    many.lines.forEach((row, index) => { row.originCountry = ["CN", "ES", "TW", "PL", "DE", "FR", "IT", "GB"][index]!; });
+    await saveDraft("invoice-origins.pdf", many);
+  });
+
   it("renders a one-page invoice with the summary on that page", async () => {
     const { plan, text } = await pagesOf(1);
     expect(plan.map((page) => page.role)).toEqual(["first"]);

@@ -178,9 +178,35 @@ function namedContactEmail(customer: Record<string, unknown> | null, name: strin
   return emailValue(match?.Email);
 }
 
+function defaultContact(customer: Record<string, unknown> | null) {
+  return list(customer?.Contacts).find((contact) => contact.Default === true) ?? null;
+}
+
 function defaultContactEmail(customer: Record<string, unknown> | null) {
-  const preferred = list(customer?.Contacts).find((contact) => contact.Default === true);
-  return emailValue(preferred?.Email);
+  return emailValue(defaultContact(customer)?.Email);
+}
+
+const CARRIER_NAMES: Record<string, string> = {
+  FEDI: "FedEx",
+  FEDEX: "FedEx",
+  DHL: "DHL",
+  UPS: "UPS",
+  TNT: "TNT",
+  DPD: "DPD",
+  EUROPA: "Europa",
+};
+
+function carrierLabel(value: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const mapped = CARRIER_NAMES[trimmed.toUpperCase()];
+  if (mapped) return mapped;
+  if (/^[A-Z0-9]{2,6}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+export function saleCourier(saleCarrier: string | null, customerCarrier: string | null) {
+  return carrierLabel(saleCarrier) ?? carrierLabel(customerCarrier) ?? customerCarrier?.trim() ?? "";
 }
 
 function orderDocument(sale: Record<string, unknown>) {
@@ -310,7 +336,12 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     buyerAddress: addressLines(billingAddress(customer, sale)),
     consigneeAddress: addressLines(deliveryAddress(customer, sale)),
     destinationCountry: isoCountry(text(deliveryAddress(customer, sale)?.Country) ?? text(billingAddress(customer, sale)?.Country)),
+    deliveryCity: text(deliveryAddress(customer, sale)?.City),
     customerId,
+    contactName: text(sale.Contact) ?? text(defaultContact(customer)?.Name) ?? "",
+    contactEmail: emailValue(sale.Email) ?? defaultContactEmail(customer) ?? "",
+    courier: saleCourier(text(sale.Carrier), text(customer?.Carrier)),
+    buyerVat: text(customer?.TaxNumber) ?? "",
     lines: quoteLines,
     additionalCharges: money.charges,
     specialInstructions: text(sale.ShippingNotes) ?? "",
