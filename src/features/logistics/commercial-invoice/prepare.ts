@@ -1,7 +1,7 @@
 import { palletGrossKg } from "./pallets";
 import { COMMERCIAL_INVOICE_SELLER, resolveCustomsStatement } from "./seller";
 import {
-  incotermPlace, isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
+  isGoodsLine, mergeInvoiceOrders, normaliseHsCode, shippedLinePence, lineWeightKg, summedNetWeightKg,
   type CustomsProcedure, type EuropaDdpModel, type GoodsLine, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment,
 } from "./rules";
 import type { Cin7Quote } from "@/lib/cin7/types";
