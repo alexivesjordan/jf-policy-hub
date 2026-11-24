@@ -8,9 +8,13 @@ alter table logistics.commercial_invoices
   add column if not exists revision integer not null default 1,
   add column if not exists is_latest boolean not null default true;
 
+alter table logistics.commercial_invoices disable trigger commercial_invoices_immutable;
+
 update logistics.commercial_invoices
 set base_number = number
 where base_number is null;
+
+alter table logistics.commercial_invoices enable trigger commercial_invoices_immutable;
 
 alter table logistics.commercial_invoices
   alter column base_number set not null;
