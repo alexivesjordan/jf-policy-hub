@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/pulse/page-header";
 import { listInstalls } from "@/features/sales/install-actions";
 import { installCoversDay } from "@/lib/installs/access-ui";
 import { installsSurface } from "@/lib/installs/archive";
+import { onlyUnassigned } from "@/lib/users/owner";
 
 
 function one(value: string | string[] | undefined) {
@@ -34,15 +35,16 @@ export async function InstallCalendarPage({
   const salesBoard = sales && installsSurface(rawView) === "board";
   const view = salesBoard ? "kanban" : rawView === "week" ? "week" : rawView === "kanban" ? "kanban" : "month";
   const mine = one(params.mine) === "1";
+  const unassigned = one(params.owner) === "unassigned";
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(one(params.on)) ? new Date(`${one(params.on)}T12:00:00`) : new Date();
   const start = view === "kanban" ? addMonths(anchor, -6) : view === "week" ? startOfWeek(anchor, { weekStartsOn: 1 }) : startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
   const end = view === "kanban" ? addMonths(anchor, 12) : view === "week" ? endOfWeek(anchor, { weekStartsOn: 1 }) : endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 });
   const listed = await listInstalls(iso(start), iso(end), mine);
-  const installs = (listed.installs ?? []).map(asDay).filter((row) => row.id);
+  const installs = onlyUnassigned((listed.installs ?? []).map(asDay).filter((row) => row.id), unassigned);
   const days = eachDayOfInterval({ start, end });
   const previous = view === "week" ? addWeeks(anchor, -1) : addMonths(anchor, -1);
   const next = view === "week" ? addWeeks(anchor, 1) : addMonths(anchor, 1);
-  const query = (date: Date, nextView: "board" | "month" | "week" | "kanban" = view === "kanban" ? "board" : view, nextMine = mine) => {
+  const query = (date: Date, nextView: "board" | "month" | "week" | "kanban" = view === "kanban" ? "board" : view, nextMine = mine, nextUnassigned = unassigned) => {
     const search = new URLSearchParams();
     if (nextView !== "board") search.set("on", iso(date));
     if (nextView === "month" && sales) search.set("view", "calendar");
@@ -50,6 +52,7 @@ export async function InstallCalendarPage({
     else if (nextView === "kanban") search.set("view", "kanban");
     else if (nextView === "month") search.set("view", "month");
     if (nextMine) search.set("mine", "1");
+    if (nextUnassigned) search.set("owner", "unassigned");
     const text = search.toString();
     return text ? `${basePath}?${text}` : basePath;
   };
@@ -65,7 +68,8 @@ export async function InstallCalendarPage({
         {view === "kanban" ? null : <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={query(next, view === "week" ? "week" : "month")}>Next</Link>}
         {view === "kanban" ? null : <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "month" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "month")}>Month</Link>}
         {view === "kanban" ? null : <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${view === "week" ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, "week")}>Week</Link>}
-        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view === "kanban" ? "board" : view === "week" ? "week" : "month", !mine)}>{mine ? "All installs" : "My installs"}</Link>
+        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${mine ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view === "kanban" ? "board" : view === "week" ? "week" : "month", !mine, unassigned)}>{mine ? "All installs" : "My installs"}</Link>
+        <Link className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${unassigned ? "bg-primary text-primary-foreground" : "border border-line"}`} href={query(anchor, view === "kanban" ? "board" : view === "week" ? "week" : "month", mine, !unassigned)}>{unassigned ? "All owners" : "Unassigned"}</Link>
         <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={`${basePath}/archive`}>Archive</Link>
         {basePath.startsWith("/operations") && view !== "kanban" ? <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href="/operations/schedule">Schedule</Link> : null}
       </div>
@@ -85,6 +89,7 @@ export async function InstallCalendarPage({
                       <Link className="block rounded-lg bg-muted px-2 py-1 text-xs font-semibold" href={`${basePath}/${row.id}`}>
                         {row.orderNumber}
                         <span className="mt-0.5 block font-normal text-grey">{row.customerName}</span>
+                        <span className="mt-0.5 block font-normal text-grey">{row.ownerName || "Unassigned"}</span>
                       </Link>
                     </li>
                   ))}
@@ -122,6 +127,8 @@ function asDay(row: Record<string, unknown>): CalendarInstall {
     stage: String(row.stage ?? "booked"),
     installPrice: row.installPrice,
     mediaCount: mediaCountOf(row),
+    ownerUserId: row.ownerUserId ? String(row.ownerUserId) : null,
+    ownerName: row.ownerName ? String(row.ownerName) : "Unassigned",
   };
 }
 

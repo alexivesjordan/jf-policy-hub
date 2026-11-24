@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { FieldResourceSelect, type FieldResourceOption } from "@/components/field-resource-select";
 import { Button, Input, Select } from "@/components/pulse/ui";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DeleteUserButton } from "@/components/delete-user-button";
 import { saveWorkspaceUser } from "@/features/workspace/actions";
 import { engineerNameFromPerson } from "@/lib/installs/new-engineer";
 import { fieldEngineerBlankLabel } from "@/lib/installs/field-engineer-label";
@@ -167,6 +168,7 @@ export function WorkspaceUserCard({
         {state?.message ? <p className="text-sm font-semibold text-red">{state.message}</p> : null}
         <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Saving" : "Save"}</Button>
       </form>
+      <DeleteUserButton userId={person.id} name={person.full_name || person.email} />
     </li>
   );
 }

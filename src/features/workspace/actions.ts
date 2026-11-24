@@ -172,6 +172,53 @@ export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: F
   return null;
 }
 
+export async function setRecordOwner(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
+  await requireWorkspaceAdmin();
+  const supabase = await createClient();
+  const owner = clean(formData.get("ownerId"));
+  const { error } = await supabase.rpc("set_record_owner", {
+    p_kind: clean(formData.get("kind")),
+    p_id: clean(formData.get("recordId")),
+    p_owner: owner || null,
+  });
+  if (error) return { message: messageFromError(error, "Could not save the owner.") };
+  const recordId = clean(formData.get("recordId"));
+  revalidatePath("/operations/jobs");
+  revalidatePath(`/operations/jobs/${recordId}`);
+  revalidatePath("/operations/installs");
+  revalidatePath(`/operations/installs/${recordId}`);
+  revalidatePath("/sales/installs");
+  revalidatePath(`/sales/installs/${recordId}`);
+  return null;
+}
+
+export async function deleteWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
+  await requireWorkspaceAdmin();
+  const userId = clean(formData.get("userId"));
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_delete_user", { p_profile: userId });
+  if (error) return { message: messageFromError(error, "Could not delete that user.") };
+  const mode = (data as { mode?: string } | null)?.mode;
+  if (!hasServiceRole()) {
+    return { message: mode === "hard"
+      ? "The account is ready to remove, but signing them out needs SUPABASE_SERVICE_ROLE_KEY on the server."
+      : "They are removed from Pulse, but blocking sign-in needs SUPABASE_SERVICE_ROLE_KEY on the server." };
+  }
+  const service = createAdminClient();
+  if (!service) {
+    return { message: "They are removed from Pulse, but blocking sign-in needs SUPABASE_SERVICE_ROLE_KEY on the server." };
+  }
+  if (mode === "hard") {
+    const removed = await service.auth.admin.deleteUser(userId);
+    if (removed.error) return { message: "Could not remove that sign-in. Try again in a moment." };
+  } else {
+    const banned = await service.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
+    if (banned.error) return { message: "They are removed from Pulse, but the sign-in ban did not save. Try again in a moment." };
+  }
+  revalidatePath("/workspace/users");
+  return { message: mode === "hard" ? "User deleted." : "User deleted. Their name stays on past records." };
+}
+
 export async function resendWorkspaceInvite(formData: FormData) {
   await requireWorkspaceAdmin();
   if (!hasServiceRole()) return;

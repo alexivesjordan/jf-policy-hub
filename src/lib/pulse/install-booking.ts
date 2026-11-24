@@ -20,6 +20,8 @@ export const SALES_INSTALL_FIELDS = [
   "status",
   "bookingRepId",
   "bookingRepName",
+  "ownerUserId",
+  "ownerName",
   "proposalPath",
   "serviceQuoteId",
   "stage",

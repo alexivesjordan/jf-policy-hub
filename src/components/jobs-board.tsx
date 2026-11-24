@@ -34,6 +34,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { setJobStatus } from "@/features/operations/actions";
 import type { JobSummary } from "@/features/operations/types";
 import { formatDate } from "@/lib/format";
+import { ownerLabel } from "@/lib/users/owner";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "pulse-jobs-view";
@@ -84,7 +85,10 @@ export function JobsBoard({
   const router = useRouter();
   const [overrides, setOverrides] = useState<Record<string, { status: string; status_label: string }>>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const rows = jobs.map((job) => (overrides[job.id] ? { ...job, ...overrides[job.id] } : job));
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const rows = jobs
+    .filter((job) => !unassignedOnly || !job.owner_user_id)
+    .map((job) => (overrides[job.id] ? { ...job, ...overrides[job.id] } : job));
 
   useEffect(() => {
     if (explicit) {
@@ -125,6 +129,9 @@ export function JobsBoard({
           </ToggleGroup>
         }
       />
+      <button type="button" className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${unassignedOnly ? "bg-primary text-primary-foreground" : "border border-line"}`} onClick={() => setUnassignedOnly((current) => !current)}>
+        {unassignedOnly ? "All owners" : "Unassigned"}
+      </button>
       {error ? <ErrorState title="Jobs did not load" description={error} /> : null}
       {notice ? <p className="text-sm text-foreground" role="status">{notice}</p> : null}
       {rows.length === 0 && !error ? (
@@ -175,6 +182,7 @@ function JobList({ jobs }: { jobs: JobSummary[] }) {
                 {job.fixture ? <Badge tone="pending">Fixture</Badge> : null}
               </span>
               <span className="mt-1 block text-sm text-muted-foreground">{job.cin7_order_number || job.cin7_number || "No order number"}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{ownerLabel(job.owner_name)}</span>
               <span className="mt-2 flex items-center justify-between gap-2 text-sm">
                 <Badge tone="active">{displayStatus(job.status_label)}</Badge>
                 <span className="text-muted-foreground">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</span>
@@ -190,6 +198,7 @@ function JobList({ jobs }: { jobs: JobSummary[] }) {
               <TableHead>Customer</TableHead>
               <TableHead>Order</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Owner</TableHead>
               <TableHead>Dates</TableHead>
             </TableRow>
           </TableHeader>
@@ -206,6 +215,7 @@ function JobList({ jobs }: { jobs: JobSummary[] }) {
                 </TableCell>
                 <TableCell>{job.cin7_order_number || job.cin7_number || "No order number"}</TableCell>
                 <TableCell><Badge tone="active">{displayStatus(job.status_label)}</Badge></TableCell>
+                <TableCell>{ownerLabel(job.owner_name)}</TableCell>
                 <TableCell className="text-grey">{jobDate(job)}{job.city ? ` · ${job.city}` : ""}</TableCell>
               </TableRow>
             ))}
@@ -366,6 +376,7 @@ function JobKanbanCard({
           ) : null}
           <Link href={`/operations/jobs/${job.id}`} className="min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <p className="font-semibold text-foreground">{job.customer_name}</p>
+            <p className="text-xs text-muted-foreground">{ownerLabel(job.owner_name)}</p>
             <p className="mt-1 text-xs text-muted-foreground">{job.cin7_order_number || job.cin7_number || "No order number"}</p>
             <p className="mt-1 text-xs text-muted-foreground">{jobDate(job)}</p>
           </Link>
