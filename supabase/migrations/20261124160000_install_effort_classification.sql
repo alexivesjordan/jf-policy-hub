@@ -73,7 +73,7 @@ r as (
   cross join lateral (select case
     when b.n ~* p.non_physical or b.c in ('Service', 'Powder Coating') or upper(b.sku) like 'MARKETING%' then 'delivery_only:non_physical'
     when b.n ~* p.box_component and b.nl !~ 'set of 2 boxes' then 'delivery_only:box_component'
-    when b.core ~* p.bolt_on and b.nl !~ 'end cap|replacement|spare|\ycap\y'
+    when b.core ~* p.bolt_on and b.nl !~ 'end cap|replacement|spare|\ycap\y|power sled'
          and b.c in ('Rigs & Racks', 'Rig & Rack Attachments', 'Gym Storage', 'Functional Fitness', 'Other') then 'rack:bolt_on_component'
     when b.core ~* p.part and b.n !~* p.bundle and b.c <> 'Gym Flooring' then 'delivery_only:part'
     when b.c = any(p.build_cats) and not (b.c = 'Strength Machines' and b.nl ~ 'stand|rack') then 'needs_build:build_category'
