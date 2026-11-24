@@ -205,9 +205,15 @@ function paymentGate(type: CustomerType, orderValue: number | null, threshold: n
   return parts.join(" ");
 }
 
-function unknownAssembly(line: QuoteLineInput, category: string | null): ResolvedLine {
+function unknownBuildFallback(effortClass: EffortRow["effortClass"] | null | undefined) {
+  if (effortClass === "rack") return RATES.unknownBuild.rack;
+  if (effortClass === "unsure") return RATES.unknownBuild.unsure;
+  return RATES.unknownBuild.needsBuild;
+}
+
+function unknownAssembly(line: QuoteLineInput, category: string | null, effortClass?: EffortRow["effortClass"] | null): ResolvedLine {
   const label = category || "Other";
-  const minutes = RATES.unknownFallbackMinutes;
+  const fallback = unknownBuildFallback(effortClass);
   return {
     productName: line.productName,
     qty: line.qty,
@@ -218,11 +224,12 @@ function unknownAssembly(line: QuoteLineInput, category: string | null): Resolve
     row: {
       ...defaultRow(line.productName, label, {
         category: label,
-        buildCrew: 1,
-        buildMinutes: minutes,
+        buildCrew: fallback.crew,
+        buildMinutes: fallback.minutes,
         note: "Needs review",
       }),
       needsAssembly: null,
+      effortClass: effortClass ?? null,
       reviewFlag: "needs-review",
     },
   };
@@ -340,12 +347,13 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
         buildMinutes: ELITE_CARDIO_HQ.hqBuildMinutes,
         note: "Built at HQ and shipped assembled.",
       });
+      const suggestedHq = bySku?.status === "suggested" || bySku?.reviewFlag === "needs-review";
       return {
         productName: line.productName,
         qty: line.qty,
         match: bySku ? "exact" : "category_default",
         category: base.category || "cardio",
-        provisional: false,
+        provisional: suggestedHq,
         note: "Built at HQ and shipped assembled. On site: placement only.",
         row: {
           ...base,
@@ -358,6 +366,8 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
           hqBuildMinutes: bySku?.status === "confirmed" ? (bySku.hqBuildMinutes ?? ELITE_CARDIO_HQ.hqBuildMinutes) : ELITE_CARDIO_HQ.hqBuildMinutes,
           hqBuildCrew: bySku?.status === "confirmed" ? (bySku.hqBuildCrew ?? ELITE_CARDIO_HQ.hqBuildCrew) : ELITE_CARDIO_HQ.hqBuildCrew,
           sitePositionMinutes: bySku?.sitePositionMinutes ?? ELITE_CARDIO_HQ.sitePositionMinutes,
+          reviewFlag: suggestedHq ? "needs-review" : null,
+          status: bySku?.status,
         },
       };
     }
@@ -378,10 +388,10 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
         };
       }
       if (bySku.needsAssembly == null) {
-        if (isLooseKit(line.productName) && bySku.effortClass !== "rack" && bySku.effortClass !== "unsure") {
+        if (isLooseKit(line.productName) && bySku.effortClass !== "rack" && bySku.effortClass !== "unsure" && bySku.effortClass !== "needs_build") {
           return handlingLine(line, bySku.category, bySku);
         }
-        return unknownAssembly(line, bySku.category);
+        return unknownAssembly(line, bySku.category, bySku.effortClass);
       }
       if (bySku.needsAssembly === false) {
         return {
@@ -553,9 +563,13 @@ function isLooseKit(name: string) {
 /** Tags are for items that are built or placed. Loose kit and Needs review lines are not tagged. */
 function chargesTag(row: EffortRow) {
   if ((row.sitePositionMinutes ?? 0) > 0) return true;
-  if (row.needsAssembly === false) return false;
   if (row.needsAssembly === true) return true;
+  if (row.needsAssembly === false || row.needsAssembly === null) return false;
   return (row.buildMinutes ?? 0) > 0;
+}
+
+function lineHasUnpricedBuild(line: ResolvedLine) {
+  return line.match === "unknown";
 }
 
 function defaultRow(productName: string, category: string, effort: CategoryEffortDefault): EffortRow {
@@ -1176,8 +1190,8 @@ export function effortRowForSku(input: {
     return {
       ...defaultRow(input.productName, category, {
         category,
-        buildCrew: 1,
-        buildMinutes: RATES.unknownFallbackMinutes,
+        buildCrew: unknownBuildFallback(input.effortClass).crew,
+        buildMinutes: unknownBuildFallback(input.effortClass).minutes,
         note: "Needs review",
         needsAssembly: null,
       }),
@@ -1230,6 +1244,7 @@ export function forSales(result: PriceResult) {
     bigInstall: result.bigInstall,
     provisional: result.finality === "provisional",
     requirements: result.requirements,
+    hasUnpricedBuildLines: result.lines.some(lineHasUnpricedBuild),
   };
 }
 

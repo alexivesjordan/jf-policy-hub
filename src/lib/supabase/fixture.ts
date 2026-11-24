@@ -554,7 +554,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       } else if (status && row.status !== status) return false;
       return true;
     });
-    const reviewCount = effortRows.filter((row) => (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null).length;
+    const reviewCount = effortRows.filter((row) => row.status === "suggested" || ((row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null)).length;
     return { review_count: reviewCount, name_rule_count: 2, total: rows.length, categories: ["Benches", "Flooring", "Strength", "Rigs & Racks"], rows };
   }
   if (fn === "orbit_calendar") {

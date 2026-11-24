@@ -5,7 +5,7 @@ export const BEST_CASE_NOTICE =
 export const SEGMENT_NOT_SET =
   "Customer segment not set: ask Alex/admin to tag the customer in Cin7.";
 
-export const PRICER_VERSION = "v2.5";
+export const PRICER_VERSION = "v2.6";
 export const EFFORT_TABLE_VERSION = "v2.5";
 
 export const RATES = {
@@ -18,8 +18,15 @@ export const RATES = {
   vanPayloadKg: 500,
   vansAvailable: 2,
   palletRate: 65,
-  /** Unclassified build time. A Needs review line is excluded until a time is entered. */
-  unknownFallbackMinutes: 0,
+  /**
+   * Placeholder build when a class has no stored time. Alex has not set these yet.
+   * Unclassified loose kit does not use them: it stays handling-only at 0 minutes.
+   */
+  unknownBuild: {
+    rack: { crew: 2, minutes: 120 },
+    needsBuild: { crew: 2, minutes: 120 },
+    unsure: { crew: 2, minutes: 120 },
+  },
   palletCapacityKg: 400,
   dayThresholdHours: 12,
   /** Default site window 08:00–17:00. A day may run past 8 h inside this window. */

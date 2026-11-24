@@ -132,7 +132,7 @@ export function PriceQuoteForm({ cin7Connected, initialOrder = "" }: { cin7Conne
       ) : null}
       {failure ? <Banner tone="error">{failure}</Banner> : null}
       {sold?.subcontractor ? <SubcontractorQuote offer={sold.subcontractor} /> : null}
-      {!sold?.subcontractor && quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} /> : null}
+      {!sold?.subcontractor && quote?.customerPrice != null ? <InstallPriceCard price={quote.customerPrice} quoteNumber={quote.quoteNumber} postcode={quote.postcode} provisional={quote.hasUnpricedBuildLines} /> : null}
       {!sold?.subcontractor && includeService && quote?.service ? (
         <>
           <ServiceQuoteResult service={quote.service} />
@@ -195,13 +195,13 @@ function warrantyPrices(service: { prices?: { prices: { annualPm: number; twiceY
   return service?.prices?.[0]?.prices ?? null;
 }
 
-function InstallPriceCard({ price, quoteNumber, postcode }: { price: number; quoteNumber?: string; postcode?: string }) {
+function InstallPriceCard({ price, quoteNumber, postcode, provisional }: { price: number; quoteNumber?: string; postcode?: string; provisional?: boolean }) {
   return (
     <div className="rounded-3xl border border-line bg-card px-6 py-6">
       {quoteNumber || postcode ? <p className="text-sm text-grey">{[quoteNumber, postcode].filter(Boolean).join(" · ")}</p> : null}
       <p className="mt-2 text-sm text-grey">Install price</p>
       <p className="font-display text-4xl">{money(price)}</p>
-      <p className="mt-2 text-sm text-grey">ex VAT</p>
+      <p className="mt-2 text-sm text-grey">{provisional ? "Provisional. ex VAT" : "ex VAT"}</p>
     </div>
   );
 }

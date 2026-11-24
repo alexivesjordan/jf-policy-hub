@@ -1,6 +1,6 @@
 -- Read effort_class and rack_family on the effort table, and filter Needs review.
--- The classification columns are added by 20261124160000, which is already applied
--- on TEST and production. This only replaces the read functions.
+-- Release order: 20261124160000, then this file, then the app. Not applied to production.
+-- 20261124160000 adds the columns. This file only replaces the read functions.
 
 create or replace function public.orbit_sku_effort_for_pricing(p_skus text[])
 returns jsonb
@@ -62,7 +62,10 @@ begin
   return jsonb_build_object(
     'review_count', (
       select count(*) from ops.sku_effort
-      where effort_class in ('rack', 'unsure') and needs_assembly is null
+      where status = 'suggested'
+        or cin7_category = 'Other'
+        or suggestion_rule is not null
+        or (effort_class in ('rack', 'unsure') and needs_assembly is null)
     ),
     'name_rule_count', (
       select count(*) from ops.sku_effort where suggestion_rule is not null and status = 'suggested'

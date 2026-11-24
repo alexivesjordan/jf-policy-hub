@@ -1,5 +1,19 @@
--- Read only. The classification migration is already applied on TEST and production.
--- These checks report that state. They do not change it.
+-- Read only. Release order: 20261124160000, then 20261124170000, then the app.
+-- Not applied to production. Fails if the classification column is missing.
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'ops'
+      and table_name = 'sku_effort'
+      and column_name = 'effort_class'
+  ) then
+    raise exception 'PRECHECK FAILED: ops.sku_effort.effort_class is missing. Apply 20261124160000_install_effort_classification.sql before 20261124170000.';
+  end if;
+end
+$$;
 
 select column_name
 from information_schema.columns
@@ -10,9 +24,3 @@ order by column_name;
 
 select to_regclass('ops.sku_effort_backup_20261124') as sku_backup,
        to_regclass('ops.cin7_category_defaults_backup_20261124') as category_backup;
-
-select effort_class, count(*)
-from ops.sku_effort
-where status = 'suggested'
-group by effort_class
-order by effort_class;

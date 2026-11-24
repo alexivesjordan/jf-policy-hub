@@ -152,7 +152,8 @@ async function effortTableFor(lines: { sku: string }[]) {
       effortClass: row.effort_class,
       rackFamily: row.rack_family,
       workPhase: row.suggestion_rule === "sled-track" ? "sled" : row.effort_unit === "tile" || row.effort_unit === "m2" ? "floor" : "job",
-      needsReview: (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null,
+      needsReview: (row.build_location === "hq" && (row.status === "suggested" || Boolean(row.suggestion_rule)))
+        || ((row.effort_class === "rack" || row.effort_class === "unsure" || row.effort_class === "needs_build") && row.needs_assembly == null),
     }),
     status: row.status === "confirmed" ? "confirmed" as const : "suggested" as const,
   }));
@@ -756,6 +757,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       customerName: view.customerName,
       postcode: view.postcode,
       customerPrice: view.customerPrice,
+      hasUnpricedBuildLines: view.hasUnpricedBuildLines,
       savedQuoteId: savedQuoteId ?? undefined,
       contactEmail: saved?.contactEmail ?? null,
       missingCin7Email: draft.source === "cin7" && !saved?.contactEmail,

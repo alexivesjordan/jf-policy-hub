@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { loadBundledEffortTable } from "./effort-table";
 import { priceInstall, priceVariation, forSales, BEST_CASE_PROFILE, DEFAULT_PRICING } from "./engine";
-import { BEST_CASE_NOTICE, SEGMENT_NOT_SET } from "./rates";
+import { BEST_CASE_NOTICE, RATES, SEGMENT_NOT_SET } from "./rates";
 
 const table = loadBundledEffortTable();
 
@@ -77,23 +77,58 @@ describe("mode A", () => {
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.5 * 100) / 100);
   });
 
-  it("prices an unknown category as Needs review with no build time", () => {
-    const result = priceInstall({
+  it("prices an unknown line from its class fallback", () => {
+    const priced = (line: { productName: string; category?: string; sku?: string }, row?: Parameters<typeof priceInstall>[0]["table"][number]) => priceInstall({
       mode: "A",
       postcode: "NR1 1AA",
       miles: 10,
       segment: "franchisee",
-      lines: [{ productName: "Mystery widget", category: "widgets", qty: 1, unitWeightKg: 12 }],
-      table,
+      lines: [{ ...line, qty: 1, unitWeightKg: 12 }],
+      table: row ? [row] : table,
     });
-    assert.equal(result.blockedReason, null);
-    assert.equal(result.lines[0]?.match, "unknown");
-    assert.equal(result.lines[0]?.note, "Needs review");
-    assert.equal(result.lines[0]?.row?.buildMinutes, 0);
-    assert.equal(result.breakdown?.freight, 0);
-    assert.equal(result.flags.some((flag) => /weight unknown on Mystery widget/.test(flag)), false);
-    assert.ok(result.flags.some((flag) => flag.startsWith("Needs review: Mystery widget")));
-    assert.equal("flags" in forSales(result), false);
+    const widget = priced({ productName: "Mystery widget", category: "widgets" });
+    assert.equal(widget.lines[0]?.match, "unknown");
+    assert.equal(widget.lines[0]?.note, "Needs review");
+    assert.equal(widget.lines[0]?.row?.buildCrew, RATES.unknownBuild.needsBuild.crew);
+    assert.equal(widget.lines[0]?.row?.buildMinutes, RATES.unknownBuild.needsBuild.minutes);
+    assert.equal(forSales(widget).hasUnpricedBuildLines, true);
+    assert.equal("flags" in forSales(widget), false);
+    const loose = priced({ productName: "Hex dumbbell 10kg", category: "Dumbbells", sku: "HEX-10" });
+    assert.equal(loose.lines[0]?.match, "handling_only");
+    assert.equal(loose.lines[0]?.row?.buildMinutes, 0);
+    assert.equal(forSales(loose).hasUnpricedBuildLines, false);
+    const rack = priced(
+      { productName: "3 tier kettlebell rack", sku: "JF-KBR-3" },
+      {
+        sku: "JF-KBR-3",
+        productName: "3 tier kettlebell rack",
+        productLine: null,
+        category: "Rigs & Racks",
+        buildLocation: "site",
+        crateAtHq: false,
+        buildCrew: null,
+        buildMinutes: null,
+        hqBuildCrew: null,
+        hqBuildMinutes: null,
+        sitePositionMinutes: null,
+        complexity: null,
+        carryCrew: 1,
+        weightBand: "",
+        unitWeightKg: null,
+        assembledWeightKg: null,
+        assembledDimsMm: null,
+        wheeled: null,
+        carryDifficulty: null,
+        pumpTruckOk: false,
+        floorFixing: "N",
+        reviewFlag: null,
+        needsAssembly: null,
+        effortClass: "rack",
+      },
+    );
+    assert.equal(rack.lines[0]?.row?.buildCrew, RATES.unknownBuild.rack.crew);
+    assert.equal(rack.lines[0]?.row?.buildMinutes, RATES.unknownBuild.rack.minutes);
+    assert.equal(forSales(rack).hasUnpricedBuildLines, true);
   });
 
   it("uses a Cin7 category default and does not build loose kit", () => {

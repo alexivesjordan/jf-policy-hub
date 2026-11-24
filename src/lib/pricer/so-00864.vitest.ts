@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { effortRowForSku, priceInstall, type QuoteLineInput } from "./engine";
+import { effortRowForSku, forSales, priceInstall, type QuoteLineInput } from "./engine";
+import { RATES } from "./rates";
 import type { EffortRow } from "./effort-table";
 
 /**
@@ -69,7 +70,10 @@ describe("SO-00864 classification", () => {
   it("excludes untimed racks, loose-kit freight and loose-kit tags", () => {
     const review = result.lines.find((line) => line.productName.includes("kettlebell rack"));
     expect(review?.note).toBe("Needs review");
-    expect(review?.row?.buildMinutes).toBe(0);
+    expect(review?.row?.buildCrew).toBe(RATES.unknownBuild.rack.crew);
+    expect(review?.row?.buildMinutes).toBe(RATES.unknownBuild.rack.minutes);
+    expect(forSales(result).hasUnpricedBuildLines).toBe(true);
+    expect(forSales(result).pricerVersion).toBe("v2.6");
     expect(result.lines.filter((line) => /dumbbell \d/.test(line.productName)).every((line) => line.match === "handling_only")).toBe(true);
     expect(result.breakdown?.freight).toBe(0);
     expect(result.breakdown?.consumables).toBe(0.88);
@@ -77,6 +81,6 @@ describe("SO-00864 classification", () => {
     expect(result.breakdown?.days).toBe(1);
     expect(result.flags.some((flag) => /weight unknown/i.test(flag))).toBe(false);
     expect(result.flags.some((flag) => flag.startsWith("Needs review: 3 tier kettlebell rack"))).toBe(true);
-    expect(result.customerPrice).toBe(85.19);
+    expect(result.customerPrice).toBe(183.86);
   });
 });
