@@ -205,28 +205,27 @@ function paymentGate(type: CustomerType, orderValue: number | null, threshold: n
   return parts.join(" ");
 }
 
-function unknownBuildFallback(effortClass: EffortRow["effortClass"] | null | undefined) {
-  if (effortClass === "rack") return RATES.unknownBuild.rack;
-  if (effortClass === "unsure") return RATES.unknownBuild.unsure;
-  return RATES.unknownBuild.needsBuild;
+const NO_BUILD_TIME = "No build time set";
+
+function missingBuildClass(effortClass: EffortRow["effortClass"] | null | undefined) {
+  return effortClass === "rack" || effortClass === "needs_build" || effortClass === "unsure";
 }
 
 function unknownAssembly(line: QuoteLineInput, category: string | null, effortClass?: EffortRow["effortClass"] | null): ResolvedLine {
   const label = category || "Other";
-  const fallback = unknownBuildFallback(effortClass);
   return {
     productName: line.productName,
     qty: line.qty,
     match: "unknown",
     category: label,
     provisional: true,
-    note: "Needs review",
+    note: NO_BUILD_TIME,
     row: {
       ...defaultRow(line.productName, label, {
         category: label,
-        buildCrew: fallback.crew,
-        buildMinutes: fallback.minutes,
-        note: "Needs review",
+        buildCrew: 1,
+        buildMinutes: 0,
+        note: NO_BUILD_TIME,
       }),
       needsAssembly: null,
       effortClass: effortClass ?? null,
@@ -387,22 +386,14 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
           row: bySku,
         };
       }
-      if (bySku.needsAssembly == null) {
-        if (isLooseKit(line.productName) && bySku.effortClass !== "rack" && bySku.effortClass !== "unsure" && bySku.effortClass !== "needs_build") {
+      if (bySku.needsAssembly === false || bySku.effortClass === "delivery_only") {
+        return handlingLine(line, bySku.category, bySku);
+      }
+      if (bySku.needsAssembly == null || (missingBuildClass(bySku.effortClass) && bySku.buildMinutes == null)) {
+        if (isLooseKit(line.productName) && !missingBuildClass(bySku.effortClass)) {
           return handlingLine(line, bySku.category, bySku);
         }
         return unknownAssembly(line, bySku.category, bySku.effortClass);
-      }
-      if (bySku.needsAssembly === false) {
-        return {
-          productName: line.productName,
-          qty: line.qty,
-          match: "handling_only",
-          category: bySku.category,
-          provisional: false,
-          note: "No assembly. Handling and carry only.",
-          row: bySku,
-        };
       }
       return { productName: line.productName, qty: line.qty, match: "exact", category: bySku.category, provisional: false, note: null, row: bySku };
     }
@@ -1186,13 +1177,26 @@ export function effortRowForSku(input: {
       workPhase: input.workPhase ?? "job",
     };
   }
-  if (input.needsAssembly === null || (/^other$/i.test(category) && input.needsAssembly !== true && input.effortUnit !== "tile" && input.effortUnit !== "m2")) {
+  if (input.effortClass === "delivery_only" || input.needsAssembly === false) {
+    return {
+      ...handlingRow(input.productName, category),
+      sku: input.sku,
+      needsAssembly: false,
+      effortClass: input.effortClass ?? null,
+      buildCrew: input.crew ?? 1,
+      buildMinutes: 0,
+      effortUnit: input.effortUnit ?? "each",
+      workPhase: input.workPhase ?? "job",
+      reviewFlag: null,
+    };
+  }
+  if (input.needsAssembly === null || (missingBuildClass(input.effortClass) && input.buildMinutes == null) || (/^other$/i.test(category) && input.needsAssembly !== true && input.effortUnit !== "tile" && input.effortUnit !== "m2")) {
     return {
       ...defaultRow(input.productName, category, {
         category,
-        buildCrew: unknownBuildFallback(input.effortClass).crew,
-        buildMinutes: unknownBuildFallback(input.effortClass).minutes,
-        note: "Needs review",
+        buildCrew: 1,
+        buildMinutes: 0,
+        note: NO_BUILD_TIME,
         needsAssembly: null,
       }),
       sku: input.sku,
@@ -1200,17 +1204,6 @@ export function effortRowForSku(input: {
       effortClass: input.effortClass ?? null,
       rackFamily: input.rackFamily ?? null,
       reviewFlag: "needs-review",
-    };
-  }
-  if (input.needsAssembly === false) {
-    return {
-      ...handlingRow(input.productName, category),
-      sku: input.sku,
-      needsAssembly: false,
-      buildCrew: input.crew ?? 1,
-      buildMinutes: 0,
-      effortUnit: input.effortUnit ?? "each",
-      workPhase: input.workPhase ?? "job",
     };
   }
   const phase = input.workPhase ?? (input.effortUnit === "tile" || input.effortUnit === "m2" || /floor/i.test(category) ? "floor" : "job");
@@ -1288,7 +1281,7 @@ function describeBreakdown(
       productName: line.productName,
       qty: line.qty,
       category: line.category,
-      match: line.note === "Needs review" ? "Needs review" : line.match,
+      match: line.note === NO_BUILD_TIME ? NO_BUILD_TIME : line.match,
       buildCrew: line.row?.buildCrew ?? null,
       buildMinutes: line.row?.buildMinutes ?? null,
       note: line.note,

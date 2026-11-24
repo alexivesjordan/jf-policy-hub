@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { loadBundledEffortTable } from "./effort-table";
 import { priceInstall, priceVariation, forSales, BEST_CASE_PROFILE, DEFAULT_PRICING } from "./engine";
-import { BEST_CASE_NOTICE, RATES, SEGMENT_NOT_SET } from "./rates";
+import { BEST_CASE_NOTICE, SEGMENT_NOT_SET } from "./rates";
 
 const table = loadBundledEffortTable();
 
@@ -88,9 +88,8 @@ describe("mode A", () => {
     });
     const widget = priced({ productName: "Mystery widget", category: "widgets" });
     assert.equal(widget.lines[0]?.match, "unknown");
-    assert.equal(widget.lines[0]?.note, "Needs review");
-    assert.equal(widget.lines[0]?.row?.buildCrew, RATES.unknownBuild.needsBuild.crew);
-    assert.equal(widget.lines[0]?.row?.buildMinutes, RATES.unknownBuild.needsBuild.minutes);
+    assert.equal(widget.lines[0]?.note, "No build time set");
+    assert.equal(widget.lines[0]?.row?.buildMinutes, 0);
     assert.equal(forSales(widget).hasUnpricedBuildLines, true);
     assert.equal("flags" in forSales(widget), false);
     const loose = priced({ productName: "Hex dumbbell 10kg", category: "Dumbbells", sku: "HEX-10" });
@@ -126,8 +125,8 @@ describe("mode A", () => {
         effortClass: "rack",
       },
     );
-    assert.equal(rack.lines[0]?.row?.buildCrew, RATES.unknownBuild.rack.crew);
-    assert.equal(rack.lines[0]?.row?.buildMinutes, RATES.unknownBuild.rack.minutes);
+    assert.equal(rack.lines[0]?.note, "No build time set");
+    assert.equal(rack.lines[0]?.row?.buildMinutes, 0);
     assert.equal(forSales(rack).hasUnpricedBuildLines, true);
   });
 

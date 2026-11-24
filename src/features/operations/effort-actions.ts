@@ -102,6 +102,38 @@ export async function saveMissingCategoryDefaults(_state: ActionState, formData:
   }
 }
 
+export async function saveSkuEffortRow(input: {
+  sku: string;
+  needsAssembly: "yes" | "no" | "unknown";
+  crew: number | null;
+  minutes: number | null;
+}): Promise<ActionState> {
+  try {
+    const profile = await requireOperationsUser();
+    const allowed = profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "edit";
+    if (!allowed) return { ok: false, message: "You cannot edit the effort table." };
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("orbit_update_sku_effort", {
+      p_skus: [input.sku],
+      p_needs_assembly: input.needsAssembly,
+      p_crew: input.crew,
+      p_minutes: input.minutes,
+      p_status: "confirmed",
+      p_notes: null,
+      p_build_location: null,
+      p_hq_minutes: null,
+      p_hq_crew: null,
+      p_position_minutes: null,
+      p_effort_unit: null,
+    });
+    if (error) throw new Error(messageFromError(error, "Could not save that SKU."));
+    revalidatePath("/operations/settings");
+    return { ok: true, message: "Saved." };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not save that SKU." };
+  }
+}
+
 export async function bulkUpdateSkuEffort(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const supabase = await ownerClient();

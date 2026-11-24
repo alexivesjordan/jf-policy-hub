@@ -149,7 +149,7 @@ export function PriceWorkings({
       {flags.filter((flag) => flag.startsWith("Needs review:")).map((flag) => (
         <p key={flag} className="rounded-2xl border border-line bg-card px-4 py-3 text-sm text-grey">
           {flag}{" "}
-          <Link href="/operations/settings?status=suggested" className="font-semibold text-ink underline decoration-red">Open the effort table</Link>
+          <Link href="/operations/settings?status=no-build-time" className="font-semibold text-ink underline decoration-red">Open the effort table</Link>
         </p>
       ))}
       <section className="rounded-3xl border border-line bg-card px-5 py-4">

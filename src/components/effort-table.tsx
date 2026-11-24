@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { LockedFields } from "@/components/locked-fields";
 import { Banner, Button, Input, Select } from "@/components/pulse/ui";
 import { EmptyState } from "@/components/pulse/states";
-import { EffortDataTable } from "@/components/effort-data-table";
+import { SkuEffortGrid } from "@/components/sku-effort-grid";
 import {
   saveCin7CategoryDefaults,
   saveMissingCategoryDefaults,
@@ -180,5 +180,5 @@ export function SkuEffortEditor({
   filters: { search: string; category: string; status: string; needsAssembly: string };
   categories: string[];
 }) {
-  return <EffortDataTable rows={rows} page={page} total={total} filters={filters} categories={categories} />;
+  return <SkuEffortGrid rows={rows} page={page} total={total} filters={filters} categories={categories} />;
 }

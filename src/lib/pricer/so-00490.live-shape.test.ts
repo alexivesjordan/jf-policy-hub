@@ -194,10 +194,9 @@ describe("SO-00490 live-shaped categories", () => {
   it("stays near the golden once those machines are HQ-built", () => {
     // Elite Cardio is HQ-built as well as the pin-loaded machines, so HQ labour is £1,184.04.
     // Site days drop because those cardio machines are placement only.
-    // Freight is no longer on the quote. The untimed Functional Fitness line uses the
-    // needs-build placeholder of 2×120, so this is not the old £3,780.26.
-    assert.equal(result.cost, 3370.58);
-    assert.equal(result.customerPrice, Math.round(3370.58 * 1.8 * 100) / 100);
+    // Freight is off the quote, and the untimed Functional Fitness line is 0 minutes.
+    assert.equal(result.cost, 3267.43);
+    assert.equal(result.customerPrice, Math.round(3267.43 * 1.8 * 100) / 100);
     assert.equal(result.breakdown?.freight, 0);
     assert.equal(result.breakdown?.hqCost, 1184.04);
   });

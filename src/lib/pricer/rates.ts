@@ -18,15 +18,6 @@ export const RATES = {
   vanPayloadKg: 500,
   vansAvailable: 2,
   palletRate: 65,
-  /**
-   * Placeholder build when a class has no stored time. Alex has not set these yet.
-   * Unclassified loose kit does not use them: it stays handling-only at 0 minutes.
-   */
-  unknownBuild: {
-    rack: { crew: 2, minutes: 120 },
-    needsBuild: { crew: 2, minutes: 120 },
-    unsure: { crew: 2, minutes: 120 },
-  },
   palletCapacityKg: 400,
   dayThresholdHours: 12,
   /** Default site window 08:00–17:00. A day may run past 8 h inside this window. */

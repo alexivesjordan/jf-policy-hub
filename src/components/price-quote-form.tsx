@@ -201,7 +201,8 @@ function InstallPriceCard({ price, quoteNumber, postcode, provisional }: { price
       {quoteNumber || postcode ? <p className="text-sm text-grey">{[quoteNumber, postcode].filter(Boolean).join(" · ")}</p> : null}
       <p className="mt-2 text-sm text-grey">Install price</p>
       <p className="font-display text-4xl">{money(price)}</p>
-      <p className="mt-2 text-sm text-grey">{provisional ? "Provisional. ex VAT" : "ex VAT"}</p>
+      <p className="mt-2 text-sm text-grey">ex VAT</p>
+      {provisional ? <p className="mt-2 text-sm font-semibold">Provisional. Build time missing.</p> : null}
     </div>
   );
 }

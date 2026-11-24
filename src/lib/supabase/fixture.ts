@@ -551,6 +551,10 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       if (status === "needs-review") {
         const review = (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null;
         if (!review) return false;
+      } else if (status === "no-build-time") {
+        const effort = row as { effort_class?: string; needs_assembly?: boolean | null; build_minutes?: number | null };
+        const missing = (effort.effort_class === "rack" || effort.effort_class === "needs_build" || effort.effort_class === "unsure") && (effort.needs_assembly == null || effort.build_minutes == null);
+        if (!missing) return false;
       } else if (status && row.status !== status) return false;
       return true;
     });

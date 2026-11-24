@@ -30,21 +30,46 @@ async function SettingsBody({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireOperationsUser();
+  const profile = await requireOperationsUser();
   const context = await getOfficeContext();
+  const canEditEffort = profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "edit";
   const params = await searchParams;
   const search = one(params.search);
   const category = one(params.category);
   const status = one(params.status);
   const needs = one(params.needs);
   const page = Math.max(0, Number(one(params.page)) || 0);
-  if (!context.is_owner) {
+  if (!context.is_owner && !canEditEffort) {
     return (
       <PageHeader
         eyebrow="Pulse Operations"
         title="Effort table"
-        description="Only the named owner can view and change pricing and the charges grid."
       />
+    );
+  }
+
+  if (!context.is_owner) {
+    const effort = await listSkuEffort({ search, category, status, needsAssembly: needs, offset: page * 50 }).catch(() => null);
+    return (
+      <div className="space-y-8">
+        <PageHeader eyebrow="Pulse Operations" title="Effort table" />
+        <Card>
+          <h2 className="font-display text-2xl">Effort table</h2>
+          <div className="mt-4">
+            {effort ? (
+              <SkuEffortEditor
+                rows={effort.rows ?? []}
+                page={page}
+                total={effort.total ?? 0}
+                filters={{ search, category, status, needsAssembly: needs }}
+                categories={effort.categories ?? []}
+              />
+            ) : (
+              <ErrorState title="The effort table is not available" />
+            )}
+          </div>
+        </Card>
+      </div>
     );
   }
 
@@ -102,16 +127,10 @@ async function SettingsBody({
 
       <Card>
         <h2 className="font-display text-2xl">Cin7 category defaults</h2>
-        <p className="mt-2 text-sm text-grey">
-          Used when a SKU has not been confirmed. Seeds are suggestions. An unknown line is Needs review and has no build time.
-        </p>
         <div className="mt-4">
           {categories.length > 0 ? <CategoryDefaultEditor rows={categories} /> : <p className="text-sm text-ink">Apply the effort migration to seed category defaults.</p>}
         </div>
         <h3 className="font-display mt-8 text-xl">Categories with no default</h3>
-        <p className="mt-2 text-sm text-grey">
-          {gaps.length} categories, {gaps.reduce((sum, row) => sum + Number(row.sku_count), 0)} SKUs. An unknown line is Needs review until you set a time.
-        </p>
         <div className="mt-4">
           <CategoryGapEditor rows={gaps} />
         </div>
@@ -120,12 +139,6 @@ async function SettingsBody({
       <Card>
         <div>
           <h2 className="font-display text-2xl">Effort table</h2>
-          {effort && effort.review_count > 0 ? (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-3">
-              <p className="text-sm font-semibold">{effort.review_count} {effort.review_count === 1 ? "product needs" : "products need"} a review.</p>
-              <a className="text-sm font-semibold underline decoration-primary" href="/operations/settings?status=suggested">Show these</a>
-            </div>
-          ) : null}
         </div>
         <div className="mt-4">
           {effort ? (
