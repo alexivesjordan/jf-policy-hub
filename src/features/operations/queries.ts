@@ -108,6 +108,8 @@ export type SkuEffortRow = {
   status: string;
   notes: string | null;
   suggestion_rule?: string | null;
+  effort_class?: "delivery_only" | "rack" | "needs_build" | "unsure" | null;
+  rack_family?: string | null;
 };
 
 export async function listCin7CategoryDefaults() {

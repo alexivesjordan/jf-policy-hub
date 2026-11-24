@@ -19,6 +19,8 @@ const COLUMNS = [
   ["product_name", "Product"],
   ["cin7_category", "Cin7 category"],
   ["assembly", "Assembly"],
+  ["class", "Class"],
+  ["family", "Rack family"],
   ["unit", "Unit"],
   ["location", "Built at"],
   ["crew", "Crew"],
@@ -30,7 +32,20 @@ type SortKey = (typeof COLUMNS)[number][0];
 
 type Filters = { search: string; category: string; status: string; needsAssembly: string };
 
+function classLabel(value: SkuEffortRow["effort_class"]) {
+  if (value === "delivery_only") return "Delivery only";
+  if (value === "rack") return "Rack";
+  if (value === "needs_build") return "Needs build";
+  if (value === "unsure") return "Unsure";
+  return "—";
+}
+
+function needsReview(row: SkuEffortRow) {
+  return (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null;
+}
+
 function effortStatus(row: SkuEffortRow): { label: string; tone: "good" | "pending" | "neutral" } {
+  if (needsReview(row)) return { label: "Needs review", tone: "pending" };
   if (row.status === "confirmed") return { label: "Confirmed", tone: "good" };
   if (row.suggestion_rule) return { label: "Needs review", tone: "pending" };
   if (row.status === "suggested") return { label: "Suggested", tone: "pending" };
@@ -156,7 +171,8 @@ export function EffortDataTable({
               <option value="">All</option>
               <option value="suggested">Suggested</option>
               <option value="confirmed">Confirmed</option>
-              <option value="name-rule">Needs review</option>
+              <option value="needs-review">Needs review</option>
+              <option value="name-rule">Name rule</option>
             </Select>
           </label>
         </div>
@@ -187,7 +203,7 @@ export function EffortDataTable({
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-xs">{row.sku}</p>
                     <p className="font-semibold">{row.product_name}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{row.cin7_category ?? "No category"} · {assemblyLabel(row.needs_assembly)} · {effortStatus(row).label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{row.cin7_category ?? "No category"} · {classLabel(row.effort_class)} · {row.rack_family ?? "No rack family"} · {effortStatus(row).label}</p>
                     <p className="text-sm text-muted-foreground">{unitLabel(row.effort_unit)} · {row.build_location === "hq" ? "HQ" : "Site"} · Crew {row.crew ?? "—"} · {minutesLabel(row)}</p>
                     <Button type="button" variant="ghost" className="mt-2 px-0" onClick={() => setEditing(row.sku)}>Edit row</Button>
                   </div>
@@ -245,6 +261,8 @@ export function EffortDataTable({
                       {row.suggestion_rule === "pin-loaded" ? <span className="mt-1 block text-xs text-muted-foreground">Built at HQ</span> : null}
                     </td>
                     <td className="px-3 py-2">{assemblyLabel(row.needs_assembly)}</td>
+                    <td className="px-3 py-2">{classLabel(row.effort_class)}</td>
+                    <td className="px-3 py-2">{row.rack_family ?? "—"}</td>
                     <td className="px-3 py-2">
                       {unitLabel(row.effort_unit)}
                       {row.cin7_uom ? <span className="mt-1 block text-xs text-muted-foreground">Cin7 {row.cin7_uom}</span> : null}
@@ -336,6 +354,8 @@ function sortValue(row: SkuEffortRow, key: SortKey) {
   if (key === "product_name") return row.product_name;
   if (key === "cin7_category") return row.cin7_category ?? "";
   if (key === "assembly") return assemblyLabel(row.needs_assembly);
+  if (key === "class") return classLabel(row.effort_class);
+  if (key === "family") return row.rack_family ?? "";
   if (key === "unit") return unitLabel(row.effort_unit);
   if (key === "location") return row.build_location === "hq" ? "HQ" : "Site";
   if (key === "crew") return row.crew ?? -1;

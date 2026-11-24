@@ -103,14 +103,14 @@ async function SettingsBody({
       <Card>
         <h2 className="font-display text-2xl">Cin7 category defaults</h2>
         <p className="mt-2 text-sm text-grey">
-          Used when a SKU has not been confirmed. Seeds are suggestions. Other stays unknown and prices as a 2-man, 2-hour assembly.
+          Used when a SKU has not been confirmed. Seeds are suggestions. An unknown line is Needs review and has no build time.
         </p>
         <div className="mt-4">
           {categories.length > 0 ? <CategoryDefaultEditor rows={categories} /> : <p className="text-sm text-ink">Apply the effort migration to seed category defaults.</p>}
         </div>
         <h3 className="font-display mt-8 text-xl">Categories with no default</h3>
         <p className="mt-2 text-sm text-grey">
-          {gaps.length} categories, {gaps.reduce((sum, row) => sum + Number(row.sku_count), 0)} SKUs. These price as a 2-man, 2-hour assembly until you set one. Leave a row unknown to skip it.
+          {gaps.length} categories, {gaps.reduce((sum, row) => sum + Number(row.sku_count), 0)} SKUs. An unknown line is Needs review until you set a time.
         </p>
         <div className="mt-4">
           <CategoryGapEditor rows={gaps} />

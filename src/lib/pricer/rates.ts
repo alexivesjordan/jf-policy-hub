@@ -18,6 +18,8 @@ export const RATES = {
   vanPayloadKg: 500,
   vansAvailable: 2,
   palletRate: 65,
+  /** Unclassified build time. A Needs review line is excluded until a time is entered. */
+  unknownFallbackMinutes: 0,
   palletCapacityKg: 400,
   dayThresholdHours: 12,
   /** Default site window 08:00–17:00. A day may run past 8 h inside this window. */

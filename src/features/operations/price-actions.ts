@@ -134,6 +134,8 @@ async function effortTableFor(lines: { sku: string }[]) {
     suggestion_rule?: string | null;
     status?: string | null;
     effort_unit?: "each" | "tile" | "m2" | null;
+    effort_class?: "delivery_only" | "rack" | "needs_build" | "unsure" | null;
+    rack_family?: string | null;
   }[]).map((row) => ({
     ...effortRowForSku({
       sku: row.sku,
@@ -147,8 +149,10 @@ async function effortTableFor(lines: { sku: string }[]) {
       hqBuildCrew: row.hq_build_crew,
       sitePositionMinutes: row.site_position_minutes,
       effortUnit: row.effort_unit,
+      effortClass: row.effort_class,
+      rackFamily: row.rack_family,
       workPhase: row.suggestion_rule === "sled-track" ? "sled" : row.effort_unit === "tile" || row.effort_unit === "m2" ? "floor" : "job",
-      needsReview: row.status === "suggested" || Boolean(row.suggestion_rule),
+      needsReview: (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null,
     }),
     status: row.status === "confirmed" ? "confirmed" as const : "suggested" as const,
   }));

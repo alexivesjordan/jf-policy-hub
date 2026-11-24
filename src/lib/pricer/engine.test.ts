@@ -77,20 +77,21 @@ describe("mode A", () => {
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.5 * 100) / 100);
   });
 
-  it("prices an unknown category as a 2-man 2-hour assembly and flags it", () => {
+  it("prices an unknown category as Needs review with no build time", () => {
     const result = priceInstall({
       mode: "A",
       postcode: "NR1 1AA",
       miles: 10,
       segment: "franchisee",
-      lines: [{ productName: "Mystery widget", category: "widgets", qty: 1 }],
+      lines: [{ productName: "Mystery widget", category: "widgets", qty: 1, unitWeightKg: 12 }],
       table,
     });
     assert.equal(result.blockedReason, null);
     assert.equal(result.lines[0]?.match, "unknown");
-    assert.equal(result.lines[0]?.row?.buildCrew, 2);
-    assert.equal(result.lines[0]?.row?.buildMinutes, 120);
-    assert.ok(result.customerPrice != null && result.customerPrice > 0);
+    assert.equal(result.lines[0]?.note, "Needs review");
+    assert.equal(result.lines[0]?.row?.buildMinutes, 0);
+    assert.equal(result.breakdown?.freight, 0);
+    assert.equal(result.flags.some((flag) => /weight unknown on Mystery widget/.test(flag)), false);
     assert.ok(result.flags.some((flag) => flag.startsWith("Needs review: Mystery widget")));
     assert.equal("flags" in forSales(result), false);
   });

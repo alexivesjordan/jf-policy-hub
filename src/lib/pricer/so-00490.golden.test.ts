@@ -7,7 +7,9 @@ import { loadBundledEffortTable } from "./effort-table";
 import { forSales, priceInstall, type CategoryEffortDefault } from "./engine";
 import { BEST_CASE_NOTICE } from "./rates";
 
-const WORKED_COST = 3356.51;
+// Was £3,356.51 when loose-kit pallet freight was £195. Freight is no longer on an install quote.
+// £195 plus the 15% contingency is £224.25, and 3356.51 − 224.25 = 3132.26.
+const WORKED_COST = 3132.26;
 
 const MACHINE_DEFAULTS: CategoryEffortDefault[] = ["cardio", "rack-rig", "bench", "strength-selectorised"].map((category) => ({
   category,
@@ -121,7 +123,7 @@ describe("SO-00490 golden workings", () => {
     assert.equal(result.requirements?.vanSize, "crafter");
     assert.equal(breakdown.days, 4);
     assert.equal(breakdown.nights, 3);
-    assert.equal(breakdown.freight, 195);
+    assert.equal(breakdown.freight, 0);
     assert.equal(breakdown.consumables, 6.16);
     assert.equal(breakdown.vehicle, 57.51);
     assert.equal(breakdown.hotel, 480);
@@ -129,7 +131,7 @@ describe("SO-00490 golden workings", () => {
     assert.equal(Math.round(breakdown.contingencyRate * 100), 15);
     assert.ok(Math.abs((result.cost ?? 0) - WORKED_COST) <= 1, `cost ${result.cost} on site ${breakdown.onSiteHours}h hq ${breakdown.hqCost}`);
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.8 * 100) / 100);
-    assert.equal(Math.round(WORKED_COST * 1.8 * 100) / 100, 6041.72);
+    assert.equal(Math.round(WORKED_COST * 1.8 * 100) / 100, 5638.07);
     const recommended = breakdown.crewPlans.find((plan) => plan.note.includes("Recommended"));
     assert.equal(recommended?.id, "overnight-straight");
     assert.ok(breakdown.crewPlans.every((plan) => plan.id === "overnight-straight" || plan.siteCost + 0.01 >= (recommended?.siteCost ?? 0)));

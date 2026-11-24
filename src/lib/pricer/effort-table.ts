@@ -34,6 +34,9 @@ export type EffortRow = {
   effortUnit?: "each" | "tile" | "m2" | null;
   /** Flooring is laid before sled track. Those phases are never overlapped. */
   workPhase?: "job" | "floor" | "sled" | null;
+  /** Classification from the install-effort migration. Null on older table rows. */
+  effortClass?: "delivery_only" | "rack" | "needs_build" | "unsure" | null;
+  rackFamily?: string | null;
 };
 
 function num(value: string): number | null {
