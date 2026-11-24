@@ -205,7 +205,13 @@ function paymentGate(type: CustomerType, orderValue: number | null, threshold: n
   return parts.join(" ");
 }
 
-function unknownAssembly(line: QuoteLineInput, category: string | null): ResolvedLine {
+const NO_BUILD_TIME = "No build time set";
+
+function missingBuildClass(effortClass: EffortRow["effortClass"] | null | undefined) {
+  return effortClass === "rack" || effortClass === "needs_build" || effortClass === "unsure";
+}
+
+function unknownAssembly(line: QuoteLineInput, category: string | null, effortClass?: EffortRow["effortClass"] | null): ResolvedLine {
   const label = category || "Other";
   return {
     productName: line.productName,
@@ -213,15 +219,38 @@ function unknownAssembly(line: QuoteLineInput, category: string | null): Resolve
     match: "unknown",
     category: label,
     provisional: true,
-    note: "Needs review",
+    note: NO_BUILD_TIME,
     row: {
       ...defaultRow(line.productName, label, {
         category: label,
-        buildCrew: 2,
-        buildMinutes: 120,
-        note: "Unknown effort. Conservative 2-man, 2-hour assembly.",
+        buildCrew: 1,
+        buildMinutes: 0,
+        note: NO_BUILD_TIME,
       }),
+      needsAssembly: null,
+      effortClass: effortClass ?? null,
       reviewFlag: "needs-review",
+    },
+  };
+}
+
+function handlingLine(line: QuoteLineInput, category: string | null, row?: EffortRow | null): ResolvedLine {
+  const label = category || row?.category || line.category?.trim() || "";
+  return {
+    productName: line.productName,
+    qty: line.qty,
+    match: "handling_only",
+    category: label,
+    provisional: false,
+    note: "No assembly. Handling and carry only.",
+    row: {
+      ...(row ?? handlingRow(line.productName, label)),
+      sku: line.sku?.trim() || row?.sku || null,
+      category: label,
+      needsAssembly: false,
+      buildCrew: row?.buildCrew ?? 1,
+      buildMinutes: 0,
+      reviewFlag: null,
     },
   };
 }
@@ -317,12 +346,13 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
         buildMinutes: ELITE_CARDIO_HQ.hqBuildMinutes,
         note: "Built at HQ and shipped assembled.",
       });
+      const suggestedHq = bySku?.status === "suggested" || bySku?.reviewFlag === "needs-review";
       return {
         productName: line.productName,
         qty: line.qty,
         match: bySku ? "exact" : "category_default",
         category: base.category || "cardio",
-        provisional: false,
+        provisional: suggestedHq,
         note: "Built at HQ and shipped assembled. On site: placement only.",
         row: {
           ...base,
@@ -335,6 +365,8 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
           hqBuildMinutes: bySku?.status === "confirmed" ? (bySku.hqBuildMinutes ?? ELITE_CARDIO_HQ.hqBuildMinutes) : ELITE_CARDIO_HQ.hqBuildMinutes,
           hqBuildCrew: bySku?.status === "confirmed" ? (bySku.hqBuildCrew ?? ELITE_CARDIO_HQ.hqBuildCrew) : ELITE_CARDIO_HQ.hqBuildCrew,
           sitePositionMinutes: bySku?.sitePositionMinutes ?? ELITE_CARDIO_HQ.sitePositionMinutes,
+          reviewFlag: suggestedHq ? "needs-review" : null,
+          status: bySku?.status,
         },
       };
     }
@@ -354,17 +386,14 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
           row: bySku,
         };
       }
-      if (bySku.reviewFlag === "needs-review" || bySku.needsAssembly === null) return unknownAssembly(line, bySku.category);
-      if (bySku.needsAssembly === false) {
-        return {
-          productName: line.productName,
-          qty: line.qty,
-          match: "handling_only",
-          category: bySku.category,
-          provisional: false,
-          note: "No assembly. Handling and carry only.",
-          row: bySku,
-        };
+      if (bySku.needsAssembly === false || bySku.effortClass === "delivery_only") {
+        return handlingLine(line, bySku.category, bySku);
+      }
+      if (bySku.needsAssembly == null || (missingBuildClass(bySku.effortClass) && bySku.buildMinutes == null)) {
+        if (isLooseKit(line.productName) && !missingBuildClass(bySku.effortClass)) {
+          return handlingLine(line, bySku.category, bySku);
+        }
+        return unknownAssembly(line, bySku.category, bySku.effortClass);
       }
       return { productName: line.productName, qty: line.qty, match: "exact", category: bySku.category, provisional: false, note: null, row: bySku };
     }
@@ -506,6 +535,7 @@ function matchLine(line: QuoteLineInput, table: EffortRow[], defaults: CategoryE
     }
   }
 
+  if (isLooseKit(line.productName)) return handlingLine(line, category || null);
   return unknownAssembly(line, category || null);
 }
 
@@ -519,6 +549,18 @@ function inferredCategory(name: string) {
 function isLooseKit(name: string) {
   if (/rack/i.test(name)) return false;
   return /dumbbell|kettlebell|fixed barbell|bumper|slam ball|battle rope|power band|floor stand/i.test(name);
+}
+
+/** Tags are for items that are built or placed. Loose kit and Needs review lines are not tagged. */
+function chargesTag(row: EffortRow) {
+  if ((row.sitePositionMinutes ?? 0) > 0) return true;
+  if (row.needsAssembly === true) return true;
+  if (row.needsAssembly === false || row.needsAssembly === null) return false;
+  return (row.buildMinutes ?? 0) > 0;
+}
+
+function lineHasUnpricedBuild(line: ResolvedLine) {
+  return line.match === "unknown";
 }
 
 function defaultRow(productName: string, category: string, effort: CategoryEffortDefault): EffortRow {
@@ -571,7 +613,7 @@ function handlingRow(productName: string, category: string): EffortRow {
     carryDifficulty: "high",
     pumpTruckOk: true,
     floorFixing: "N",
-    reviewFlag: "Handling-only fallback. Weight unknown until a table row exists.",
+    reviewFlag: null,
   };
 }
 
@@ -695,7 +737,10 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     const row = line.row;
     if (!row) continue;
     if (line.provisional && line.note) provisional.add(line.note);
-    if (row.reviewFlag && row.reviewFlag !== "needs-review") flags.push(`${row.productName}: ${row.reviewFlag}`);
+    if (row.reviewFlag && row.reviewFlag !== "needs-review") {
+      const weightKnown = row.unitWeightKg != null || row.assembledWeightKg != null;
+      if (!(/weight unknown/i.test(row.reviewFlag) && weightKnown)) flags.push(`${row.productName}: ${row.reviewFlag}`);
+    }
     if (row.complexity === "high") high = true;
     if (/floor/i.test(row.category)) hasFlooring = true;
     else hasEquipment = true;
@@ -813,10 +858,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
   const hourly = effectiveHourlyRate();
   const vans = 1;
   const roundTripMiles = miles * 2;
-  const siteKitKg = siteBuildKg + looseKg;
-  const overflowKg = Math.max(0, siteKitKg - vans * RATES.vanPayloadKg);
-  const sitePallets = overflowKg > 0 ? Math.ceil(overflowKg / RATES.palletCapacityKg) : 0;
-  const freight = sitePallets * RATES.palletRate;
+  const freight = 0;
   if (hqUnits > 0) {
     flags.push(`${hqUnits} assembled units need oversized pallets. oversize_pallet_rate is UNSET — needs a Lynnstar per-job quote.`);
   }
@@ -851,7 +893,7 @@ function costJob(lines: ResolvedLine[], profile: SiteProfile, miles: number, spe
     food = choice.food;
     flags.push(`Crew plan: ${choice.label}. ${days} days, ${nights} nights.`);
   }
-  const machines = lines.filter((line) => line.row && line.row.category !== "weights" && line.row.category !== "flooring").reduce((sum, line) => sum + line.qty, 0);
+  const machines = lines.filter((line) => line.row && chargesTag(line.row)).reduce((sum, line) => sum + line.qty, 0);
   const consumables = machines * RATES.tagCost;
   provisional.add("tag_cost_per_unit");
   flags.push("cover_cost_per_unit and leave_behind_pack_cost are UNSET and excluded");
@@ -956,7 +998,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
       ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
       : estimateMilesFromKingsLynn(postcode);
   const resolved = request.lines.map((line) => applyLineWeight(line, matchLine(line, request.table, request.categoryDefaults ?? [])));
-  const review = resolved.filter((line) => line.match === "unknown" || line.row?.reviewFlag === "needs-review");
+  const unpriced = resolved.filter((line) => lineHasUnpricedBuild(line));
 
   const base: PriceResult = {
     pricerVersion: PRICER_VERSION,
@@ -1013,10 +1055,10 @@ export function priceInstall(request: PriceRequest): PriceResult {
   const customerPrice = pricing.minJobCharge != null ? Math.max(markedUp, pricing.minJobCharge) : markedUp;
   const floor = pricing.marginFloorPct != null ? roundMoney(costed.cost * (1 + pricing.marginFloorPct)) : null;
   const flags = [...costed.flags];
-  if (review.length > 0) {
-    const names = review.map((line) => line.productName);
+  if (unpriced.length > 0) {
+    const names = unpriced.map((line) => line.productName);
     const shown = names.slice(0, 30).join(", ");
-    flags.push(`Needs review: ${shown}${names.length > 30 ? `, and ${names.length - 30} more` : ""}. Confirm them on the Pricing page.`);
+    flags.push(`No build time set: ${shown}${names.length > 30 ? `, and ${names.length - 30} more` : ""}.`);
   }
   if (pricing.minJobCharge == null) flags.push("min job charge not set");
   if (pricing.marginFloorPct == null) flags.push("margin floor not set");
@@ -1101,6 +1143,8 @@ export function effortRowForSku(input: {
   hqBuildCrew?: number | null;
   sitePositionMinutes?: number | null;
   needsReview?: boolean;
+  effortClass?: EffortRow["effortClass"];
+  rackFamily?: string | null;
   effortUnit?: "each" | "tile" | "m2" | null;
   workPhase?: "job" | "floor" | "sled" | null;
 }): EffortRow {
@@ -1133,23 +1177,33 @@ export function effortRowForSku(input: {
       workPhase: input.workPhase ?? "job",
     };
   }
-  if (input.needsAssembly === null || (/^other$/i.test(category) && input.effortUnit !== "tile" && input.effortUnit !== "m2")) {
-    return {
-      ...defaultRow(input.productName, category, { category, buildCrew: 2, buildMinutes: 120, note: "Unknown", needsAssembly: null }),
-      sku: input.sku,
-      needsAssembly: null,
-      reviewFlag: "needs-review",
-    };
-  }
-  if (input.needsAssembly === false) {
+  if (input.effortClass === "delivery_only" || input.needsAssembly === false) {
     return {
       ...handlingRow(input.productName, category),
       sku: input.sku,
       needsAssembly: false,
+      effortClass: input.effortClass ?? null,
       buildCrew: input.crew ?? 1,
       buildMinutes: 0,
       effortUnit: input.effortUnit ?? "each",
       workPhase: input.workPhase ?? "job",
+      reviewFlag: null,
+    };
+  }
+  if (input.needsAssembly === null || (missingBuildClass(input.effortClass) && input.buildMinutes == null) || (/^other$/i.test(category) && input.needsAssembly !== true && input.effortUnit !== "tile" && input.effortUnit !== "m2")) {
+    return {
+      ...defaultRow(input.productName, category, {
+        category,
+        buildCrew: 1,
+        buildMinutes: 0,
+        note: NO_BUILD_TIME,
+        needsAssembly: null,
+      }),
+      sku: input.sku,
+      needsAssembly: null,
+      effortClass: input.effortClass ?? null,
+      rackFamily: input.rackFamily ?? null,
+      reviewFlag: "needs-review",
     };
   }
   const phase = input.workPhase ?? (input.effortUnit === "tile" || input.effortUnit === "m2" || /floor/i.test(category) ? "floor" : "job");
@@ -1183,7 +1237,34 @@ export function forSales(result: PriceResult) {
     bigInstall: result.bigInstall,
     provisional: result.finality === "provisional",
     requirements: result.requirements,
+    hasUnpricedBuildLines: result.lines.some(lineHasUnpricedBuild),
+    provisionalNotes: salesProvisionalNotes(result),
   };
+}
+
+function salesProvisionalNotes(result: PriceResult) {
+  const notes: string[] = [];
+  const add = (note: string) => {
+    if (!notes.includes(note)) notes.push(note);
+  };
+  if (result.lines.some(lineHasUnpricedBuild)) add("Build time missing.");
+  if (result.milesMethod?.includes("120 miles")) add("Mileage is an estimate.");
+  if (result.flags.some((flag) => /weight unknown|weight estimated/i.test(flag))) add("Some product weights were estimated or missing.");
+  if (result.flags.some((flag) => /min job charge not set/i.test(flag))) add("Minimum job charge is not set.");
+  if (result.flags.some((flag) => /margin floor not set/i.test(flag))) add("Margin floor is not set.");
+  if (result.flags.some((flag) => /oversize_pallet_rate is UNSET/i.test(flag))) add("Oversized pallet freight is not set.");
+  for (const item of result.provisionalItems) {
+    if (/no build time set/i.test(item)) continue;
+    if (/site_prep|tag_cost|contingency|hq_unpack|weight_band/i.test(item)) continue;
+    if (/^no assembly/i.test(item)) continue;
+    if (/^DHZ/i.test(item)) add("DHZ figures are provisional.");
+    else if (/^fallback:/i.test(item)) add("Some products used a category fallback.");
+    else if (/built at HQ/i.test(item)) add("HQ build time is still a suggestion.");
+    else if (/each machine/i.test(item)) add("Some products used a category default.");
+    else if (/HQ-built Performance Strength/i.test(item)) add("Some pin-loaded machines are priced as HQ-built.");
+    else if (!result.lines.some((line) => line.productName === item)) add(item.endsWith(".") ? item : `${item}.`);
+  }
+  return notes;
 }
 
 function describeBreakdown(
@@ -1226,7 +1307,7 @@ function describeBreakdown(
       productName: line.productName,
       qty: line.qty,
       category: line.category,
-      match: line.match,
+      match: line.note === NO_BUILD_TIME ? NO_BUILD_TIME : line.match,
       buildCrew: line.row?.buildCrew ?? null,
       buildMinutes: line.row?.buildMinutes ?? null,
       note: line.note,

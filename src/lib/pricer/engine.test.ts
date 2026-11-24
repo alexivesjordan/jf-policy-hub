@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { loadBundledEffortTable } from "./effort-table";
-import { priceInstall, priceVariation, forSales, BEST_CASE_PROFILE, DEFAULT_PRICING } from "./engine";
+import { priceInstall, priceVariation, forSales, effortRowForSku, BEST_CASE_PROFILE, DEFAULT_PRICING } from "./engine";
+import type { EffortRow } from "./effort-table";
 import { BEST_CASE_NOTICE, SEGMENT_NOT_SET } from "./rates";
 
 const table = loadBundledEffortTable();
@@ -77,22 +78,83 @@ describe("mode A", () => {
     assert.equal(result.customerPrice, Math.round((result.cost ?? 0) * 1.5 * 100) / 100);
   });
 
-  it("prices an unknown category as a 2-man 2-hour assembly and flags it", () => {
-    const result = priceInstall({
+  it("prices an unknown line from its class fallback", () => {
+    const priced = (line: { productName: string; category?: string; sku?: string }, row?: Parameters<typeof priceInstall>[0]["table"][number]) => priceInstall({
       mode: "A",
       postcode: "NR1 1AA",
       miles: 10,
       segment: "franchisee",
-      lines: [{ productName: "Mystery widget", category: "widgets", qty: 1 }],
-      table,
+      lines: [{ ...line, qty: 1, unitWeightKg: 12 }],
+      table: row ? [row] : table,
     });
-    assert.equal(result.blockedReason, null);
-    assert.equal(result.lines[0]?.match, "unknown");
-    assert.equal(result.lines[0]?.row?.buildCrew, 2);
-    assert.equal(result.lines[0]?.row?.buildMinutes, 120);
-    assert.ok(result.customerPrice != null && result.customerPrice > 0);
-    assert.ok(result.flags.some((flag) => flag.startsWith("Needs review: Mystery widget")));
-    assert.equal("flags" in forSales(result), false);
+    const widget = priced({ productName: "Mystery widget", category: "widgets" });
+    assert.equal(widget.lines[0]?.match, "unknown");
+    assert.equal(widget.lines[0]?.note, "No build time set");
+    assert.equal(widget.lines[0]?.row?.buildMinutes, 0);
+    assert.equal(forSales(widget).hasUnpricedBuildLines, true);
+    assert.ok(widget.flags.some((flag) => flag.startsWith("No build time set: Mystery widget")));
+    assert.ok(forSales(widget).provisionalNotes.includes("Build time missing."));
+    assert.ok(forSales(widget).provisionalNotes.includes("Minimum job charge is not set."));
+    assert.equal("flags" in forSales(widget), false);
+    const loose = priced({ productName: "Hex dumbbell 10kg", category: "Dumbbells", sku: "HEX-10" });
+    assert.equal(loose.lines[0]?.match, "handling_only");
+    assert.equal(loose.lines[0]?.row?.buildMinutes, 0);
+    assert.equal(forSales(loose).hasUnpricedBuildLines, false);
+    const rackRow = {
+        sku: "JF-KBR-3",
+        productName: "3 tier kettlebell rack",
+        productLine: null,
+        category: "Rigs & Racks",
+        buildLocation: "site" as const,
+        crateAtHq: false,
+        buildCrew: null,
+        buildMinutes: null,
+        hqBuildCrew: null,
+        hqBuildMinutes: null,
+        sitePositionMinutes: null,
+        complexity: null,
+        carryCrew: 1,
+        weightBand: "",
+        unitWeightKg: null,
+        assembledWeightKg: null,
+        assembledDimsMm: null,
+        wheeled: null,
+        carryDifficulty: null,
+        pumpTruckOk: false,
+        floorFixing: "N",
+        reviewFlag: null,
+        needsAssembly: null,
+        effortClass: "rack",
+    } satisfies EffortRow;
+    const rack = priced({ productName: "3 tier kettlebell rack", sku: "JF-KBR-3" }, rackRow);
+    assert.equal(rack.lines[0]?.note, "No build time set");
+    assert.equal(rack.lines[0]?.row?.buildMinutes, 0);
+    assert.equal(forSales(rack).hasUnpricedBuildLines, true);
+    const hq = effortRowForSku({
+      sku: "EC-1",
+      productName: "Elite Cardio treadmill",
+      category: "Treadmills",
+      needsAssembly: true,
+      crew: 2,
+      buildMinutes: 120,
+      buildLocation: "hq",
+      needsReview: true,
+    });
+    hq.status = "suggested";
+    const mixed = priceInstall({
+      mode: "A",
+      postcode: "NR1 1AA",
+      miles: 10,
+      segment: "trade",
+      lines: [
+        { sku: "EC-1", productName: "Elite Cardio treadmill", qty: 1, unitWeightKg: 80 },
+        { sku: "JF-KBR-3", productName: "3 tier kettlebell rack", qty: 1, unitWeightKg: 12 },
+      ],
+      table: [hq, rackRow],
+    });
+    const flag = mixed.flags.find((item) => item.startsWith("No build time set:"));
+    assert.ok(flag?.includes("3 tier kettlebell rack"));
+    assert.equal(flag?.includes("Elite Cardio"), false);
   });
 
   it("uses a Cin7 category default and does not build loose kit", () => {

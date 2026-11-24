@@ -5,7 +5,7 @@ export const BEST_CASE_NOTICE =
 export const SEGMENT_NOT_SET =
   "Customer segment not set: ask Alex/admin to tag the customer in Cin7.";
 
-export const PRICER_VERSION = "v2.5";
+export const PRICER_VERSION = "v2.6";
 export const EFFORT_TABLE_VERSION = "v2.5";
 
 export const RATES = {

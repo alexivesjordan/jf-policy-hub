@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { effortRowForSku, priceInstall } from "@/lib/pricer/engine";
 import { fixtureSubcontractorRpc } from "@/lib/subcontractors/fixture-board";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
@@ -169,6 +170,21 @@ const effortRows = [
     status: "suggested",
     notes: "Build at HQ",
     suggestion_rule: "pin-loaded",
+  },
+  {
+    sku: "JF-KBR-3",
+    product_name: "3 tier kettlebell rack",
+    cin7_category: "Rigs & Racks",
+    cin7_uom: "Each",
+    needs_assembly: null,
+    crew: null,
+    build_minutes: null,
+    effort_unit: "each",
+    build_location: "site",
+    status: "suggested",
+    notes: null,
+    effort_class: "rack",
+    rack_family: "Kettlebell rack (2-tier / 3-tier / S-Series)",
   },
 ];
 
@@ -532,10 +548,18 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     const rows = effortRows.filter((row) => {
       if (search && !`${row.sku} ${row.product_name}`.toLowerCase().includes(search)) return false;
       if (category && row.cin7_category !== category) return false;
-      if (status && row.status !== status) return false;
+      if (status === "needs-review") {
+        const review = (row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null;
+        if (!review) return false;
+      } else if (status === "no-build-time") {
+        const effort = row as { effort_class?: string; needs_assembly?: boolean | null; build_minutes?: number | null };
+        const missing = (effort.effort_class === "rack" || effort.effort_class === "needs_build" || effort.effort_class === "unsure") && (effort.needs_assembly == null || effort.build_minutes == null);
+        if (!missing) return false;
+      } else if (status && row.status !== status) return false;
       return true;
     });
-    return { review_count: 2, name_rule_count: 2, total: rows.length, categories: ["Benches", "Flooring", "Strength"], rows };
+    const reviewCount = effortRows.filter((row) => row.status === "suggested" || ((row.effort_class === "rack" || row.effort_class === "unsure") && row.needs_assembly == null)).length;
+    return { review_count: reviewCount, name_rule_count: 2, total: rows.length, categories: ["Benches", "Flooring", "Strength", "Rigs & Racks"], rows };
   }
   if (fn === "orbit_calendar") {
     const monday = weekMonday();
@@ -545,6 +569,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       unavailability: [],
     };
   }
+  if (fn === "orbit_job_workings") return fixtureNeedsReviewQuote();
   if (fn === "orbit_job_requirements") {
     return { installers: 2, licensed_drivers: 1, van_size: "small", van_count: 1, stair_climber: false, install_days: 2 };
   }
@@ -694,6 +719,41 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
   if (fn === "install_cancel") return fixtureInstall("2026-11-16", "annual", true, "cancelled");
   return null;
+}
+
+function fixtureNeedsReviewQuote() {
+  const line = {
+    sku: "JF-KBR-3",
+    productName: "3 tier kettlebell rack",
+    category: "Rigs & Racks",
+    qty: 1,
+    unitWeightKg: 36,
+  };
+  const result = priceInstall({
+    mode: "A",
+    postcode: "PE30 4JJ",
+    miles: 0,
+    segment: "trade",
+    lines: [line],
+    table: [effortRowForSku({
+      sku: line.sku,
+      productName: line.productName,
+      category: line.category,
+      needsAssembly: null,
+      crew: null,
+      buildMinutes: null,
+      effortClass: "rack",
+      rackFamily: "Kettlebell rack (2-tier / 3-tier / S-Series)",
+    })],
+  });
+  return {
+    breakdown: result.breakdown,
+    flags: result.flags,
+    notice: result.notice,
+    customerPrice: result.customerPrice,
+    segment: "trade",
+    markup: result.markup,
+  };
 }
 
 function isoPlus(iso: string, days: number) {

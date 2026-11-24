@@ -106,7 +106,7 @@ export function compactPriceFlags(notes: InstallPriceNotesData) {
   const missing = notes.unset.filter(isSettingKey);
   if (missing.length === 1) items.push(`${plainSetting(missing[0])} is not set yet.`);
   else if (missing.length > 1) items.push("Some effort-table settings are not set yet.");
-  const needsReview = flags.filter((flag) => flag.startsWith("Needs review:"));
+  const needsReview = flags.filter((flag) => flag.startsWith("No build time set:") || flag.startsWith("Needs review:"));
   if (needsReview.length === 1) items.push(needsReview[0].replace(/ Confirm them on the Pricing page\./, ""));
   else if (needsReview.length > 1) items.push("Some products still need a confirmed install time.");
   if (flags.some((flag) => /weight unknown|weight estimated/i.test(flag))) items.push("Some product weights were estimated or missing.");
@@ -146,10 +146,10 @@ export function PriceWorkings({
   return (
     <div className="space-y-4 text-sm text-ink">
       {notice ? <QuoteNotice>{notice}</QuoteNotice> : null}
-      {flags.filter((flag) => flag.startsWith("Needs review:")).map((flag) => (
+      {flags.filter((flag) => flag.startsWith("No build time set:")).map((flag) => (
         <p key={flag} className="rounded-2xl border border-line bg-card px-4 py-3 text-sm text-grey">
           {flag}{" "}
-          <Link href="/operations/settings?status=suggested" className="font-semibold text-ink underline decoration-red">Open the effort table</Link>
+          <Link href="/operations/settings?status=no-build-time" className="font-semibold text-ink underline decoration-red">Open the effort table</Link>
         </p>
       ))}
       <section className="rounded-3xl border border-line bg-card px-5 py-4">
