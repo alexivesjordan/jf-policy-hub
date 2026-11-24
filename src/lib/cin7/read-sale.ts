@@ -120,6 +120,11 @@ const COUNTRY_ISO: Record<string, string> = {
   sweden: "SE",
   norway: "NO",
   switzerland: "CH",
+  suisse: "CH",
+  schweiz: "CH",
+  svizzera: "CH",
+  suiza: "CH",
+  swiss: "CH",
   "united states": "US",
   usa: "US",
 };
@@ -127,12 +132,26 @@ const COUNTRY_ISO: Record<string, string> = {
 function isoCountry(value: string | null) {
   if (!value) return null;
   const trimmed = value.trim();
+  const named = COUNTRY_ISO[trimmed.toLowerCase()];
+  if (named) return named;
   if (/^[A-Za-z]{2}$/.test(trimmed)) {
     const code = trimmed.toUpperCase();
     return code === "EL" ? "GR" : code;
   }
   if (/^[A-Za-z]{3}$/.test(trimmed)) return iso2FromIso3(trimmed);
-  return COUNTRY_ISO[trimmed.toLowerCase()] ?? null;
+  return null;
+}
+
+/** Sale shipping country, then sale billing, then the customer. A street is not required. */
+export function destinationCountryOf(customer: Record<string, unknown> | null, sale: Record<string, unknown>) {
+  const addresses = list(customer?.Addresses);
+  const customerCountry = (type: string) => isoCountry(text(addresses.find((address) => text(address.Type) === type && address.DefaultForType === true)?.Country));
+  return isoCountry(text(record(sale.ShippingAddress)?.Country))
+    ?? isoCountry(text(record(sale.BillingAddress)?.Country))
+    ?? customerCountry("Shipping")
+    ?? customerCountry("Billing")
+    ?? addresses.map((address) => isoCountry(text(address.Country))).find((code): code is string => Boolean(code))
+    ?? null;
 }
 
 function productHsCode(product: Record<string, unknown>) {
@@ -359,7 +378,7 @@ export async function readCin7Sale(orderNumberOrId: string, get: Cin7Getter): Pr
     currency: text(sale.Currency) ?? text(customer?.Currency) ?? text(record(sale.Order)?.Currency),
     buyerAddress: addressLines(billingAddress(customer, sale)),
     consigneeAddress: addressLines(deliveryAddress(customer, sale)),
-    destinationCountry: isoCountry(text(deliveryAddress(customer, sale)?.Country) ?? text(billingAddress(customer, sale)?.Country)),
+    destinationCountry: destinationCountryOf(customer, sale),
     deliveryCity: text(deliveryAddress(customer, sale)?.City),
     customerId,
     contactName: text(sale.Contact) ?? text(defaultContact(customer)?.Name) ?? "",

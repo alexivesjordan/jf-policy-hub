@@ -9,6 +9,8 @@ export type ModuleNavItem = {
   adminOnly?: boolean;
   ownerOnly?: boolean;
   disabled?: boolean;
+  /** Match this href only, so a shorter path is not active on a longer sibling. */
+  exact?: boolean;
   /** Collapsible group. The parent is a toggle; the children are the links. */
   children?: ModuleNavItem[];
 };
@@ -120,7 +122,14 @@ export const pulseModules: PulseModule[] = [
     icon: "logistics",
     paths: ["/logistics"],
     nav: [
-      { href: "/logistics/commercial-invoices", label: "Commercial invoices" },
+      {
+        href: "/logistics/commercial-invoices",
+        label: "Commercial Invoices",
+        children: [
+          { href: "/logistics/commercial-invoices", label: "Generate a Commercial Invoice", exact: true },
+          { href: "/logistics/commercial-invoices/search", label: "Search Commercial Invoices" },
+        ],
+      },
       { href: "/logistics/customs-statements", label: "Customs statements" },
     ],
   },

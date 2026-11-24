@@ -6,27 +6,61 @@ import { dimensionCounts, inspectPallets, palletGrossKg } from "@/features/logis
 import { CUSTOMS_STATEMENTS } from "@/features/logistics/commercial-invoice/seller";
 import { applyBuyerVat, matchCustomsStatement, type StatementRule } from "@/features/logistics/commercial-invoice/statements";
 import { commercialInvoiceBody } from "@/features/logistics/commercial-invoice/shipment-input";
-import { countryChoices, goodsTotal, incotermPlace, summedNetWeightKg, type InvoiceDraft, type InvoiceOrder, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
-
-type PalletInput = { lengthCm: string; widthCm: string; depthCm: string; weightKg: string; kind: "parcel" | "pallet"; box?: string };
-const emptyPallet = (): PalletInput => ({ lengthCm: "", widthCm: "", depthCm: "", weightKg: "", kind: "parcel" });
+import { countryChoices, goodsTotal, incotermPlace, summedNetWeightKg, type InvoiceDraft, type InvoiceShipment } from "@/features/logistics/commercial-invoice/rules";
+import { dimensionsWereEdited, dimensionRowsFromBoxes, emptyDimension, incomingDraft, mergeRetrievedDraft, sameOrderNumbers, type DimensionRow, type InvoicePrefill } from "@/features/logistics/commercial-invoice/retrieve";
 
 const TERMS = ["DAP", "DDP", "EXW", "FCA", "CPT", "CIP", "DPU", "FOB", "CIF"];
 
-export function CommercialInvoiceWorkspace() {
-  const [numbers, setNumbers] = useState("");
-  const [draft, setDraft] = useState<InvoiceDraft | null>(null);
+export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: InvoicePrefill | null }) {
+  const [numbers, setNumbers] = useState(prefill?.orderNumbers ?? "");
+  const [draft, setDraft] = useState<InvoiceDraft | null>(prefill?.draft ?? null);
   const idempotencyKey = useRef<string | null>(null);
+  const lookupSeq = useRef(0);
+  const touched = useRef(new Set<string>(prefill ? ["destinationCountry", "incoterm", "buyer", "lines", "shipment"] : []));
+  const dimensionsTouched = useRef(prefill ? dimensionsWereEdited(prefill.pallets) : false);
   const [working, setWorking] = useState<"lookup" | "preview" | "issue" | null>(null);
   const [error, setError] = useState("");
   const [details, setDetails] = useState<string[]>([]);
   const [issued, setIssued] = useState("");
-  const [palletRows, setPalletRows] = useState<PalletInput[]>([emptyPallet()]);
+  const [palletRows, setPalletRows] = useState<DimensionRow[]>(prefill?.pallets ?? [emptyDimension()]);
   const [rules, setRules] = useState<StatementRule[]>([]);
 
+  function edit(key: string, recipe: (current: InvoiceDraft) => InvoiceDraft) {
+    touched.current.add(key);
+    setDraft((current) => current ? recipe(current) : current);
+  }
+
+  function markDimensions() {
+    dimensionsTouched.current = true;
+  }
+
+  function resetForm() {
+    lookupSeq.current += 1;
+    touched.current.clear();
+    dimensionsTouched.current = false;
+    idempotencyKey.current = null;
+    setNumbers("");
+    setDraft(null);
+    setPalletRows([emptyDimension()]);
+    setIssued("");
+    setError("");
+    setDetails([]);
+  }
+
+  function onNumbers(value: string) {
+    setNumbers(value);
+    lookupSeq.current += 1;
+    if (!draft || sameOrderNumbers(value, draft.orders)) return;
+    touched.current.clear();
+    setDraft(null);
+    if (!dimensionsTouched.current) setPalletRows([emptyDimension()]);
+  }
+
   async function lookup() {
+    const seq = lookupSeq.current + 1;
+    lookupSeq.current = seq;
     void fetch("/api/logistics/customs-statements").then(async (res) => {
-      if (!res.ok) return;
+      if (!res.ok || seq !== lookupSeq.current) return;
       const json = await res.json();
       setRules(Array.isArray(json.rules) ? json.rules : []);
     }).catch(() => undefined);
@@ -41,70 +75,21 @@ export function CommercialInvoiceWorkspace() {
         body: JSON.stringify({ orderNumbers: numbers }),
       });
       const json = await res.json();
+      if (seq !== lookupSeq.current) return;
       if (!res.ok) throw new Error(json.error || "Cin7 lookup failed.");
-      const found = json.orders as InvoiceOrder[];
+      const found = json.orders as Parameters<typeof incomingDraft>[0];
       if (!found.length) throw new Error("No orders.");
-      const boxes = found.flatMap((order) => order.boxes ?? []);
-      if (boxes.length) setPalletRows(boxes.slice(0, 30).map((box) => ({ ...emptyPallet(), box })));
-      setDraft({
-        reference: "PREVIEW",
-        issueDate: new Date().toISOString().slice(0, 10),
-        currency: found[0]?.currency ?? "",
-        orders: found.map((order) => order.orderNumber),
-        seller: found[0] ? { ...found[0].buyer, name: "Jordan Fitness Ltd", address: "", vat: "", eori: "" } : { name: "", address: "", vat: "", eori: "" },
-        buyer: found[0]?.buyer ?? { name: "", address: "", vat: "", eori: "" },
-        consignee: found[0]?.consignee ?? { name: "", address: "", vat: "", eori: "" },
-        importer: { name: "", address: "", vat: "", eori: "" },
-        frenchVatNumber: "",
-        frenchFiscalRepresentativeVat: "",
-        ddpModel: "not_applicable",
-        carrier: "Other",
-        entryCountry: "",
-        clearanceCountry: "",
-        destinationCountry: found[0]?.country ?? "",
-        incoterm: "DAP",
-        namedPlace: incotermPlace(found[0]?.deliveryCity ?? "", found[0]?.country ?? ""),
-        deliveryCity: found[0]?.deliveryCity ?? "",
-        procedure: "unconfirmed",
-        approvedStatement: "",
-        statementApprovedBy: "",
-        reasonForExport: "Sale of goods",
-        packages: 1,
-        packageType: "Carton",
-        netWeightKg: 0,
-        grossWeightKg: 0,
-        freightValue: 0,
-        insuranceValue: 0,
-        otherChargesValue: 0,
-        shipmentRef: "",
-        signatory: "Jordan Fitness Ltd",
-        notes: "",
-        physicalShipmentConfirmed: true,
-        lines: found.flatMap((order) => order.lines),
-        shipment: {
-          fao: "",
-          despatchDate: new Date().toISOString().slice(0, 10),
-          deliveryAddress: found[0]?.consignee.address ?? "",
-          contactName: found[0]?.contactName ?? "",
-          contactEmail: found[0]?.contactEmail ?? "",
-          courier: found[0]?.courier ?? "",
-          specialInstructions: [...new Set(found.map((order) => order.specialInstructions?.trim()).filter((note): note is string => Boolean(note)))].join("\n"),
-          parcels: 1,
-          pallets: 0,
-          palletLines: [],
-          deliveryPence: found.reduce((sum, order) => sum + (order.deliveryPence ?? 0), 0),
-          surchargePence: 0,
-          vatPence: 0,
-          customsStatementId: "matched",
-          customsStatementText: "",
-          issuedAt: new Date().toISOString(),
-        },
-      });
+      if (!dimensionsTouched.current) {
+        const boxes = found.flatMap((order) => order.boxes ?? []);
+        if (boxes.length) setPalletRows(dimensionRowsFromBoxes(boxes));
+      }
+      setDraft((current) => mergeRetrievedDraft(current, incomingDraft(found), touched.current));
     } catch (err) {
+      if (seq !== lookupSeq.current) return;
       setDraft(null);
       setError(err instanceof Error ? err.message : "Order lookup failed.");
     } finally {
-      setWorking(null);
+      if (seq === lookupSeq.current) setWorking(null);
     }
   }
 
@@ -189,9 +174,8 @@ export function CommercialInvoiceWorkspace() {
         setDetails(Array.isArray(json.details) ? json.details : []);
         throw new Error(json.error || "That invoice could not be saved.");
       }
-      setIssued(json.number);
-      idempotencyKey.current = null;
       const file = await fetch(`/api/logistics/commercial-invoices/${json.id}`);
+      resetForm();
       if (file.ok) {
         const url = URL.createObjectURL(await file.blob());
         const anchor = document.createElement("a");
@@ -199,6 +183,8 @@ export function CommercialInvoiceWorkspace() {
         anchor.download = json.filename;
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } else {
+        setError("Issued " + json.number + " but the PDF could not be downloaded.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "That invoice could not be saved.");
@@ -208,7 +194,7 @@ export function CommercialInvoiceWorkspace() {
   }
 
   function patchShipment(patch: Partial<InvoiceShipment>) {
-    setDraft((current) => current?.shipment ? { ...current, shipment: { ...current.shipment, ...patch } } : current);
+    edit("shipment", (current) => current.shipment ? { ...current, shipment: { ...current.shipment, ...patch } } : current);
   }
 
   const net = draft ? summedNetWeightKg(draft.lines) : 0;
@@ -220,7 +206,7 @@ export function CommercialInvoiceWorkspace() {
       <section className="space-y-3 rounded-3xl border border-line bg-card p-5">
         <h2 className="text-lg font-semibold">Orders</h2>
         <label className="block text-sm font-semibold" htmlFor="invoice-orders">Order numbers</label>
-        <textarea id="invoice-orders" rows={2} value={numbers} onChange={(event) => setNumbers(event.currentTarget.value)} className="w-full rounded-xl border border-line bg-paper p-3" />
+        <textarea id="invoice-orders" rows={2} value={numbers} onChange={(event) => onNumbers(event.currentTarget.value)} className="w-full rounded-xl border border-line bg-paper p-3" />
         <div className="space-y-2">
           <p className="text-sm font-semibold">Dimensions</p>
           <div className="grid grid-cols-6 gap-2 text-sm font-semibold">
@@ -234,19 +220,19 @@ export function CommercialInvoiceWorkspace() {
             <div key={index} className="grid grid-cols-6 gap-2">
               <div>
                 {row.box ? <span className="mb-1 block text-xs font-semibold">{row.box}</span> : null}
-                <select aria-label={row.box ? `Pallets/Parcels ${row.box}` : "Pallets/Parcels"} className="w-full rounded-xl border border-line px-2 py-2" value={row.kind} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, kind: event.currentTarget.value === "pallet" ? "pallet" : "parcel" } : item))}>
+                <select aria-label={row.box ? `Pallets/Parcels ${row.box}` : "Pallets/Parcels"} className="w-full rounded-xl border border-line px-2 py-2" value={row.kind} onChange={(event) => { markDimensions(); setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, kind: event.currentTarget.value === "pallet" ? "pallet" : "parcel" } : item)); }}>
                   <option value="parcel">Parcel</option>
                   <option value="pallet">Pallet</option>
                 </select>
               </div>
-              <input aria-label="Length cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.lengthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, lengthCm: event.currentTarget.value } : item))} />
-              <input aria-label="Width cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.widthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, widthCm: event.currentTarget.value } : item))} />
-              <input aria-label="Depth cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.depthCm} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, depthCm: event.currentTarget.value } : item))} />
-              <input aria-label="Weight kg" inputMode="decimal" type="number" min={0.1} max={2000} step={0.1} className="rounded-xl border border-line px-2 py-2" value={row.weightKg} onChange={(event) => setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, weightKg: event.currentTarget.value } : item))} />
-              {index > 0 ? <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => setPalletRows(palletRows.filter((_, itemIndex) => itemIndex !== index))}>Remove</button> : <span />}
+              <input aria-label="Length cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.lengthCm} onChange={(event) => { markDimensions(); setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, lengthCm: event.currentTarget.value } : item)); }} />
+              <input aria-label="Width cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.widthCm} onChange={(event) => { markDimensions(); setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, widthCm: event.currentTarget.value } : item)); }} />
+              <input aria-label="Depth cm" inputMode="numeric" type="number" min={1} max={1000} step={1} className="rounded-xl border border-line px-2 py-2" value={row.depthCm} onChange={(event) => { markDimensions(); setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, depthCm: event.currentTarget.value } : item)); }} />
+              <input aria-label="Weight kg" inputMode="decimal" type="number" min={0.1} max={2000} step={0.1} className="rounded-xl border border-line px-2 py-2" value={row.weightKg} onChange={(event) => { markDimensions(); setPalletRows(palletRows.map((item, itemIndex) => itemIndex === index ? { ...item, weightKg: event.currentTarget.value } : item)); }} />
+              {index > 0 ? <button type="button" className="rounded-xl border border-line px-2 py-2 text-sm font-semibold" onClick={() => { markDimensions(); setPalletRows(palletRows.filter((_, itemIndex) => itemIndex !== index)); }}>Remove</button> : <span />}
             </div>
           ))}
-          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={palletRows.length >= 30} onClick={() => setPalletRows([...palletRows, emptyPallet()])}>Add row</button>
+          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={palletRows.length >= 30} onClick={() => { markDimensions(); setPalletRows([...palletRows, emptyDimension()]); }}>Add row</button>
         </div>
         <button type="button" onClick={() => void lookup()} disabled={!numbers.trim() || working !== null} className="rounded-xl bg-red px-4 py-2 font-semibold text-white disabled:opacity-50">
           {working === "lookup" ? "Retrieving orders…" : "Retrieve orders"}
@@ -269,13 +255,13 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Incoterm
               <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.incoterm} onChange={(event) => {
                 const incoterm = event.currentTarget.value;
-                setDraft({
-                  ...draft,
+                edit("incoterm", (current) => ({
+                  ...current,
                   incoterm,
-                  shipment: draft.shipment && incoterm !== "DDP"
-                    ? { ...draft.shipment, customsStatementId: "none", customsStatementText: "" }
-                    : draft.shipment,
-                });
+                  shipment: current.shipment && incoterm !== "DDP"
+                    ? { ...current.shipment, customsStatementId: "none", customsStatementText: "" }
+                    : current.shipment,
+                }));
               }}>
                 {TERMS.map((term) => <option key={term}>{term}</option>)}
               </select>
@@ -283,7 +269,7 @@ export function CommercialInvoiceWorkspace() {
             <label className="text-sm font-semibold">Destination country
               <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.destinationCountry} onChange={(event) => {
                 const destinationCountry = event.currentTarget.value;
-                setDraft({ ...draft, destinationCountry, namedPlace: incotermPlace(draft.deliveryCity ?? "", destinationCountry) });
+                edit("destinationCountry", (current) => ({ ...current, destinationCountry, namedPlace: incotermPlace(current.deliveryCity ?? "", destinationCountry) }));
               }}>
                 {countryChoices().map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
               </select>
@@ -292,22 +278,22 @@ export function CommercialInvoiceWorkspace() {
             {draft.incoterm === "DDP" ? (
               <>
                 <label className="text-sm font-semibold">Importer name
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.name} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, name: event.currentTarget.value } })} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.name} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, name: event.currentTarget.value } }))} />
                 </label>
                 <label className="text-sm font-semibold md:col-span-2">Importer address
-                  <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.address} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, address: event.currentTarget.value } })} />
+                  <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.address} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, address: event.currentTarget.value } }))} />
                 </label>
                 <label className="text-sm font-semibold">Importer VAT
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.vat} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, vat: event.currentTarget.value } })} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.vat} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, vat: event.currentTarget.value } }))} />
                 </label>
                 <label className="text-sm font-semibold">Importer EORI
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.eori} onChange={(event) => setDraft({ ...draft, importer: { ...draft.importer, eori: event.currentTarget.value } })} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.eori} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, eori: event.currentTarget.value } }))} />
                 </label>
                 <label className="text-sm font-semibold">Clearance country
-                  <input maxLength={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.clearanceCountry} onChange={(event) => setDraft({ ...draft, clearanceCountry: event.currentTarget.value.toUpperCase() })} />
+                  <input maxLength={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.clearanceCountry} onChange={(event) => edit("incoterm", (current) => ({ ...current, clearanceCountry: event.currentTarget.value.toUpperCase() }))} />
                 </label>
                 <label className="text-sm font-semibold">Customs procedure
-                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.procedure} onChange={(event) => setDraft({ ...draft, procedure: event.currentTarget.value as InvoiceDraft["procedure"] })}>
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.procedure} onChange={(event) => edit("incoterm", (current) => ({ ...current, procedure: event.currentTarget.value as InvoiceDraft["procedure"] }))}>
                     <option value="unconfirmed">Unconfirmed</option>
                     <option value="40">40</option>
                     <option value="42">42</option>
@@ -316,7 +302,7 @@ export function CommercialInvoiceWorkspace() {
                   </select>
                 </label>
                 <label className="text-sm font-semibold">DDP model
-                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.ddpModel} onChange={(event) => setDraft({ ...draft, ddpModel: event.currentTarget.value as InvoiceDraft["ddpModel"] })}>
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.ddpModel} onChange={(event) => edit("incoterm", (current) => ({ ...current, ddpModel: event.currentTarget.value as InvoiceDraft["ddpModel"] }))}>
                     <option value="not_applicable">Not applicable</option>
                     <option value="unspecified">Unspecified</option>
                     <option value="importers_signature">Importer signature</option>
@@ -325,21 +311,21 @@ export function CommercialInvoiceWorkspace() {
                 </label>
                 {draft.ddpModel === "own_french_vat" ? (
                   <label className="text-sm font-semibold">French VAT
-                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.frenchVatNumber} onChange={(event) => setDraft({ ...draft, frenchVatNumber: event.currentTarget.value })} />
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.frenchVatNumber} onChange={(event) => edit("incoterm", (current) => ({ ...current, frenchVatNumber: event.currentTarget.value }))} />
                   </label>
                 ) : null}
                 {draft.procedure === "42" || draft.procedure === "other" ? (
                   <label className="text-sm font-semibold">Statement reviewer
-                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.statementApprovedBy} onChange={(event) => setDraft({ ...draft, statementApprovedBy: event.currentTarget.value })} />
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.statementApprovedBy} onChange={(event) => edit("incoterm", (current) => ({ ...current, statementApprovedBy: event.currentTarget.value }))} />
                   </label>
                 ) : null}
               </>
             ) : null}
             <label className="text-sm font-semibold">Buyer VAT
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.vat} onChange={(event) => setDraft({ ...draft, buyer: { ...draft.buyer, vat: event.currentTarget.value } })} />
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.vat} onChange={(event) => edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, vat: event.currentTarget.value } }))} />
             </label>
             <label className="text-sm font-semibold">Buyer EORI
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.eori} onChange={(event) => setDraft({ ...draft, buyer: { ...draft.buyer, eori: event.currentTarget.value } })} />
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.eori} onChange={(event) => edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, eori: event.currentTarget.value } }))} />
             </label>
             <label className="text-sm font-semibold">FAO
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.fao ?? ""} onChange={(event) => patchShipment({ fao: event.currentTarget.value })} />
@@ -395,16 +381,16 @@ export function CommercialInvoiceWorkspace() {
                 <p className="font-semibold md:col-span-4">{line.orderNumber} · {line.sku} — {line.productName}</p>
                 <label className="text-sm font-semibold">
                   <span className="flex items-baseline justify-between gap-2">Shipped qty <span className="text-xs font-normal opacity-70">of {line.orderedQuantity} ordered</span></span>
-                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.shippedQuantity} onChange={(event) => setDraft({ ...draft, lines: draft.lines.map((item) => item.id === line.id ? { ...item, shippedQuantity: Number(event.currentTarget.value) } : item) })} />
+                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.shippedQuantity} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, shippedQuantity: Number(event.currentTarget.value) } : item) }))} />
                 </label>
                 <label className="text-sm font-semibold">HS code
-                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.hsCode} onChange={(event) => setDraft({ ...draft, lines: draft.lines.map((item) => item.id === line.id ? { ...item, hsCode: event.currentTarget.value } : item) })} />
+                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.hsCode} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, hsCode: event.currentTarget.value } : item) }))} />
                 </label>
                 <label className="text-sm font-semibold">Origin
-                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.originCountry} onChange={(event) => setDraft({ ...draft, lines: draft.lines.map((item) => item.id === line.id ? { ...item, originCountry: event.currentTarget.value.toUpperCase() } : item) })} />
+                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.originCountry} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, originCountry: event.currentTarget.value.toUpperCase() } : item) }))} />
                 </label>
                 <label className="text-sm font-semibold">Unit kg
-                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.unitWeightKg ?? ""} onChange={(event) => setDraft({ ...draft, lines: draft.lines.map((item) => item.id === line.id ? { ...item, unitWeightKg: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) } : item) })} />
+                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.unitWeightKg ?? ""} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, unitWeightKg: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) } : item) }))} />
                 </label>
               </div>
             ))}

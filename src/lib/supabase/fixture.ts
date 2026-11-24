@@ -251,6 +251,37 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
   }
+  if (fn === "logistics_search_commercial_invoices") {
+    const query = String(args?.p_query ?? "").trim().toLowerCase();
+    const rows = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        number: "CI-2026-0007-R2",
+        revision: 2,
+        issuedAt: "2026-11-24T09:30:00.000Z",
+        customer: "NonStop Gym SA",
+        destination: "CH",
+        issuedBy: "Alex Ives",
+        orders: ["SO-00819"],
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        number: "CI-2026-0004",
+        revision: 1,
+        issuedAt: "2026-11-12T09:30:00.000Z",
+        customer: "Riverside Gym",
+        destination: "GB",
+        issuedBy: "Alex Ives",
+        orders: ["SO-00710"],
+      },
+    ];
+    return rows.filter((row) => {
+      if (!query) return true;
+      return row.number.toLowerCase().includes(query)
+        || row.customer.toLowerCase().includes(query)
+        || row.orders.some((order) => order.toLowerCase().includes(query));
+    });
+  }
   if (fn === "install_field_role") {
     if (process.env.PULSE_FIXTURE_ROLE === "engineer") return "engineer";
     if (process.env.PULSE_FIXTURE_ROLE === "lead") return "ops";
@@ -844,6 +875,9 @@ export function createFixtureClient() {
     },
     from(table: string) {
       return new FixtureQuery(table);
+    },
+    schema() {
+      return { from: (table: string) => new FixtureQuery(table) };
     },
     async rpc(fn: string, args?: Record<string, unknown>) {
       try {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ChevronRight, ChevronsUpDown, Menu } from "lucide-react";
 import { NotificationBell, type BellItem } from "@/components/notification-bell";
 import { ModuleGlyph } from "@/components/module-icon";
@@ -235,11 +235,13 @@ function SideNav({
 
 function NavGroup({ item, path, onNavigate }: { item: ModuleNavItem; path: string; onNavigate?: () => void }) {
   const children = item.children ?? [];
-  const childActive = children.some((child) => navItemActive(child.href, path));
+  const childActive = children.some((child) => navItemActive(child.href, path, child.exact));
   const [open, setOpen] = useState(childActive);
-  useEffect(() => {
+  const [trackedPath, setTrackedPath] = useState(path);
+  if (path !== trackedPath) {
+    setTrackedPath(path);
     if (childActive) setOpen(true);
-  }, [childActive]);
+  }
 
   return (
     <div>
@@ -282,7 +284,7 @@ function NavLink({
       </span>
     );
   }
-  const active = navItemActive(item.href, path);
+  const active = navItemActive(item.href, path, item.exact);
   const count = item.count ? counts[item.count] : 0;
   return (
     <Link

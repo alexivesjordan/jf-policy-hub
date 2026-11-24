@@ -291,8 +291,13 @@ describe("commercial invoice PDF", () => {
     expect(mixedText).toMatch(/No\. of pallets[\s\S]{0,30}1/);
     expect(mixedText).toMatch(/\bDDP\b/);
     expect(mixedText).not.toMatch(/Berlin|Germany/);
+    const revised = { ...swiss, reference: "CI-2026-0007-R2" };
+    const revisedText = await read(revised);
+    expect(revisedText).toMatch(/CI-2026-0007-R2/);
+    expect(revisedText).not.toMatch(/CI-2026-0007-R2-R2/);
     await saveDraft("invoice-ch-parcels.pdf", swiss);
     await saveDraft("invoice-ddp-mixed.pdf", mixed);
+    await saveDraft("invoice-r2.pdf", revised);
   });
 
   it("renders a one-page invoice with the summary on that page", async () => {

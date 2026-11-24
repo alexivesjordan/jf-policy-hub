@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readCin7Sale, type Cin7Getter } from "./read-sale";
+import { destinationCountryOf, readCin7Sale, type Cin7Getter } from "./read-sale";
 
 const saleId = "11111111-1111-4111-8111-111111111111";
 const customerId = "22222222-2222-4222-8222-222222222222";
@@ -103,5 +103,20 @@ describe("Cin7 product customs fields", () => {
       throw new Error("unexpected " + path);
     });
     expect(fallback).toMatchObject({ contactName: "Johann", contactEmail: "cornavin@nonstopgym.com", courier: "FedEx" });
+  });
+
+  it("uses the sale shipping country even when that address has no street", () => {
+    expect(destinationCountryOf(null, {
+      ShippingAddress: { Country: "Switzerland" },
+      BillingAddress: { Line1: "56 Oldmedow Road", City: "King's Lynn", Country: "United Kingdom" },
+    })).toBe("CH");
+    expect(destinationCountryOf(null, { ShippingAddress: { Country: "Suisse" } })).toBe("CH");
+    expect(destinationCountryOf(null, { ShippingAddress: { Country: "Schweiz" } })).toBe("CH");
+    expect(destinationCountryOf(null, { ShippingAddress: { Country: "CH" } })).toBe("CH");
+    expect(destinationCountryOf(null, { ShippingAddress: { Country: "UK" } })).toBe("GB");
+    expect(destinationCountryOf({
+      Addresses: [{ Type: "Shipping", DefaultForType: true, Country: "Switzerland" }],
+    }, {})).toBe("CH");
+    expect(destinationCountryOf(null, {})).toBeNull();
   });
 });
