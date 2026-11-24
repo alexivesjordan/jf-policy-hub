@@ -126,7 +126,7 @@ begin
         'requested_date', j.requested_date,
         'requested_end', j.requested_end,
         'booked_date', j.booked_date,
-        'created_at', j.created_at,
+        'created_at', j.created_at
       ) as row_data,
       j.created_at
     from ops.install_jobs j

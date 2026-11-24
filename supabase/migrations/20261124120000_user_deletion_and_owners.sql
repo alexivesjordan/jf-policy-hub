@@ -33,10 +33,6 @@ update ops.service_quotes
 set owner_user_id = created_by
 where owner_user_id is null and created_by is not null;
 
-update ops.install_jobs
-set owner_user_id = owner_rep_id
-where owner_user_id is null and owner_rep_id is not null;
-
 update ops.installs i
 set owner_user_id = coalesce(
   (select q.created_by from ops.install_quotes q where q.id = i.quote_id),
@@ -44,10 +40,54 @@ set owner_user_id = coalesce(
 )
 where i.owner_user_id is null;
 
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'ops'
+      and table_name = 'install_jobs'
+      and column_name = 'created_by'
+  ) then
+    execute $fill$
+      update ops.install_jobs
+      set owner_user_id = coalesce(owner_rep_id, created_by)
+      where owner_user_id is null
+        and coalesce(owner_rep_id, created_by) is not null
+    $fill$;
+  else
+    update ops.install_jobs j
+    set owner_user_id = coalesce(
+      j.owner_rep_id,
+      (
+        select i.owner_user_id
+        from ops.installs i
+        where i.owner_user_id is not null
+          and i.order_number in (j.cin7_order_number, j.cin7_number, j.cin7_quote_number)
+        order by i.created_at desc
+        limit 1
+      )
+    )
+    where j.owner_user_id is null
+      and coalesce(
+        j.owner_rep_id,
+        (
+          select i.owner_user_id
+          from ops.installs i
+          where i.owner_user_id is not null
+            and i.order_number in (j.cin7_order_number, j.cin7_number, j.cin7_quote_number)
+          limit 1
+        )
+      ) is not null;
+  end if;
+end $$;
+
 create or replace function ops.assign_default_owner()
 returns trigger
 language plpgsql
 as $$
+declare
+  v_owner uuid;
 begin
   if new.owner_user_id is not null then
     return new;
@@ -57,7 +97,25 @@ begin
   elsif tg_table_name = 'service_quotes' then
     new.owner_user_id := new.created_by;
   elsif tg_table_name = 'install_jobs' then
-    new.owner_user_id := coalesce(new.owner_rep_id, auth.uid());
+    v_owner := new.owner_rep_id;
+    if v_owner is null and exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'ops'
+        and table_name = 'install_jobs'
+        and column_name = 'created_by'
+    ) then
+      execute 'select ($1).created_by' into v_owner using new;
+    end if;
+    if v_owner is null then
+      select i.owner_user_id into v_owner
+      from ops.installs i
+      where i.owner_user_id is not null
+        and i.order_number in (new.cin7_order_number, new.cin7_number, new.cin7_quote_number)
+      order by i.created_at desc
+      limit 1;
+    end if;
+    new.owner_user_id := coalesce(v_owner, auth.uid());
   elsif tg_table_name = 'installs' then
     new.owner_user_id := new.booking_rep_id;
   end if;
@@ -261,6 +319,7 @@ begin
     jsonb_build_object('mode', case when v_history then 'soft' else 'hard' end)
   );
 
+  perform set_config('orbit.profile_sync', 'on', true);
   update public.profiles
   set deleted_at = now(),
       is_active = false,
