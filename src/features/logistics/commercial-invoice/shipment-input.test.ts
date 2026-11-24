@@ -91,9 +91,13 @@ describe("shipment input limits", () => {
         issuedAt: "2026-11-23T09:00:00.000Z",
       },
     };
-    const pallets = [{ lengthCm: 120, widthCm: 80, depthCm: 100, weightKg: 12 }];
-    const body = commercialInvoiceBody(draft, pallets, 1, 12);
+    const pallets = [
+      { kind: "parcel" as const, lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 },
+      { kind: "parcel" as const, lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 },
+    ];
+    const body = commercialInvoiceBody(draft, pallets, 0, 43);
     expect(body.shipment).not.toHaveProperty("issuedAt");
+    expect(body.shipment).toMatchObject({ parcels: 2, pallets: 0, palletLines: pallets });
     expect(previewBodySchema.safeParse(body).success).toBe(true);
     const issue = issueBodySchema.safeParse({ ...body, idempotencyKey: "00000000-0000-4000-8000-000000000001" });
     expect(issue.success).toBe(true);

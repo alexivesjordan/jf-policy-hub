@@ -6,7 +6,7 @@ import { issueBodySchema, schemaIssuePaths } from "@/features/logistics/commerci
 import { storeInvoicePdf, type StoredInvoice } from "@/features/logistics/commercial-invoice/publish";
 import { inspectPallets } from "@/features/logistics/commercial-invoice/pallets";
 import { parseOrderNumbers, validateCommercialInvoice, type InvoiceDraft } from "@/features/logistics/commercial-invoice/rules";
-import { matchCustomsStatement, rulesFromRows } from "@/features/logistics/commercial-invoice/statements";
+import { matchCustomsStatement, prepareCustomsStatement, rulesFromRows } from "@/features/logistics/commercial-invoice/statements";
 import type { Profile } from "@/lib/types";
 import { cin7IsConnected, getCin7Client } from "@/lib/cin7/client";
 import type { Cin7Quote } from "@/lib/cin7/types";
@@ -109,18 +109,25 @@ export async function POST(request: Request) {
   const prior = await supabase.rpc("logistics_issued_quantities", { p_sales: orders.map((order) => order.id) });
   const rules = rulesFromRows((await supabase.schema("logistics").from("customs_statement_rules").select("incoterm, destination_country, carrier, statement_text, extra_line, priority, active").eq("active", true)).data);
   const checked = inspectPallets(input.shipment?.palletLines ?? [], "issue");
-  if (checked.problems.length) return Response.json({ error: "A pallet is invalid.", details: checked.problems }, { status: 422 });
-  const statementId = input.shipment?.customsStatementId ?? "matched";
+  if (checked.problems.length) return Response.json({ error: "A dimension row is invalid.", details: checked.problems }, { status: 422 });
+  const buyerVat = input.buyerVat ?? input.shipment?.buyerVat ?? "";
+  const requestedId = input.shipment?.customsStatementId ?? "matched";
+  const statement = prepareCustomsStatement({
+    incoterm: input.incoterm,
+    statementId: requestedId,
+    buyerVat,
+    text: requestedId === "matched"
+      ? matchCustomsStatement(rules, { incoterm: input.incoterm, destinationCountry: input.destinationCountry, carrier: input.shipment?.courier ?? "" })
+      : input.shipment?.customsStatementText ?? "",
+  });
   let draft;
   try {
     draft = applyOptionalDdp(applyShipment(withShipmentPence(draftFromOrders(orders, input), orders, issuedQuantities(prior.data)), {
       ...input.shipment,
       palletLines: checked.pallets,
-      customsStatementId: statementId,
-      customsStatementText: statementId === "matched"
-        ? matchCustomsStatement(rules, { incoterm: input.incoterm, destinationCountry: input.destinationCountry, carrier: input.shipment?.courier ?? "" })
-        : input.shipment?.customsStatementText,
-      buyerVat: input.buyerVat ?? input.shipment?.buyerVat,
+      customsStatementId: statement.id,
+      customsStatementText: statement.text,
+      buyerVat,
       buyerEori: input.buyerEori ?? input.shipment?.buyerEori,
       grossWeightKg: input.grossWeightKg,
     }), input);

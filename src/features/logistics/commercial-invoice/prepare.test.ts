@@ -72,11 +72,13 @@ describe("shipment defaults", () => {
     sale.deliveryCity = "Genève";
     sale.buyerVat = "CHE-123";
     sale.destinationCountry = "CH";
+    sale.boxes = ["Box 1", "Box 2"];
     const order = ordersFromCin7([sale], [])[0]!;
     expect(order.contactName).toBe("Johann");
     expect(order.courier).toBe("FedEx");
     expect(order.deliveryCity).toBe("Genève");
     expect(order.buyer.vat).toBe("CHE-123");
+    expect(order.boxes).toEqual(["Box 1", "Box 2"]);
     expect(incotermPlace(order.deliveryCity ?? "", order.country)).toBe("Genève, Switzerland");
   });
 

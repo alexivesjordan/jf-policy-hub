@@ -56,6 +56,8 @@ export type Cin7Quote = {
   courier?: string | null;
   /** Customer TaxNumber. Empty when Cin7 has none. */
   buyerVat?: string | null;
+  /** Distinct pack-line box labels from the sale's non-void fulfilments. Empty when Cin7 has no pack. */
+  boxes?: string[];
   lines: Cin7QuoteLine[];
   /** Order lines were empty, so quote lines were used. */
   usedQuoteLines?: boolean;

@@ -32,7 +32,8 @@ function otherFields(rule: StatementRule) {
 
 function matches(rule: StatementRule, input: { incoterm: string; destinationCountry: string; carrier: string }) {
   if (!rule.active) return false;
-  if (filled(rule.incoterm) && rule.incoterm!.trim().toUpperCase() !== input.incoterm.trim().toUpperCase()) return false;
+  if (input.incoterm.trim().toUpperCase() !== "DDP") return false;
+  if (rule.incoterm?.trim().toUpperCase() !== "DDP") return false;
   if (filled(rule.carrier) && rule.carrier!.trim().toLowerCase() !== input.carrier.trim().toLowerCase()) return false;
   if (!filled(rule.destinationCountry)) return true;
   const destination = rule.destinationCountry!.trim().toUpperCase();
@@ -67,4 +68,28 @@ export function matchCustomsStatement(rules: StatementRule[], input: { incoterm:
     || otherFields(b) - otherFields(a)
     || b.priority - a.priority);
   return found[0] ? statementRuleText(found[0]) : "";
+}
+
+/** Puts the Buyer VAT into `{buyerVat}`. A blank VAT drops the placeholder and the brackets or comma wrapped around it. */
+export function applyBuyerVat(text: string, buyerVat: string) {
+  const vat = buyerVat.trim();
+  if (!text.includes("{buyerVat}")) return text;
+  if (vat) return text.replaceAll("{buyerVat}", vat);
+  return text
+    .replace(/[ \t]*\([ \t]*\{buyerVat\}[ \t]*\)/g, "")
+    .replace(/,[ \t]*\{buyerVat\}/g, "")
+    .replace(/\{buyerVat\}[ \t]*,[ \t]*/g, "")
+    .replace(/[ \t]?\{buyerVat\}/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.;:])/g, "$1")
+    .replace(/[ \t]+\)/g, ")")
+    .replace(/\([ \t]+/g, "(")
+    .replace(/\(\)/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+export function prepareCustomsStatement(input: { incoterm: string; statementId: string; text: string; buyerVat: string }) {
+  if (input.incoterm.trim().toUpperCase() !== "DDP") return { id: "none", text: "" };
+  return { id: input.statementId, text: applyBuyerVat(input.text, input.buyerVat) };
 }

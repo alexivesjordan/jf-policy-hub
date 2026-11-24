@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { originSummary } from "./origin";
-import { acceptedPallets, inspectPallets, palletGrossKg, palletProblems } from "./pallets";
-import { matchCustomsStatement, type StatementRule } from "./statements";
+import { acceptedPallets, dimensionCounts, dimensionSummary, inspectPallets, palletGrossKg, palletProblems } from "./pallets";
+import { DDP_FISCAL_STATEMENTS } from "./ddp-statements";
+import { applyBuyerVat, matchCustomsStatement, prepareCustomsStatement, type StatementRule } from "./statements";
+import { readFileSync } from "node:fs";
 
 const ddp: StatementRule = {
   incoterm: "DDP",
@@ -52,10 +54,22 @@ describe("commercial invoice origins, pallets and statements", () => {
     expect(rows.pallets).toHaveLength(2);
     expect(palletGrossKg(rows.pallets)).toBe(255.5);
     expect(palletProblems(rows.pallets, "issue")).toEqual([]);
-    expect(palletProblems([], "issue")).toEqual(["Enter at least one pallet."]);
+    expect(palletProblems([], "issue")).toEqual(["Enter at least one row."]);
+    expect(dimensionCounts([
+      { kind: "parcel" },
+      { kind: "parcel" },
+    ])).toEqual({ parcels: 2, pallets: 0 });
+    expect(dimensionSummary([{ kind: "pallet" }, { kind: "parcel" }, { kind: "parcel" }])).toBe("1 pallet, 2 parcels");
+    expect(dimensionSummary([{ kind: "parcel" }])).toBe("1 parcel");
+    expect(dimensionSummary([{}, {}])).toBe("2 pallets");
+    expect(dimensionCounts([{}])).toEqual({ parcels: 0, pallets: 1 });
     expect(acceptedPallets([{ lengthCm: 1001, widthCm: 10, depthCm: 10, weightKg: 1 }]).invalid).toBe(true);
     expect(acceptedPallets([{ lengthCm: 10, widthCm: 10, depthCm: 10, weightKg: 1.25 }]).invalid).toBe(true);
-    expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "issue").problems).toEqual(["Pallet 1: enter weight"]);
+    expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "issue").problems).toEqual(["1 Pallet: enter weight"]);
+    expect(inspectPallets([{ kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 }, { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 }], "issue").pallets).toEqual([
+      { kind: "parcel", lengthCm: 20, widthCm: 14, depthCm: 133, weightKg: 33 },
+      { kind: "parcel", lengthCm: 46, widthCm: 9, depthCm: 84, weightKg: 10 },
+    ]);
     expect(inspectPallets([{ lengthCm: 120, widthCm: 100, depthCm: 150, weightKg: null }], "preview").pallets).toEqual([]);
     expect(inspectPallets([{ lengthCm: null, widthCm: null, depthCm: null, weightKg: null }, { lengthCm: 120, widthCm: 80, depthCm: 60, weightKg: 10 }], "preview").pallets).toHaveLength(1);
   });
@@ -69,5 +83,54 @@ describe("commercial invoice origins, pallets and statements", () => {
     const france: StatementRule = { ...ddp, destinationCountry: "FR", priority: 1, statementText: "France", extraLine: null };
     const europe: StatementRule = { ...ddp, priority: 5 };
     expect(matchCustomsStatement([europe, france], { incoterm: "DDP", destinationCountry: "FR", carrier: "" })).toBe("France");
+  });
+
+  it("matches only a DDP rule, and only when the shipment is DDP", () => {
+    const seeded: StatementRule[] = DDP_FISCAL_STATEMENTS.map((rule) => ({
+      incoterm: "DDP",
+      destinationCountry: rule.destinationCountry,
+      carrier: null,
+      statementText: rule.text,
+      extraLine: null,
+      priority: rule.priority,
+      active: true,
+    }));
+    const open: StatementRule = { incoterm: null, destinationCountry: "EU", carrier: null, statementText: "Any incoterm", extraLine: null, priority: 100, active: true };
+    const exw: StatementRule = { incoterm: "EXW", destinationCountry: "BE", carrier: null, statementText: "Ex works", extraLine: null, priority: 100, active: true };
+    const rules = [...seeded, open, exw];
+    const be = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "BE")!.text;
+    const eu = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "EU")!.text;
+    const nl = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === "NL")!.text;
+    for (const country of ["BE", "LU", "NL", "IE", "FR"]) {
+      const expected = DDP_FISCAL_STATEMENTS.find((rule) => rule.destinationCountry === country)!.text;
+      expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: country, carrier: "" })).toBe(expected);
+      expect(matchCustomsStatement(rules, { incoterm: "EXW", destinationCountry: country, carrier: "" })).toBe("");
+      expect(matchCustomsStatement(rules, { incoterm: "DAP", destinationCountry: country, carrier: "" })).toBe("");
+    }
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "DE", carrier: "" })).toBe(eu);
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "CH", carrier: "" })).toBe("");
+    expect(matchCustomsStatement(rules, { incoterm: "DDP", destinationCountry: "BE", carrier: "" })).toBe(be);
+    expect(matchCustomsStatement([open, exw], { incoterm: "DDP", destinationCountry: "BE", carrier: "" })).toBe("");
+    const prepared = prepareCustomsStatement({ incoterm: "DDP", statementId: "matched", text: nl, buyerVat: "NL123456789B01" });
+    expect(prepared.text).toContain("Dutch VAT law (NL123456789B01)");
+    expect(prepared.text).not.toContain("{buyerVat}");
+    const blank = prepareCustomsStatement({ incoterm: "DDP", statementId: "matched", text: nl, buyerVat: "  " });
+    expect(blank.text).toMatch(/Dutch VAT law$/);
+    expect(blank.text).not.toMatch(/\(\s*\)|\{buyerVat\}|,\s*$/);
+    expect(applyBuyerVat("Reverse Charge, {buyerVat}", "")).toBe("Reverse Charge");
+    expect(applyBuyerVat("{buyerVat}, Reverse Charge", "")).toBe("Reverse Charge");
+    expect(applyBuyerVat("Charge, {buyerVat}, next", "")).toBe("Charge, next");
+    expect(prepareCustomsStatement({ incoterm: "DAP", statementId: "matched", text: be, buyerVat: "" })).toEqual({ id: "none", text: "" });
+    const migration = readFileSync("supabase/migrations/20261123160000_logistics_ddp_fiscal_statements.sql", "utf8");
+    const rollback = readFileSync("supabase/release/r3/ddp-fiscal-statements-rollback.sql", "utf8");
+    for (const rule of DDP_FISCAL_STATEMENTS) {
+      expect(rule.text.length).toBeGreaterThan(0);
+      expect(rule.text.length).toBeLessThanOrEqual(2000);
+      expect(migration).toContain(rule.id);
+      expect(migration).toContain(rule.text);
+      expect(rollback).toContain(rule.id);
+    }
+    expect(migration).toContain("FRZS 8888 63388");
+    expect(migration).not.toMatch(/update logistics\.customs_statement_rules/i);
   });
 });
