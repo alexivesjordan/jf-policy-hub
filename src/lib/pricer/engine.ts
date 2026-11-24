@@ -998,7 +998,7 @@ export function priceInstall(request: PriceRequest): PriceResult {
       ? { miles: request.miles, method: "miles supplied with the request", speedMph: request.speedMph ?? RATES.effectiveSpeedMph }
       : estimateMilesFromKingsLynn(postcode);
   const resolved = request.lines.map((line) => applyLineWeight(line, matchLine(line, request.table, request.categoryDefaults ?? [])));
-  const review = resolved.filter((line) => line.match === "unknown" || line.row?.reviewFlag === "needs-review");
+  const unpriced = resolved.filter((line) => lineHasUnpricedBuild(line));
 
   const base: PriceResult = {
     pricerVersion: PRICER_VERSION,
@@ -1055,10 +1055,10 @@ export function priceInstall(request: PriceRequest): PriceResult {
   const customerPrice = pricing.minJobCharge != null ? Math.max(markedUp, pricing.minJobCharge) : markedUp;
   const floor = pricing.marginFloorPct != null ? roundMoney(costed.cost * (1 + pricing.marginFloorPct)) : null;
   const flags = [...costed.flags];
-  if (review.length > 0) {
-    const names = review.map((line) => line.productName);
+  if (unpriced.length > 0) {
+    const names = unpriced.map((line) => line.productName);
     const shown = names.slice(0, 30).join(", ");
-    flags.push(`Needs review: ${shown}${names.length > 30 ? `, and ${names.length - 30} more` : ""}. Confirm them on the Pricing page.`);
+    flags.push(`No build time set: ${shown}${names.length > 30 ? `, and ${names.length - 30} more` : ""}.`);
   }
   if (pricing.minJobCharge == null) flags.push("min job charge not set");
   if (pricing.marginFloorPct == null) flags.push("margin floor not set");
@@ -1238,7 +1238,33 @@ export function forSales(result: PriceResult) {
     provisional: result.finality === "provisional",
     requirements: result.requirements,
     hasUnpricedBuildLines: result.lines.some(lineHasUnpricedBuild),
+    provisionalNotes: salesProvisionalNotes(result),
   };
+}
+
+function salesProvisionalNotes(result: PriceResult) {
+  const notes: string[] = [];
+  const add = (note: string) => {
+    if (!notes.includes(note)) notes.push(note);
+  };
+  if (result.lines.some(lineHasUnpricedBuild)) add("Build time missing.");
+  if (result.milesMethod?.includes("120 miles")) add("Mileage is an estimate.");
+  if (result.flags.some((flag) => /weight unknown|weight estimated/i.test(flag))) add("Some product weights were estimated or missing.");
+  if (result.flags.some((flag) => /min job charge not set/i.test(flag))) add("Minimum job charge is not set.");
+  if (result.flags.some((flag) => /margin floor not set/i.test(flag))) add("Margin floor is not set.");
+  if (result.flags.some((flag) => /oversize_pallet_rate is UNSET/i.test(flag))) add("Oversized pallet freight is not set.");
+  for (const item of result.provisionalItems) {
+    if (/no build time set/i.test(item)) continue;
+    if (/site_prep|tag_cost|contingency|hq_unpack|weight_band/i.test(item)) continue;
+    if (/^no assembly/i.test(item)) continue;
+    if (/^DHZ/i.test(item)) add("DHZ figures are provisional.");
+    else if (/^fallback:/i.test(item)) add("Some products used a category fallback.");
+    else if (/built at HQ/i.test(item)) add("HQ build time is still a suggestion.");
+    else if (/each machine/i.test(item)) add("Some products used a category default.");
+    else if (/HQ-built Performance Strength/i.test(item)) add("Some pin-loaded machines are priced as HQ-built.");
+    else if (!result.lines.some((line) => line.productName === item)) add(item.endsWith(".") ? item : `${item}.`);
+  }
+  return notes;
 }
 
 function describeBreakdown(

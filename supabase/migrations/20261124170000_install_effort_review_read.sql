@@ -120,7 +120,9 @@ begin
 end;
 $$;
 
-create or replace function public.orbit_update_sku_effort(
+drop function if exists public.orbit_update_sku_effort(text[], text, integer, numeric, text, text, text, integer, integer, integer, text);
+
+create function public.orbit_update_sku_effort(
   p_skus text[],
   p_needs_assembly text,
   p_crew integer,
@@ -131,7 +133,9 @@ create or replace function public.orbit_update_sku_effort(
   p_hq_minutes integer default null,
   p_hq_crew integer default null,
   p_position_minutes integer default null,
-  p_effort_unit text default null
+  p_effort_unit text default null,
+  p_clear_crew boolean default false,
+  p_clear_minutes boolean default false
 )
 returns integer
 language plpgsql
@@ -160,8 +164,8 @@ begin
         when p_needs_assembly = 'unknown' then null
         else p_needs_assembly = 'yes'
       end,
-      crew = coalesce(p_crew, crew),
-      build_minutes = coalesce(p_minutes, build_minutes),
+      crew = case when p_clear_crew then null else coalesce(p_crew, crew) end,
+      build_minutes = case when p_clear_minutes then null else coalesce(p_minutes, build_minutes) end,
       effort_unit = case when p_effort_unit in ('each', 'tile', 'm2') then p_effort_unit else effort_unit end,
       build_location = case when p_build_location in ('hq', 'site') then p_build_location else build_location end,
       hq_build_minutes = coalesce(p_hq_minutes, hq_build_minutes),
@@ -177,3 +181,6 @@ begin
   return v_count;
 end;
 $$;
+
+revoke all on function public.orbit_update_sku_effort(text[], text, integer, numeric, text, text, text, integer, integer, integer, text, boolean, boolean) from public, anon;
+grant execute on function public.orbit_update_sku_effort(text[], text, integer, numeric, text, text, text, integer, integer, integer, text, boolean, boolean) to authenticated, service_role;

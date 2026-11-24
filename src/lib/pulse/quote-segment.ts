@@ -78,6 +78,8 @@ export function salesOrderActionResult(input: {
   missingCin7Email?: boolean;
   /** True when the price includes a build line that has no stored time. No line list. */
   hasUnpricedBuildLines?: boolean;
+  /** Sales-safe reasons the price is provisional. No product names. */
+  provisionalNotes?: string[];
   service?: {
     id: string | null;
     quoteNumber: string;
@@ -121,6 +123,7 @@ export function salesOrderActionResult(input: {
           contactEmail: input.contactEmail?.trim() || null,
           missingCin7Email: input.missingCin7Email === true && !input.contactEmail?.trim(),
           hasUnpricedBuildLines: input.hasUnpricedBuildLines === true,
+          provisionalNotes: (input.provisionalNotes ?? []).filter((note) => note.trim()),
           service,
         },
   };

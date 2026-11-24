@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOperationsUser } from "@/lib/auth";
+import { canSaveSkuEffort, skuEffortSavePlan } from "@/features/operations/effort-access";
 import { syncCin7Products, type SkuSyncRow } from "@/lib/cin7/sync-products";
 import { messageFromError } from "@/lib/errors";
 import { parseCsv } from "@/lib/pricer/effort-table";
@@ -110,21 +111,23 @@ export async function saveSkuEffortRow(input: {
 }): Promise<ActionState> {
   try {
     const profile = await requireOperationsUser();
-    const allowed = profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "edit";
-    if (!allowed) return { ok: false, message: "You cannot edit the effort table." };
+    if (!canSaveSkuEffort(profile)) return { ok: false, message: "You cannot edit the effort table." };
+    const plan = skuEffortSavePlan(input);
     const supabase = await createClient();
     const { error } = await supabase.rpc("orbit_update_sku_effort", {
       p_skus: [input.sku],
-      p_needs_assembly: input.needsAssembly,
+      p_needs_assembly: plan.needsAssembly,
       p_crew: input.crew,
       p_minutes: input.minutes,
-      p_status: "confirmed",
+      p_status: plan.status,
       p_notes: null,
       p_build_location: null,
       p_hq_minutes: null,
       p_hq_crew: null,
       p_position_minutes: null,
       p_effort_unit: null,
+      p_clear_crew: plan.clearCrew,
+      p_clear_minutes: plan.clearMinutes,
     });
     if (error) throw new Error(messageFromError(error, "Could not save that SKU."));
     revalidatePath("/operations/settings");

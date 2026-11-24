@@ -758,6 +758,7 @@ export async function priceSalesOrder(_state: ActionState, formData: FormData): 
       postcode: view.postcode,
       customerPrice: view.customerPrice,
       hasUnpricedBuildLines: view.hasUnpricedBuildLines,
+      provisionalNotes: view.provisionalNotes,
       savedQuoteId: savedQuoteId ?? undefined,
       contactEmail: saved?.contactEmail ?? null,
       missingCin7Email: draft.source === "cin7" && !saved?.contactEmail,

@@ -78,7 +78,8 @@ describe("SO-00864 classification", () => {
     expect(result.breakdown?.hotel).toBe(0);
     expect(result.breakdown?.days).toBe(1);
     expect(result.flags.some((flag) => /weight unknown/i.test(flag))).toBe(false);
-    expect(result.flags.some((flag) => flag.startsWith("Needs review: 3 tier kettlebell rack"))).toBe(true);
+    expect(result.flags.some((flag) => flag.startsWith("No build time set: 3 tier kettlebell rack"))).toBe(true);
+    expect(result.flags.some((flag) => flag.includes("dumbbell"))).toBe(false);
     expect(result.customerPrice).toBe(85.19);
   });
 });

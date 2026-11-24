@@ -2,7 +2,7 @@
 -- Port of scripts/install-effort/classify.py + families.py (same rules, same order) so no SKU list is needed.
 -- Alex's decisions (24/11/2026): freight off install quotes; loose kit and Step & Decks delivery-only;
 -- 2-tier horizontal dumbbell rack, vertical dumbbell rack, Olympic bar holder and standing mat hanger 1 x 10;
--- wall-fixed mat hangers delivery-only (0). Other racks and unsure rows get needs_assembly NULL (the engine's
+-- wall-fixed mat hangers delivery-only (0). Bolt-on shelves and uprights (J75 / HELIX / FSUK) are racks with no time. Other racks and unsure rows get needs_assembly NULL (the engine's
 -- "Needs review" signal, see note below). needs_build rows keep their current crew/minutes.
 -- Only rows with status 'suggested' are changed; confirmed rows are never touched.
 -- Previous values: ops.sku_effort_backup_20261124 and ops.cin7_category_defaults_backup_20261124.
@@ -47,6 +47,7 @@ with p as (
     'hoodie|t-shirt|pick & pack|gift card|website|mould cost|powder ?coat|^stock code$|^message line$|balance brought forward|type description here|workshop|courses?\y|nutrition & programming|brochure|design costs|\ydvd\y|customi[sz]ation charge|\ycharge\y|membership|\ycourse\y|leaflet|catalogue|instructions|product-discounts|discount|\yservice\y|warranty|label application|\ydelivery\y|installation|\yinstall\y|\ypens\y|bottles of water|cardboard .*pallet|\ypallet\y|^marketing|carriage|postage|\yvinyl wrap\y|\ywrap(ping)? charge|labour|consultation|design fee|\yfee\y'::text non_physical,
     'bolt pack|\ybolts\y|roller bolts|anchor bolts|\ynuts\y|washers|end caps?|top cap|cap covers|\yfeet\y|foot plates|weight labels?|\ysaddles?\y|\ytrays?\y(?! -)|- cover\y|\ycover$|rack cover|(rack|spare|set of \d) wheels?|wheels \(set|\yprongs?\y|\ycradles?\y|stoppers?\y|\ybush(es)?\y|bush inserts?|\yinserts?\y|pull pins?|pop pin|adjuster pin|bench pin|assembly pins|\ypins?\y(?= -|$)|\yrubbers\y|rubber (ring|stopper|cushion|band)s?|replacement|\yspares?\y|\ybearings?\y|upholstery|\yknobs?\y|\yshroud\y|\ycable for\y|pulley wheels?|\ylid\y|eye ?bolt|eye nuts|shackle|plate holder rubber|weight tree arm|side rails|end bar|back bar|fixings|\yplug\y|adapter plug|\ydecals?\y|stickers?|\yleg\s*-\s*each|uprights? - (pair|\d+mm)|conversion bracket|filling nozzle|\yshelf\y.*- each|storage shelf|squat stand plates|\yspring - |fuzzy straps|non-slip handles|plank handles|platform pad|strap attachment|v-strap|pulldown (bar|handle)|ball holder for|rack plate holders|cage wheels|wooden base|rack holder for|cap washers|rack arm|rack (dumbbell|kettlebell|plate|wall ball) shelf|weight stack pin|lanyard'::text part,
     '\ybox \d\y|\(set of 2 boxes\)'::text box_component,
+    '\yshelf\y|\yuprights?\y'::text bolt_on,
     '(&|\+|\yand\y|\ywith\y)\s*(\d+\s*x\s*)?(\w+\s+){0,3}racks?\y|set\s*\+\s*rack|&\s*\d+ pair rack'::text bundle,
     'power rack|half rack|squat rack|squat stands?\y|power stand|\yrig\y|\yrigs\y|cable rack|\yt rack\y|monkey bar|multi ?rack|wall mounted chin bar|pull ?up (station|rig)|cross ?fit rig|functional rig|\yj75 .*(rack|rig)\y|helix .*(rack|stand)\y|storage cage|lifting club squat stands'::text training_rack,
     '\yracks?\y|weight tree|bar holder|ball holder|band hanger|mats? (wall )?hanger|mat hanger|rower hanger|\yhanger\y|storage (system|rack|pod|hub|point|box)|\yshelving\y|\ythe hub\y|bar storage|ball storage|plate storage|ball rail|flat shelf|toaster rack|bosu rack|bag arms|storage point|mat frame|floor stand|\ystand\y(?! (wall|bolts))|wall mount\y|wall bracket|punch bag bracket|folding wall bracket|retractable punch bag bracket|height measure'::text storage_rack,
@@ -72,6 +73,8 @@ r as (
   cross join lateral (select case
     when b.n ~* p.non_physical or b.c in ('Service', 'Powder Coating') or upper(b.sku) like 'MARKETING%' then 'delivery_only:non_physical'
     when b.n ~* p.box_component and b.nl !~ 'set of 2 boxes' then 'delivery_only:box_component'
+    when b.core ~* p.bolt_on and b.nl !~ 'end cap|replacement|spare|\ycap\y'
+         and b.c in ('Rigs & Racks', 'Rig & Rack Attachments', 'Gym Storage', 'Functional Fitness', 'Other') then 'rack:bolt_on_component'
     when b.core ~* p.part and b.n !~* p.bundle and b.c <> 'Gym Flooring' then 'delivery_only:part'
     when b.c = any(p.build_cats) and not (b.c = 'Strength Machines' and b.nl ~ 'stand|rack') then 'needs_build:build_category'
     when b.nl ~ 'freestanding punch bag' then 'unsure:punchbag_free'
@@ -114,7 +117,9 @@ o as (
   ) v(sku, cls, rule) on v.sku = r.sku
 ),
 f as (
-  select o.*, fm.family rack_family, fm.grp rack_group
+  select o.*,
+         case when o.rule = 'bolt_on_component' then 'Bolt-on shelves & uprights (J75 / HELIX / Freestanding Gym Storage)' else fm.family end rack_family,
+         case when o.rule = 'bolt_on_component' then 'storage' else fm.grp end rack_group
   from o left join lateral (
     select coalesce(min(family) filter (where rk = 1), '(unmatched)') family, coalesce(min(grp) filter (where rk = 1), '?') grp
     from (select ff.family, ff.grp, row_number() over (order by ff.ord) rk
