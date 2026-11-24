@@ -7,6 +7,7 @@ import { enGB } from "date-fns/locale";
 import { money, ukDate } from "@/components/install-sales-view";
 import { KANBAN_COLUMNS, firstFilledKanban, installCoversDay, kanbanAccessChip, kanbanColumn } from "@/lib/installs/access-ui";
 import { isWeekend } from "@/lib/pulse/booking-range";
+import { ownerLabel } from "@/lib/users/owner";
 
 export type CalendarInstall = {
   id: string;
@@ -17,6 +18,8 @@ export type CalendarInstall = {
   stage: string;
   installPrice: unknown;
   mediaCount: number | null;
+  ownerUserId?: string | null;
+  ownerName?: string | null;
 };
 
 export function InstallMonthGrid({
@@ -77,6 +80,7 @@ export function InstallMonthGrid({
                     <Link className="block rounded-lg bg-muted px-2 py-1 text-xs font-semibold" href={`${basePath}/${row.id}`}>
                       {row.orderNumber}
                       <span className="mt-0.5 block font-normal text-grey">{row.customerName}</span>
+                      <span className="mt-0.5 block font-normal text-grey">{ownerLabel(row.ownerName)}</span>
                     </Link>
                   </li>
                 ))}
@@ -112,6 +116,7 @@ export function InstallKanban({ installs, basePath }: { installs: CalendarInstal
                 <li key={card.id}>
                   <Link href={`${basePath}/${card.id}`} className="block rounded-2xl border border-line bg-card p-3">
                     <p className="font-semibold">{card.customerName}</p>
+                    <p className="text-xs text-grey">{ownerLabel(card.ownerName)}</p>
                     <p className="text-sm text-grey">{card.orderNumber}</p>
                     {chip ? <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold">{chip}</span> : null}
                     <p className="mt-2 text-sm">{ukDate(card.startOn)}</p>
@@ -135,6 +140,7 @@ function InstallList({ installs, basePath }: { installs: CalendarInstall[]; base
         <li key={row.id}>
           <Link href={`${basePath}/${row.id}`} className="block rounded-2xl border border-line bg-card p-3">
             <p className="font-semibold">{row.customerName}</p>
+            <p className="text-xs text-grey">{ownerLabel(row.ownerName)}</p>
             <p className="text-sm text-grey">{row.orderNumber}</p>
             <p className="mt-1 text-sm">{ukDate(row.startOn)}</p>
             <p className="text-sm font-semibold">{money(row.installPrice)}</p>

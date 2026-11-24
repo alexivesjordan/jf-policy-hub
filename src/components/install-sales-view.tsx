@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ownerLabel } from "@/lib/users/owner";
 import { projectInstall, type InstallRecord } from "@/lib/pulse/install-booking";
 
 const WARRANTY: Record<string, string> = {
@@ -59,6 +60,7 @@ export function InstallSalesView({
           <Row label="Warranty and maintenance" value={warranty} />
           <Row label="Warranty and maintenance price" value={row.warrantyPrice == null ? "—" : money(row.warrantyPrice)} />
           <Row label="Status" value={STATUS[String(row.status)] ?? String(row.status ?? "—")} />
+          <Row label="Owner" value={ownerLabel(typeof row.ownerName === "string" ? row.ownerName : null)} />
           <Row label="Booked by" value={String(row.bookingRepName ?? "—")} />
           <Row label="Contact" value={[row.contactName, row.contactEmail, row.contactPhone].filter(Boolean).join(" · ") || "—"} />
           <Row label="Site" value={String(row.siteAddress ?? "—")} />

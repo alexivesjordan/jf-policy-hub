@@ -25,6 +25,8 @@ export type JobSummary = {
   requested_end?: string | null;
   booked_date: string | null;
   created_at: string;
+  owner_user_id?: string | null;
+  owner_name?: string | null;
 };
 
 export type QuoteVersionSummary = {
@@ -55,6 +57,8 @@ export type JobDetail = {
   hold_review_date: string | null;
   lost_reason: string | null;
   created_at: string;
+  owner_user_id?: string | null;
+  owner_name?: string | null;
   customer: {
     id: string;
     name: string;

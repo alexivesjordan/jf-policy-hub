@@ -54,6 +54,7 @@ export async function listPeople() {
     .select("id, email, full_name")
     .eq("is_active", true)
     .eq("access_granted", true)
+    .is("deleted_at", null)
     .order("email");
   if (error) {
     console.error(error);

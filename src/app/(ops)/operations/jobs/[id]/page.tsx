@@ -7,7 +7,10 @@ import { Badge, Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { AccessLinkButton } from "@/components/access-link-button";
 import { RequirementOverrideForm } from "@/components/requirement-override-form";
+import { OwnerPicker } from "@/components/owner-picker";
 import { getJob, getJobRequirements, getOfficeContext } from "@/features/operations/queries";
+import { listPeople } from "@/features/policies/queries";
+import { ownerLabel } from "@/lib/users/owner";
 import { createClient } from "@/lib/supabase/server";
 import type { QuoteBreakdown } from "@/lib/pricer/breakdown";
 import { canOverrideRequirements } from "@/lib/pulse/requirements";
@@ -18,7 +21,7 @@ import { requireOperationsUser } from "@/lib/auth";
 export const metadata = { title: "Job" };
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOperationsUser();
+  const profile = await requireOperationsUser();
   const context = await getOfficeContext();
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
@@ -57,6 +60,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <Badge tone="active">{job.status_label}</Badge>
           </p>
           <dl className="mt-4 space-y-2 text-sm">
+            <Row label="Owner" value={ownerLabel(job.owner_name)} />
             <Row label="Type" value={job.job_type} />
             <Row label="Delivered by" value={job.delivered_by === "in_house" ? "In house" : "Subcontractor"} />
             <Row label="Number" value={job.cin7_number ?? "Not set"} />
@@ -73,6 +77,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </p>
           ) : null}
           {job.lost_reason ? <p className="mt-4 text-sm text-ink/80">Lost / cancelled: {job.lost_reason}</p> : null}
+          {profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "edit" || profile.levels?.sales === "edit" ? (
+            <OwnerPicker
+              kind="job"
+              id={job.id}
+              ownerId={job.owner_user_id ?? null}
+              people={(await listPeople().catch(() => [])).map((person) => ({ id: person.id, name: person.full_name || person.email }))}
+            />
+          ) : null}
         </Card>
         <Card>
           <h2 className="font-display text-2xl">Customer and site</h2>

@@ -7,6 +7,8 @@ import { SubcontractorInstallSection } from "@/components/subcontractor-install-
 import { PageSkeleton } from "@/components/pulse/states";
 import { InstallVisitPhotos } from "@/components/install-visit-photos";
 import { installProposalUrl, listVisitPhotos, readInstall } from "@/features/sales/install-actions";
+import { OwnerPicker } from "@/components/owner-picker";
+import { listPeople } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
 import { canCancelInstall } from "@/lib/installs/access-auth";
 import { createClient } from "@/lib/supabase/server";
@@ -48,6 +50,14 @@ async function SalesInstall({ params }: { params: Promise<{ id: string }> }) {
         proposalUrl={proposalUrl}
         cancel={canCancel ? <CancelBookingButton installId={id} /> : null}
       />
+      {profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.sales === "edit" || profile.levels?.operations === "edit" ? (
+        <OwnerPicker
+          kind="install"
+          id={id}
+          ownerId={typeof loaded.install.ownerUserId === "string" ? loaded.install.ownerUserId : null}
+          people={(await listPeople().catch(() => [])).map((person) => ({ id: person.id, name: person.full_name || person.email }))}
+        />
+      ) : null}
       <InstallAccessPanel install={loaded.install} />
       <InstallVisitPhotos photos={photos} />
       <SubcontractorInstallSection profile={profile} install={loaded.install} />
