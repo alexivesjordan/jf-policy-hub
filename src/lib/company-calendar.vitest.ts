@@ -7,6 +7,8 @@ describe("company calendar", () => {
     expect(absenceType("sickness")).toBe("sick");
     expect(absenceType("mot")).toBe("other_absence");
     expect(calendarTypeLabel("company_event")).toBe("Event");
+    expect(calendarTypeLabel("off")).toBe("Off");
+    expect(calendarTypeLabel("sick")).toBe("Sick");
   });
 
   it("includes a day inside the range", () => {

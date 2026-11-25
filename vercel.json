@@ -11,6 +11,10 @@
     {
       "path": "/api/orbit/archive-installs",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/hr/bank-holidays",
+      "schedule": "0 5 * * 1"
     }
   ]
 }

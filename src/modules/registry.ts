@@ -8,6 +8,8 @@ export type ModuleNavItem = {
   count?: "pending" | "unread";
   adminOnly?: boolean;
   ownerOnly?: boolean;
+  /** Workspace owner or admin. Used for HR settings. */
+  workspaceAdminOnly?: boolean;
   disabled?: boolean;
   /** Match this href only, so a shorter path is not active on a longer sibling. */
   exact?: boolean;
@@ -39,11 +41,15 @@ export const pulseModules: PulseModule[] = [
     href: "/people",
     status: "active",
     icon: "people",
-    paths: ["/people", "/dashboard", "/policies", "/amendments", "/notifications", "/admin"],
+    paths: ["/people", "/dashboard", "/policies", "/amendments", "/notifications", "/admin", "/account"],
     nav: [
       { href: "/people", label: "Overview" },
+      { href: "/people/team", label: "Team" },
+      { href: "/people/time-off", label: "Time off" },
+      { href: "/people/cases", label: "Cases" },
       { href: "/people/calendar", label: "Calendar" },
       { href: "/policies", label: "Policies" },
+      { href: "/people/settings", label: "Settings", workspaceAdminOnly: true },
     ],
   },
   {

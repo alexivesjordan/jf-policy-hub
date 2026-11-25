@@ -57,7 +57,7 @@ async function CalendarBody({
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Pulse People" title="Calendar" />
+      <PageHeader eyebrow="Jordan Pulse" title="Calendar" />
       {calendar.error ? <p className="text-sm">{calendar.error}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Link className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" href={href(previous)}>Previous</Link>
@@ -86,6 +86,7 @@ async function CalendarBody({
                         {row.name ?? "Company"} · {calendarTypeLabel(row.entryType)}
                       </p>
                     )}
+                    {row.notes ? <p className="truncate text-[11px] text-grey">{row.notes}</p> : null}
                   </li>
                 ))}
               </ul>

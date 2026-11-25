@@ -1,5 +1,5 @@
 export const CALENDAR_TYPES = ["annual_leave", "sick", "other_absence", "company_event"] as const;
-export type CalendarType = (typeof CALENDAR_TYPES)[number];
+export type CalendarType = (typeof CALENDAR_TYPES)[number] | "off";
 
 export type CalendarItem = {
   id: string;
@@ -15,6 +15,7 @@ export function calendarTypeLabel(type: CalendarType) {
   if (type === "annual_leave") return "Leave";
   if (type === "sick") return "Sick";
   if (type === "company_event") return "Event";
+  if (type === "off") return "Off";
   return "Away";
 }
 

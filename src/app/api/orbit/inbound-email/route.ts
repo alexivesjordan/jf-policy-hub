@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { caseTokenFromAddress, hashCaseToken, inboundCaseEnabled } from "@/lib/hr/inbound";
 import { suggestQuotedPrice } from "@/lib/subcontractors/price";
 import { fetchReceivedText, inboundDomain, parseInboundEvent, verifyResendSignature } from "@/lib/subcontractors/inbound";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,6 +23,20 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Could not read that event" }, { status: 400 });
   }
   if (parsed.kind === "ignore") return Response.json({ ok: true, ignored: true });
+  const caseToken = parsed.recipients.map((address) => caseTokenFromAddress(address, inboundDomain(process.env))).find(Boolean);
+  if (caseToken) {
+    if (!inboundCaseEnabled(process.env)) return Response.json({ ok: true, ignored: true });
+    const admin = createAdminClient();
+    if (!admin) return Response.json({ ok: false }, { status: 500 });
+    const saved = await admin.rpc("hr_record_case_email", {
+      p_hash: hashCaseToken(caseToken),
+      p_from: parsed.from,
+      p_subject: parsed.subject,
+      p_body: parsed.text,
+    });
+    if (saved.error) return Response.json({ ok: false }, { status: 500 });
+    return Response.json({ ok: true, matched: Boolean(saved.data) });
+  }
   if (!parsed.token) return Response.json({ ok: true, matched: false });
 
   let text = parsed.text;
