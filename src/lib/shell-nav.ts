@@ -1,4 +1,4 @@
-import { moduleAllows } from "@/lib/access";
+import { canManageWorkspace, moduleAllows } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 import type { ModuleNavItem } from "@/modules/registry";
 
@@ -20,6 +20,7 @@ export function visibleNav(items: ModuleNavItem[], profile: Profile, isOwner: bo
   const visible: ModuleNavItem[] = [];
   for (const item of items) {
     if (item.adminOnly && !moduleAllows(profile, "people", "edit")) continue;
+    if (item.workspaceAdminOnly && !canManageWorkspace(profile)) continue;
     if (item.ownerOnly && !isOwner) continue;
     if (item.children) {
       const children = visibleNav(item.children, profile, isOwner);

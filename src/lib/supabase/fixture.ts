@@ -201,10 +201,53 @@ function weekMonday() {
   return monday.toISOString().slice(0, 10);
 }
 
+function fixtureIdentity() {
+  const name = process.env.PULSE_FIXTURE_NAME?.trim();
+  const email = process.env.PULSE_FIXTURE_EMAIL?.trim();
+  if (!name && !email) return profile;
+  const fullName = name || profile.full_name;
+  const [first, ...rest] = fullName.split(" ");
+  return {
+    ...profile,
+    email: email || profile.email,
+    full_name: fullName,
+    first_name: first,
+    last_name: rest.join(" ") || profile.last_name,
+  };
+}
+
 function sessionProfile() {
+  const identity = fixtureIdentity();
   const marker = process.env.PULSE_FIXTURE_ROLE;
-  if (marker === "rep" || marker === "lead" || marker === "engineer") return { ...profile, role: "staff" };
-  return profile;
+  if (marker === "rep" || marker === "lead" || marker === "engineer") return { ...identity, role: "staff" as const };
+  return identity;
+}
+
+function visibleCalendar() {
+  const viewer = sessionProfile();
+  const privileged = viewer.role === "admin";
+  return [
+    {
+      id: "cal-leave",
+      entry_type: "annual_leave",
+      profile_id: "00000000-0000-4000-8000-000000000002",
+      display_name: "Avery Quinn",
+      starts_on: "2026-11-16",
+      ends_on: "2026-11-18",
+      notes: privileged ? "Family" : null,
+      request_status: "confirmed",
+    },
+    {
+      id: "cal-sick",
+      entry_type: privileged ? "sick" : "off",
+      profile_id: "00000000-0000-4000-8000-000000000003",
+      display_name: "Blake Morgan",
+      starts_on: "2026-11-19",
+      ends_on: "2026-11-19",
+      notes: privileged ? "Flu" : null,
+      request_status: "confirmed",
+    },
+  ];
 }
 
 function tables(): Record<string, Record<string, unknown>[]> {
@@ -215,14 +258,26 @@ function tables(): Record<string, Record<string, unknown>[]> {
     policy_versions: [],
     amendments: [],
     notifications: [],
+    calendar_entries_visible: visibleCalendar(),
     calendar_entries: [
       {
         id: "cal-leave",
         entry_type: "annual_leave",
-        profile_id: USER_ID,
+        profile_id: "00000000-0000-4000-8000-000000000002",
+        display_name: "Avery Quinn",
         starts_on: "2026-11-16",
         ends_on: "2026-11-18",
-        notes: "Annual leave",
+        notes: "Family",
+        request_status: "confirmed",
+      },
+      {
+        id: "cal-sick",
+        entry_type: "sick",
+        profile_id: "00000000-0000-4000-8000-000000000003",
+        display_name: "Blake Morgan",
+        starts_on: "2026-11-19",
+        ends_on: "2026-11-19",
+        notes: "Flu",
         request_status: "confirmed",
       },
       {
@@ -930,7 +985,7 @@ export function createFixtureClient() {
   const client = {
     auth: {
       async getUser() {
-        return { data: { user: { id: USER_ID, email: profile.email } }, error: null };
+        return { data: { user: { id: USER_ID, email: fixtureIdentity().email } }, error: null };
       },
     },
     from(table: string) {

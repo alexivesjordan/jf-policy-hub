@@ -76,6 +76,7 @@ async function Calendar({
                 {rows.map((row) => (
                   <li key={`${row.source}-${row.id}`} className="truncate text-[11px]">
                     {row.name ?? "Company"} · {calendarTypeLabel(row.entryType)}
+                    {row.notes ? <span className="block truncate text-grey">{row.notes}</span> : null}
                   </li>
                 ))}
               </ul>

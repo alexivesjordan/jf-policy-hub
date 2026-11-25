@@ -1,94 +1,66 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { dashboardCounts, listPolicies, listRecentVersions } from "@/features/policies/queries";
-import { requireUser } from "@/lib/auth";
-import { actorName, formatDate, formatTimestamp, greetingName, londonToday, plusDays } from "@/lib/format";
-import { Card } from "@/components/pulse/ui";
+import { AllowanceRing } from "@/components/hr/allowance-ring";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
+import { TextLink } from "@/components/pulse/ui";
+import { loadHrHome } from "@/features/hr/queries";
+import { requireUser } from "@/lib/auth";
 
-export const metadata = { title: "Pulse People" };
+export const metadata = { title: "My HR" };
 
 export default function PeoplePage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <PeopleOverview />
+      <Home />
     </Suspense>
   );
 }
 
-async function PeopleOverview() {
+async function Home() {
   await connection();
-  const profile = await requireUser();
-  const today = londonToday();
-  const horizon = plusDays(today, 30);
-  const [counts, due, recent] = await Promise.all([
-    dashboardCounts(horizon),
-    listPolicies({ reviewBefore: horizon }),
-    listRecentVersions(),
-  ]);
-
+  await requireUser();
+  const home = await loadHrHome();
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Pulse People" title={`Hello ${greetingName(profile)}`} />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Stat href="/policies" label="Suggestions waiting" value={counts.pending} />
-        <Stat href="/policies?status=needs-review" label="Needs review" value={counts.due} />
-        <Stat href="/policies?needs=1" label="Needs a document" value={counts.placeholders} />
+      <PageHeader eyebrow="Jordan Pulse" title="My HR" actions={<TextLink href="/people/time-off">Request time off</TextLink>} />
+      <section className="rounded-3xl border border-line bg-card p-5">
+        <AllowanceRing {...home.allowance} />
+      </section>
+      <div className="flex flex-wrap gap-2">
+        <TextLink href="/people/sickness/new">Report sickness</TextLink>
+        <TextLink href="/people/me" variant="ghost">My record</TextLink>
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="font-display text-2xl">Due for review</h2>
-          {due.length === 0 ? (
-            <EmptyState title="Nothing is due in the next 30 days" />
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {due.slice(0, 8).map((policy) => (
-                <li key={policy.id} className="flex items-start justify-between gap-3">
-                  <Link href={`/policies/${policy.id}`} className="font-semibold text-ink underline decoration-red underline-offset-2">
-                    {policy.title}
-                  </Link>
-                  <span className="shrink-0 text-sm text-ink/70">
-                    {policy.review_date && policy.review_date < today ? "Overdue" : formatDate(policy.review_date)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <Card>
-          <h2 className="font-display text-2xl">Recent changes</h2>
-          {recent.length === 0 ? (
-            <EmptyState title="No edits yet" />
-          ) : (
-            <ul className="mt-4 space-y-4">
-              {recent.map((version) => (
-                <li key={version.id}>
-                  <Link href={`/policies/${version.policy_id}`} className="font-semibold text-ink underline decoration-red underline-offset-2">
-                    {version.policy?.title ?? "Policy"}
-                  </Link>
-                  <p className="text-sm text-ink/80">{version.change_summary}</p>
-                  <p className="text-xs text-ink/60">
-                    {actorName(version.author)} · {formatTimestamp(version.created_at)} · Version {version.version_number}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      <section className="space-y-3">
+        <h2 className="font-display text-2xl">My requests</h2>
+        {home.pending.length === 0 ? <EmptyState title="No requests waiting" /> : (
+          <ul className="space-y-2">
+            {home.pending.map((item) => (
+              <li key={item.id}>
+                <Link href={item.href} className="flex min-h-11 items-center justify-between rounded-2xl border border-line bg-card px-4">
+                  <span className="font-semibold">{item.label}</span>
+                  <span className="text-sm text-grey">{item.status}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {home.manager ? (
+        <section className="space-y-3">
+          <h2 className="font-display text-2xl">Waiting for you</h2>
+          {home.mfaRequired ? <p className="text-sm font-semibold">Turn on two-step sign-in to open this.</p> : null}
+          {!home.mfaRequired && home.waiting.length === 0 ? <EmptyState title="No requests waiting" /> : null}
+          <ul className="space-y-2">
+            {home.waiting.map((item) => (
+              <li key={item.id}>
+                <Link href={item.href} className="flex min-h-11 items-center rounded-2xl border border-line bg-card px-4 font-semibold">{item.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
-  );
-}
-
-function Stat({ href, label, value }: { href: string; label: string; value: number }) {
-  return (
-    <Link href={href} className="rounded-3xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5">
-      <p className="text-sm font-semibold text-ink/70">{label}</p>
-      <p className="mt-2 font-mono text-4xl tabular-nums text-red">{value}</p>
-    </Link>
   );
 }

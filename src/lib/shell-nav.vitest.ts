@@ -43,8 +43,8 @@ describe("module nav", () => {
 
   it("sends People to Overview, Calendar, and Policies", () => {
     const people = visibleNav(pulseModules.find((module) => module.id === "people")?.nav ?? [], profile, true);
-    expect(people.map((item) => item.label)).toEqual(["Overview", "Calendar", "Policies"]);
-    expect(people.map((item) => item.href)).toEqual(["/people", "/people/calendar", "/policies"]);
+    expect(people.map((item) => item.label)).toEqual(["Overview", "Team", "Time off", "Cases", "Calendar", "Policies"]);
+    expect(people.map((item) => item.href)).toEqual(["/people", "/people/team", "/people/time-off", "/people/cases", "/people/calendar", "/policies"]);
   });
 
   it("groups commercial invoices and keeps Generate off the search page", () => {
