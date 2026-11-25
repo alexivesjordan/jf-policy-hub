@@ -1,45 +1,29 @@
-"use client";
-
-import { useState } from "react";
-import { toast } from "sonner";
+import { Suspense } from "react";
+import { connection } from "next/server";
+import { OpenCaseForm } from "@/components/hr/open-case-form";
 import { PageHeader } from "@/components/pulse/page-header";
-import { Button, Input } from "@/components/pulse/ui";
+import { PageSkeleton } from "@/components/pulse/states";
+import { loadTeam } from "@/features/hr/queries";
+import { requireUser } from "@/lib/auth";
+
+export const metadata = { title: "Open a case" };
 
 export default function OpenCasePage() {
-  const [route, setRoute] = useState("manager");
   return (
-    <form
-      className="mx-auto max-w-lg space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        toast.success("Case opened");
-      }}
-    >
+    <Suspense fallback={<PageSkeleton />}>
+      <Open />
+    </Suspense>
+  );
+}
+
+async function Open() {
+  await connection();
+  await requireUser();
+  const people = await loadTeam();
+  return (
+    <div className="space-y-4">
       <PageHeader eyebrow="Jordan Pulse" title="Open a case" />
-      <label className="block text-sm font-semibold">
-        Type
-        <select className="mt-1 h-11 w-full rounded-2xl border border-line bg-field px-3" aria-label="Type" name="type">
-          <option value="disciplinary">Disciplinary</option>
-          <option value="grievance">Grievance</option>
-          <option value="performance">Performance</option>
-          <option value="health">Health</option>
-          <option value="flexible_working">Flexible working</option>
-        </select>
-      </label>
-      <label className="block text-sm font-semibold">
-        Subject
-        <Input className="mt-1" name="subject" aria-label="Subject" placeholder="Name" required />
-      </label>
-      <label className="block text-sm font-semibold">
-        Title
-        <Input className="mt-1" name="title" aria-label="Title" required />
-      </label>
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold">Route</legend>
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name="route" checked={route === "manager"} onChange={() => setRoute("manager")} /> Manager</label>
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name="route" checked={route === "director_only"} onChange={() => setRoute("director_only")} /> Director only</label>
-      </fieldset>
-      <Button type="submit">Open</Button>
-    </form>
+      <OpenCaseForm people={people.map((person) => ({ id: person.id, name: person.name }))} />
+    </div>
   );
 }

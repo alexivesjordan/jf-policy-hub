@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import { DecisionButtons } from "@/components/hr/decision-buttons";
 import { LeaveRequestForm } from "@/components/hr/leave-request-form";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
@@ -40,7 +41,10 @@ async function TimeOff() {
             {home.mfaRequired ? <p className="text-sm font-semibold">Turn on two-step sign-in to open this.</p> : null}
             {!home.mfaRequired && home.waiting.length === 0 ? <EmptyState title="No requests waiting" /> : null}
             {home.waiting.map((item) => (
-              <p key={item.id} className="flex min-h-11 items-center rounded-2xl border border-line px-4 font-semibold">{item.label}</p>
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line px-4 py-2">
+                <p className="font-semibold">{item.label}</p>
+                <DecisionButtons id={item.id} kind={item.kind} />
+              </div>
             ))}
           </div>
         ) : null}

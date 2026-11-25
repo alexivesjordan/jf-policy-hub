@@ -15,24 +15,49 @@ async function hr() {
 
 export async function loadHrHome() {
   if (isFixtureMode()) return sampleHome;
+  const supabase = await createClient();
   const db = await hr();
-  const self = await db.from("employees").select("id, preferred_name, full_name").limit(1).maybeSingle();
+  const mine = await supabase.rpc("hr_ensure_self");
+  const selfId = typeof mine.data === "string" ? mine.data : "";
+  const self = selfId
+    ? await db.from("employees").select("id, preferred_name, full_name, manager_id").eq("id", selfId).maybeSingle()
+    : { data: null, error: mine.error };
   if (self.error || !self.data) return { ...sampleHome, name: "My HR", pending: [], waiting: [], manager: false, director: false, allowance: { entitlement: 0, taken: 0, booked: 0, left: 0 } };
-  const leave = await db.from("leave_requests").select("id, starts_on, ends_on, status, days").eq("employee_id", self.data.id);
+  const person = self.data;
+  const [leave, changes, reports] = await Promise.all([
+    db.from("leave_requests").select("id, employee_id, starts_on, ends_on, status, days"),
+    db.from("change_requests").select("id, employee_id, field_key, status"),
+    db.from("employees").select("id").eq("manager_id", person.id),
+  ]);
   const rows = Array.isArray(leave.data) ? leave.data : [];
-  const taken = rows.filter((row) => row.status === "approved").reduce((sum, row) => sum + Number(row.days ?? 0), 0);
-  const booked = rows.filter((row) => row.status === "requested").reduce((sum, row) => sum + Number(row.days ?? 0), 0);
+  const mineRows = rows.filter((row) => row.employee_id === person.id);
+  const taken = mineRows.filter((row) => row.status === "approved").reduce((sum, row) => sum + Number(row.days ?? 0), 0);
+  const booked = mineRows.filter((row) => row.status === "requested").reduce((sum, row) => sum + Number(row.days ?? 0), 0);
+  const waiting = [
+    ...rows.filter((row) => row.employee_id !== person.id && row.status === "requested").map((row) => ({
+      id: String(row.id),
+      kind: "leave" as const,
+      label: `${row.starts_on} – ${row.ends_on}`,
+      href: "/people/time-off",
+    })),
+    ...(Array.isArray(changes.data) ? changes.data : []).filter((row) => row.employee_id !== person.id && row.status === "pending").map((row) => ({
+      id: String(row.id),
+      kind: "change" as const,
+      label: String(row.field_key),
+      href: `/people/team/${row.employee_id}`,
+    })),
+  ];
   return {
-    name: self.data.preferred_name || self.data.full_name,
+    name: person.preferred_name || person.full_name,
     allowance: { entitlement: 20, taken, booked, left: Math.max(0, 20 - taken - booked) },
-    pending: rows.filter((row) => row.status === "requested").map((row) => ({
+    pending: mineRows.filter((row) => row.status === "requested").map((row) => ({
       id: String(row.id),
       label: `${row.starts_on} – ${row.ends_on}`,
       status: "Requested",
       href: "/people/time-off",
     })),
-    waiting: [],
-    manager: false,
+    waiting,
+    manager: (reports.data ?? []).length > 0,
     director: false,
     mfaRequired: false,
   };

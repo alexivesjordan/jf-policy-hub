@@ -5,6 +5,8 @@ drop view if exists public.hr_employees;
 drop view if exists public.hr_leave_requests;
 drop view if exists public.hr_settings;
 drop view if exists public.hr_cases;
+drop view if exists public.hr_change_requests;
+drop view if exists public.hr_sickness;
 
 drop schema if exists hr cascade;
 

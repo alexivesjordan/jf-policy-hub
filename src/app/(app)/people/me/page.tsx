@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChangeRequestForm } from "@/components/hr/change-request-form";
 import { loadMyRecord } from "@/features/hr/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -39,6 +40,7 @@ async function Record() {
             <Item label="Personal email" value={me.personalEmail} />
             <Item label="Address" value={me.address} />
           </dl>
+          <ChangeRequestForm />
           <ul className="mt-4 space-y-2">
             {me.changes.map((change) => (
               <li key={change.id} className="flex min-h-11 items-center justify-between rounded-2xl border border-line px-3">

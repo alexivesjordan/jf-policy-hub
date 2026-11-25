@@ -6,7 +6,7 @@ export const sampleHome = {
     { id: "change-1", label: "Phone", status: "Pending", href: "/people/me" },
   ],
   waiting: [
-    { id: "wait-1", label: "Avery Quinn · time off", href: "/people/time-off" },
+    { id: "11111111-1111-4111-8111-111111111111", kind: "leave" as const, label: "Avery Quinn · time off", href: "/people/time-off" },
   ],
   manager: true,
   director: true,

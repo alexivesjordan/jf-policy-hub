@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
+import { DecisionButtons } from "@/components/hr/decision-buttons";
 import { loadHrHome, loadTeam } from "@/features/hr/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -52,7 +53,10 @@ async function Team() {
         {home.waiting.length === 0 ? <EmptyState title="No requests waiting" /> : (
           <ul className="space-y-2">
             {home.waiting.map((item) => (
-              <li key={item.id}><Link className="flex min-h-11 items-center rounded-2xl border border-line px-4 font-semibold" href={item.href}>{item.label}</Link></li>
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line px-4 py-2">
+                <Link className="font-semibold" href={item.href}>{item.label}</Link>
+                <DecisionButtons id={item.id} kind={item.kind} />
+              </li>
             ))}
           </ul>
         )}

@@ -121,6 +121,31 @@ begin
 end;
 $$;
 
+create or replace function public.hr_ensure_self()
+returns uuid
+language plpgsql
+security definer
+set search_path = hr, public
+as $$
+declare
+  v_id uuid;
+  v_name text;
+  v_email text;
+begin
+  if not public.is_active_user() then
+    raise exception 'app: You cannot open HR Pulse.';
+  end if;
+  select e.id into v_id from hr.employees e where e.profile_id = auth.uid() limit 1;
+  if v_id is not null then return v_id; end if;
+  select coalesce(nullif(trim(full_name), ''), email), email into v_name, v_email
+  from public.profiles where id = auth.uid();
+  insert into hr.employees (profile_id, full_name, work_email, status)
+  values (auth.uid(), coalesce(v_name, 'Employee'), v_email, 'active')
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
 create or replace function public.hr_submit_change(p_field text, p_value jsonb)
 returns uuid
 language plpgsql
@@ -128,12 +153,12 @@ security definer
 set search_path = hr, public
 as $$
 declare
-  v_employee uuid := hr.current_employee_id();
+  v_employee uuid;
   v_id uuid;
   v_old jsonb;
   v_manager uuid;
 begin
-  if v_employee is null then raise exception 'app: No HR record yet.'; end if;
+  v_employee := public.hr_ensure_self();
   if p_field not in ('phone', 'personal_email', 'home_address', 'emergency_contacts', 'preferred_name') then
     raise exception 'app: That detail cannot be requested here.';
   end if;
@@ -159,10 +184,10 @@ as $$
 declare
   v_row hr.change_requests;
 begin
-  perform hr.require_mfa();
   select * into v_row from hr.change_requests where id = p_id;
   if v_row.id is null then raise exception 'app: That request is not here.'; end if;
   if v_row.submitted_by = auth.uid() then raise exception 'app: You cannot decide your own request.'; end if;
+  perform hr.require_mfa();
   if not (hr.manages(v_row.employee_id) or hr.is_director()) then
     raise exception 'app: You cannot decide that request.';
   end if;
@@ -202,13 +227,13 @@ security definer
 set search_path = hr, public
 as $$
 declare
-  v_employee uuid := hr.current_employee_id();
+  v_employee uuid;
   v_region text;
   v_days numeric;
   v_id uuid;
   v_manager uuid;
 begin
-  if v_employee is null then raise exception 'app: No HR record yet.'; end if;
+  v_employee := public.hr_ensure_self();
   if p_kind not in ('annual', 'unpaid', 'other') then raise exception 'app: Choose a type of leave.'; end if;
   if p_end < p_start then raise exception 'app: Check the dates.'; end if;
   select bank_holiday_region into v_region from hr.settings limit 1;
@@ -235,11 +260,11 @@ declare
   v_row hr.leave_requests;
   v_who uuid;
 begin
-  perform hr.require_mfa();
   select * into v_row from hr.leave_requests where id = p_id;
   if v_row.id is null then raise exception 'app: That request is not here.'; end if;
   select profile_id into v_who from hr.employees where id = v_row.employee_id;
   if v_who = auth.uid() then raise exception 'app: You cannot decide your own request.'; end if;
+  perform hr.require_mfa();
   if not (hr.manages(v_row.employee_id) or hr.is_director()) then
     raise exception 'app: You cannot decide that request.';
   end if;
@@ -261,16 +286,17 @@ set search_path = hr, public
 as $$
 declare
   v_id uuid;
-  v_self boolean := hr.is_self(p_employee);
+  v_employee uuid := coalesce(p_employee, public.hr_ensure_self());
+  v_self boolean := hr.is_self(v_employee);
 begin
   if not v_self then
     perform hr.require_mfa();
-    if not (hr.manages(p_employee) or hr.is_director()) then
+    if not (hr.manages(v_employee) or hr.is_director()) then
       raise exception 'app: You cannot report that absence.';
     end if;
   end if;
   insert into hr.sickness (employee_id, starts_on, reason_category, status)
-  values (p_employee, p_start, nullif(trim(coalesce(p_reason, '')), ''), 'open')
+  values (v_employee, p_start, nullif(trim(coalesce(p_reason, '')), ''), 'open')
   returning id into v_id;
   return v_id;
 end;
@@ -538,6 +564,7 @@ $$;
 
 revoke all on function public.hr_home() from public, anon;
 revoke all on function public.hr_log_view(text, uuid) from public, anon;
+revoke all on function public.hr_ensure_self() from public, anon;
 revoke all on function public.hr_submit_change(text, jsonb) from public, anon;
 revoke all on function public.hr_decide_change(uuid, boolean, text) from public, anon;
 revoke all on function public.hr_request_leave(date, date, boolean, boolean, text, text) from public, anon;
@@ -553,6 +580,7 @@ revoke all on function public.hr_record_case_email(text, text, text, text) from 
 
 grant execute on function public.hr_home() to authenticated, service_role;
 grant execute on function public.hr_log_view(text, uuid) to authenticated, service_role;
+grant execute on function public.hr_ensure_self() to authenticated, service_role;
 grant execute on function public.hr_submit_change(text, jsonb) to authenticated, service_role;
 grant execute on function public.hr_decide_change(uuid, boolean, text) to authenticated, service_role;
 grant execute on function public.hr_request_leave(date, date, boolean, boolean, text, text) to authenticated, service_role;
@@ -572,4 +600,6 @@ create or replace view public.hr_employees with (security_barrier = true, securi
 create or replace view public.hr_leave_requests with (security_barrier = true, security_invoker = true) as select * from hr.leave_requests;
 create or replace view public.hr_settings with (security_barrier = true, security_invoker = true) as select * from hr.settings;
 create or replace view public.hr_cases with (security_barrier = true, security_invoker = true) as select * from hr.cases;
-grant select on public.hr_employees, public.hr_leave_requests, public.hr_settings, public.hr_cases to authenticated, service_role;
+create or replace view public.hr_change_requests with (security_barrier = true, security_invoker = true) as select * from hr.change_requests;
+create or replace view public.hr_sickness with (security_barrier = true, security_invoker = true) as select * from hr.sickness;
+grant select on public.hr_employees, public.hr_leave_requests, public.hr_settings, public.hr_cases, public.hr_change_requests, public.hr_sickness to authenticated, service_role;
