@@ -32,6 +32,14 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
+    const stay = form.get("stay") === "on";
+    if (stay) {
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      const hash = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      document.cookie = `pulse-device=${hash}; Path=/; Max-Age=604800; SameSite=Lax`;
+    } else {
+      document.cookie = "pulse-device=; Path=/; Max-Age=0; SameSite=Lax";
+    }
     const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
     const supabase = createClient();
     const { error: passwordError } = await supabase.auth.signInWithPassword({ email, password });
@@ -55,6 +63,10 @@ export function LoginForm() {
       <Field label="Password">
         <Input name="password" type="password" autoComplete="current-password" required />
       </Field>
+      <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
+        <input name="stay" type="checkbox" className="size-5" />
+        Stay signed in for 7 days
+      </label>
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Please wait..." : "Sign in"}
       </Button>

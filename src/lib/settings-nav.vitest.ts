@@ -32,6 +32,8 @@ describe("settings nav", () => {
       "/settings/workspace/roles",
       "/settings/workspace/org-chart",
     ]);
+    const ownerNav = visibleNav(SETTINGS_NAV, { ...admin, workspace_role: "owner" }, true);
+    expect(ownerNav[1]?.children?.map((item) => item.href)).toContain("/settings/workspace/security");
   });
 
   it("keeps My jobs and My signature for field engineers only", () => {

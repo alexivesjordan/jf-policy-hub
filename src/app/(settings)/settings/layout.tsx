@@ -33,7 +33,7 @@ async function SettingsShell({ children }: { children: React.ReactNode }) {
     engineer = false;
   }
   return (
-    <AppShell profile={profile} pending={0} unread={0} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
+    <AppShell profile={profile} pending={0} unread={0} isOwner={profile.workspace_role === "owner"} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
       {children}
     </AppShell>
   );
