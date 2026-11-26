@@ -49,7 +49,7 @@ export const pulseModules: PulseModule[] = [
       { href: "/people/cases", label: "Cases" },
       { href: "/people/calendar", label: "Calendar" },
       { href: "/policies", label: "Policies" },
-      { href: "/people/settings", label: "Settings", workspaceAdminOnly: true },
+      { href: "/people/settings", label: "HR settings", workspaceAdminOnly: true },
     ],
   },
   {

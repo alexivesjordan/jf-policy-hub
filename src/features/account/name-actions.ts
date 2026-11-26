@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 
 export async function updateOwnName(formData: FormData) {
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/login?next=/account/name");
+  if (!profile) redirect("/login?next=/settings/account/profile");
   const names = personName(String(formData.get("firstName") ?? ""), String(formData.get("lastName") ?? ""));
   if (!names) throw new Error("Enter a first and last name.");
   const supabase = await createClient();
@@ -19,7 +19,7 @@ export async function updateOwnName(formData: FormData) {
     p_last_name: names.lastName,
   });
   if (error) throw new Error(messageFromError(error, "Could not save that name."));
-  revalidatePath("/account/name");
+  revalidatePath("/settings/account/profile");
   revalidatePath("/");
-  redirect("/account/name");
+  redirect("/settings/account/profile");
 }

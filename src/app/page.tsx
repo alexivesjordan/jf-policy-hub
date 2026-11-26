@@ -31,7 +31,7 @@ async function HomeGate() {
   } catch {
     engineer = false;
   }
-  return <Launcher profile={profile} showLogistics={Boolean(profile && canUseLogistics(profile) && !engineer)} />;
+  return <Launcher profile={profile} showLogistics={Boolean(profile && canUseLogistics(profile) && !engineer)} fieldEngineer={engineer} />;
 }
 
 function HomeFallback() {

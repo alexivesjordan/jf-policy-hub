@@ -46,7 +46,7 @@ async function FieldShell({ children }: { children: ReactNode }) {
     isOwner = profile.workspace_role === "owner";
   }
   return (
-    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)}>
+    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)} fieldEngineer={role === "engineer"}>
       {children}
     </AppShell>
   );
