@@ -7,6 +7,7 @@ import { getOfficeContext, listPulseNotifications } from "@/features/operations/
 import { listMyNotifications } from "@/features/policies/queries";
 import { Cin7Notice } from "@/components/cin7-notice";
 import { fieldRole } from "@/features/field/queries";
+import { canAdminOperations } from "@/lib/access";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
@@ -89,7 +90,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   const nav = role === "engineer" ? ENGINEER_NAV : officeNav;
 
   return (
-    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={role !== "engineer"} fieldEngineer={role === "engineer"}>
+    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner || canAdminOperations(profile)} nav={nav} notifications={notifications} showLogistics={role !== "engineer"} fieldEngineer={role === "engineer"}>
       <Cin7Notice />
       {children}
     </AppShell>

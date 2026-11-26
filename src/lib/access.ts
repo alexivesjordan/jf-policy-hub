@@ -62,11 +62,17 @@ export function canUseOperations(profile: Profile) {
   return moduleAllows(profile, "operations", "view");
 }
 
-/** Office operations and admins. Field engineers are refused separately; this does not grant sales. */
+/** Logistics is its own Pulse. Owners and admins can open it. */
 export function canUseLogistics(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;
   if (profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.role === "admin") return true;
-  return moduleAllows(profile, "operations", "view");
+  const logistics = profile.levels?.logistics;
+  if (logistics === "view" || logistics === "edit" || logistics === "admin") return true;
+  return false;
+}
+
+export function canAdminOperations(profile: Profile) {
+  return profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "admin";
 }
 
 export function canUseSales(profile: Profile) {

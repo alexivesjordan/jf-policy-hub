@@ -3,17 +3,18 @@ import { Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { getOfficeContext, listGateOverrides, listJobs } from "@/features/operations/queries";
 import { formatTimestamp } from "@/lib/format";
+import { canAdminOperations } from "@/lib/access";
 import { requireOperationsUser } from "@/lib/auth";
 
 export const metadata = { title: "Gate overrides" };
 
 export default async function OverridesPage() {
-  await requireOperationsUser();
+  const profile = await requireOperationsUser();
   const context = await getOfficeContext();
-  if (!context.is_owner) {
+  if (!context.is_owner && !canAdminOperations(profile)) {
     return (
       <div className="space-y-4">
-        <PageHeader eyebrow="Pulse Operations" title="Gate overrides" description="Only the named owner can record or read gate overrides." />
+        <PageHeader title="Gate overrides" />
       </div>
     );
   }

@@ -29,8 +29,8 @@ export function resolveModuleAccess(input: {
   return applyWorkspaceRole(input.role, mostPermissive(input.teamGrants));
 }
 
-export function allows(level: AccessLevel | undefined, need: "view" | "edit") {
-  if (!level) return false;
-  if (need === "view") return level === "view" || level === "edit";
-  return level === "edit";
+export function allows(level: AccessLevel | "admin" | undefined, need: "view" | "edit") {
+  if (!level || level === "none") return false;
+  if (need === "view") return level === "view" || level === "edit" || level === "admin";
+  return level === "edit" || level === "admin";
 }

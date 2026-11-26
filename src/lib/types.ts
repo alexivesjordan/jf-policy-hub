@@ -8,7 +8,7 @@ export type ModuleAccess = {
   enabled: boolean;
 };
 
-export type ModuleLevels = Partial<Record<PulseModuleId, "none" | "view" | "edit">>;
+export type ModuleLevels = Partial<Record<PulseModuleId | "logistics" | "policies", "none" | "view" | "edit" | "admin">>;
 export type PolicyStatus = "draft" | "active" | "archived";
 export type AmendmentStatus = "pending" | "approved" | "rejected" | "auto-applied";
 export type Severity = "low" | "medium" | "high";

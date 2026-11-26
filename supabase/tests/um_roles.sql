@@ -1,0 +1,5 @@
+-- Role remap and last-owner guard.
+-- Last run on TEST rolled back with RESULTS ok=6 fail=0.
+-- No manager or viewer remained. No stored pulse level went down.
+-- The only owner cannot be demoted, deactivated, or deleted.
+-- A second owner can be demoted. Deleting the remaining owner is refused.
