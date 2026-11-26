@@ -109,6 +109,21 @@ describe("visit PDF pack", () => {
     expect(text).toContain("None recorded");
   });
 
+  it("labels a service visit and leaves the risk assessment off that PDF", async () => {
+    const draft = sheet();
+    draft.visitType = "service";
+    draft.service = true;
+    draft.installation = false;
+    const bytes = await buildVisitPdf({ sheet: draft, riskLines: [], riskNotes: "" });
+    const loaded = await PDFDocument.load(bytes);
+    expect(loaded.getTitle()).toContain("Service visit");
+    const text = await pdfBytesToLayoutText(bytes);
+    expect(text).toContain("SERVICE VISIT");
+    expect(text).toContain("Service visit");
+    expect(text).not.toContain("INSTALLATION / SERVICE FORM");
+    expect(text).not.toContain("Risk assessment");
+  });
+
   it("recognises a stored photo or PDF by its bytes", () => {
     expect(sniffStoredFile(Uint8Array.from([0xff, 0xd8, 0xff, 0x00]))).toBe("image/jpeg");
     expect(sniffStoredFile(png)).toBe("image/png");

@@ -32,7 +32,7 @@ export async function issuePhotoTicket(ownerId: string, mimeType: string, byteSi
 }
 
 /** Confirms the stored object the same way access media does, then registers it. */
-export async function registerPhotoObject(input: { path: string; ownerId: string; kind: string; uploadedBy: string | null }) {
+export async function registerPhotoObject(input: { path: string; ownerId: string; kind: string; uploadedBy: string | null; entityTable?: string }) {
   const admin = adminOrThrow();
   if (!accessMediaPathOk(input.ownerId, input.path)) throw new Error("That file path is not allowed.");
   const info = await admin.storage.from("job-sheets").info(input.path);
@@ -59,7 +59,7 @@ export async function registerPhotoObject(input: { path: string; ownerId: string
     byteSize: info.data.size,
     kind: input.kind,
     uploadedBy: input.uploadedBy,
-    entityTable: "installs",
+    entityTable: input.entityTable ?? "installs",
     ownerId: input.ownerId,
   });
 }

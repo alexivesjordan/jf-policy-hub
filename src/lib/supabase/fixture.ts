@@ -1015,6 +1015,11 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     if (fn === "service_visit_day") return { day: today, stops: [visit] };
     return visit;
   }
+  if (fn === "service_visit_sheet") return { submitted: false };
+  if (fn === "service_visit_upload_gate") return null;
+  if (fn === "service_save_visit_sheet") {
+    return { id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd1", contactEmail: "desk@example.com", customerName: "Riverside Gym", orderNumber: "SO-00490" };
+  }
   if (fn === "service_visit_save") return "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
   if (fn === "service_visit_arrange" || fn === "service_visit_delete" || fn === "service_visit_set_progress") return null;
   if (fn === "service_visit_photo_allowed") return true;
