@@ -8,6 +8,7 @@ import { canUseLogistics } from "@/lib/access";
 import { requireSalesUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { connection } from "next/server";
 import { pulseModules } from "@/modules/registry";
 
@@ -75,7 +76,7 @@ async function SalesShell({ children }: { children: React.ReactNode }) {
   }
   const nav = (pulseModules.find((module) => module.id === "sales")?.nav ?? []).filter((item) => !item.ownerOnly || isOwner);
   return (
-    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
+    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );

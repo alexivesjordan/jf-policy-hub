@@ -5,6 +5,7 @@ import { fieldRole } from "@/features/field/queries";
 import { canUseLogistics } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 
 export const instant = false;
 
@@ -33,7 +34,7 @@ async function SettingsShell({ children }: { children: React.ReactNode }) {
     engineer = false;
   }
   return (
-    <AppShell profile={profile} pending={0} unread={0} isOwner={profile.workspace_role === "owner"} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
+    <AppShell profile={profile} pending={0} unread={0} isOwner={profile.workspace_role === "owner"} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );
