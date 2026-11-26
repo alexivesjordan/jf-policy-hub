@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { accessRedirect, canUseOperations, canUsePeople, canUseSales, moduleAllows, workspaceDenialRedirect } from "@/lib/access";
+import { accessRedirect, canUseOperations, canUsePeople, canUseSales, canUseService, moduleAllows, workspaceDenialRedirect } from "@/lib/access";
 import { isWorkspaceDenial } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 import type { ModuleAccess, Profile, Role } from "@/lib/types";
@@ -65,7 +65,18 @@ export async function requireOperationsUser() {
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseOperations(profile)) {
-    redirect(canUsePeople(profile) ? "/people" : "/no-access");
+    redirect(canUseService(profile) ? "/service" : canUsePeople(profile) ? "/people" : "/no-access");
+  }
+  return profile;
+}
+
+export async function requireServiceUser() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  if (!profile.access_granted) redirect("/no-access");
+  if (!profile.is_active) redirect("/account-inactive");
+  if (!canUseService(profile)) {
+    redirect(canUseOperations(profile) ? "/operations" : canUsePeople(profile) ? "/people" : "/no-access");
   }
   return profile;
 }
@@ -95,7 +106,7 @@ export async function requireSalesUser() {
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
   if (!canUseSales(profile)) {
-    redirect(canUsePeople(profile) ? "/people" : canUseOperations(profile) ? "/operations" : "/no-access");
+    redirect(canUsePeople(profile) ? "/people" : canUseOperations(profile) ? "/operations" : canUseService(profile) ? "/service" : "/no-access");
   }
   return profile;
 }

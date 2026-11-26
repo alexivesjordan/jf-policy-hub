@@ -20,7 +20,9 @@ describe("module nav", () => {
     expect(navItemActive("/field", "/field")).toBe(true);
     expect(navItemActive("/field", "/field/tasks")).toBe(false);
     expect(navItemActive("/field/tasks", "/field/tasks")).toBe(true);
-    expect(ENGINEER_NAV.map((item) => item.label)).toEqual(["My jobs", "My tasks", "Calendar"]);
+    expect(ENGINEER_NAV.map((item) => item.label)).toEqual(["My jobs", "My day", "My tasks", "Calendar"]);
+    expect(navItemActive("/service", "/service/day")).toBe(false);
+    expect(navItemActive("/service/day", "/service/day")).toBe(true);
   });
 
   it("treats overview routes as exact", () => {

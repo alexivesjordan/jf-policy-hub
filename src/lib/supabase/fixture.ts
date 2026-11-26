@@ -917,6 +917,71 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   }
   if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
   if (fn === "install_cancel") return fixtureInstall("2026-11-16", "annual", true, "cancelled");
+  if (fn === "service_people") {
+    return [
+      { id: "f3000000-0000-4000-8000-000000000001", name: "Lewis" },
+      { id: "f3000000-0000-4000-8000-000000000002", name: "Peter" },
+      { id: "f3000000-0000-4000-8000-000000000003", name: "Christian" },
+    ];
+  }
+  if (fn === "service_board") {
+    const from = String(args?.p_from ?? "2026-11-26").slice(0, 10);
+    const to = String(args?.p_to ?? from).slice(0, 10);
+    const day = from <= "2026-11-26" && to >= "2026-11-26" ? "2026-11-26" : from;
+    return {
+      from,
+      to,
+      canEdit: process.env.PULSE_FIXTURE_ROLE !== "engineer",
+      people: [
+        { id: "f3000000-0000-4000-8000-000000000001", name: "Lewis" },
+        { id: "f3000000-0000-4000-8000-000000000002", name: "Peter" },
+        { id: "f3000000-0000-4000-8000-000000000003", name: "Christian" },
+      ],
+      conflicts: [
+        { resourceId: "f3000000-0000-4000-8000-000000000001", day, kind: "install", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+        { resourceId: "f3000000-0000-4000-8000-000000000002", day, kind: "leave", label: "annual_leave", href: null },
+      ],
+      stops: [
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", resourceId: "f3000000-0000-4000-8000-000000000003", day, stopOrder: 1, customerName: "Riverside Gym", postcode: "PE30 4JJ", city: "King's Lynn", visitType: "repair", status: "scheduled", durationMinutes: 90, windowStart: "09:00", windowEnd: "11:00", assigneeCount: 1 },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2", resourceId: "f3000000-0000-4000-8000-000000000003", day, stopOrder: 2, customerName: "Harbour Fitness", postcode: "NR1 1AA", city: "Norwich", visitType: "swap", status: "scheduled", durationMinutes: 60, windowStart: null, windowEnd: null, assigneeCount: 1 },
+      ],
+    };
+  }
+  if (fn === "service_visit_open" || fn === "service_visit_day") {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const visit = {
+      id: String(args?.p_visit ?? "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"),
+      siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+      customerName: "Riverside Gym",
+      addressLine1: "1 High Street",
+      addressLine2: "",
+      city: "King's Lynn",
+      postcode: "PE30 4JJ",
+      contactName: "Pat Example",
+      contactPhone: "01603 000000",
+      contactEmail: "desk@example.com",
+      visitType: "repair",
+      notes: "Belt slipping on the treadmill.",
+      cin7OrderNumber: "SO-00490",
+      hubspotTicket: "",
+      visitOn: today,
+      windowStart: "09:00",
+      windowEnd: "11:00",
+      durationMinutes: 90,
+      status: "scheduled",
+      incompleteReason: "",
+      completionNote: "",
+      assignees: [{ id: "f3000000-0000-4000-8000-000000000003", name: "Christian", stopOrder: 1 }],
+      lines: [{ kind: "work", sku: "JF-TREAD", serial: "SN-100", fault: "Belt slip", parts: "Belt kit", description: "Treadmill" }],
+      assets: [{ id: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1", make: "Jordan", model: "Runner", serial: "SN-100" }],
+      photos: [],
+    };
+    if (fn === "service_visit_day") return { day: today, stops: [visit] };
+    return visit;
+  }
+  if (fn === "service_visit_save") return "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+  if (fn === "service_visit_arrange" || fn === "service_visit_delete" || fn === "service_visit_set_progress") return null;
+  if (fn === "service_visit_photo_allowed") return true;
   if (fn === "radar_owner_choices") {
     return [
       { id: USER_ID, full_name: "Alex Ives" },
