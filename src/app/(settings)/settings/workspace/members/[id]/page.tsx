@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/pulse/page-header";
 import { WorkspaceUserCard, type FieldResourceOption, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
@@ -11,7 +12,21 @@ export const metadata = { title: "Person" };
 
 const TABS = ["Overview", "Access", "Teams", "Security", "Activity"] as const;
 
-export default async function MemberPage({
+export default function MemberPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <MemberBody params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function MemberBody({
   params,
   searchParams,
 }: {
