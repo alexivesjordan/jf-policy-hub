@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/pulse/page-header";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cn, oneParam } from "@/lib/utils";
 
@@ -33,7 +33,8 @@ async function RolesBody({
   const requested = oneParam(params.tab);
   const tab = TABS.find((item) => item === requested) ?? "Roles";
   const supabase = await createClient();
-  const { data } = await supabase.rpc("workspace_teams");
+  const { data, error } = await supabase.rpc("workspace_teams");
+  denyWorkspace(error);
   const teams = (Array.isArray(data) ? data : []) as { id: string; name: string; members: number }[];
 
   return (

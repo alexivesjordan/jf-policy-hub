@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/pulse/page-header";
 import { WorkspaceUserCard, type FieldResourceOption, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { memberName, type MemberAccess, type MemberRow } from "@/lib/members";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -43,7 +43,10 @@ async function MemberBody({
     supabase.rpc("workspace_teams"),
     supabase.rpc("install_field_resources"),
   ]);
-  if (memberResult.error) throw new Error(memberResult.error.message);
+  if (memberResult.error) {
+    denyWorkspace(memberResult.error);
+    throw new Error(memberResult.error.message);
+  }
   const data = memberResult.data;
   const teamData = teamResult.data;
   if (!data || typeof data !== "object") notFound();
