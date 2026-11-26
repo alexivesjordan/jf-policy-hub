@@ -31,7 +31,7 @@ export function dueReminders(input: {
   already: ReminderKind[];
   today: string;
 }) {
-  if (!input.ownerId || input.status === "dismissed") return [] as ReminderKind[];
+  if (!input.ownerId || input.status === "dismissed" || input.status === "pushed_to_hubspot") return [] as ReminderKind[];
   const sent = new Set(input.already);
   const due: ReminderKind[] = [];
   const deadline = deadlineDay(input.deadline);

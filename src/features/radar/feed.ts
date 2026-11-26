@@ -1,7 +1,9 @@
 import { fromOcdsRelease } from "@/features/radar/parse";
-import type { ParsedNotice, RadarSource } from "@/features/radar/types";
+import type { ParsedNotice } from "@/features/radar/types";
 
-const SEARCH: Record<RadarSource, { host: string; path: string }> = {
+type TenderSource = "find-a-tender" | "contracts-finder";
+
+const SEARCH: Record<TenderSource, { host: string; path: string }> = {
   "find-a-tender": { host: "www.find-tender.service.gov.uk", path: "/api/1.0/ocdsReleasePackages" },
   "contracts-finder": { host: "www.contractsfinder.service.gov.uk", path: "/Published/Notices/OCDS/Search" },
 };
@@ -9,7 +11,7 @@ const SEARCH: Record<RadarSource, { host: string; path: string }> = {
 export const RADAR_PAGE_LIMIT = 100;
 export const RADAR_MAX_PAGES = 3;
 
-export function assertOfficialFeedUrl(source: RadarSource, raw: string) {
+export function assertOfficialFeedUrl(source: TenderSource, raw: string) {
   const url = new URL(raw);
   const allowed = SEARCH[source];
   if (url.protocol !== "https:" || url.username || url.password || url.hostname !== allowed.host || url.pathname !== allowed.path) {
@@ -18,7 +20,7 @@ export function assertOfficialFeedUrl(source: RadarSource, raw: string) {
   return url.toString();
 }
 
-export function feedUrl(source: RadarSource, from: string) {
+export function feedUrl(source: TenderSource, from: string) {
   const base = SEARCH[source];
   const url = new URL(`https://${base.host}${base.path}`);
   url.searchParams.set("limit", String(RADAR_PAGE_LIMIT));
@@ -38,7 +40,7 @@ export function ingestWindow(now: Date, lookbackDays: number) {
   };
 }
 
-function nextLink(source: RadarSource, root: unknown) {
+function nextLink(source: TenderSource, root: unknown) {
   const links = root && typeof root === "object" && !Array.isArray(root) ? (root as { links?: { next?: unknown } }).links : null;
   if (!links || typeof links.next !== "string" || !links.next) return null;
   try {
@@ -48,7 +50,7 @@ function nextLink(source: RadarSource, root: unknown) {
   }
 }
 
-export async function fetchReleasePages(source: RadarSource, startUrl: string, fetchImpl: typeof fetch = fetch) {
+export async function fetchReleasePages(source: TenderSource, startUrl: string, fetchImpl: typeof fetch = fetch) {
   const releases: unknown[] = [];
   const seen = new Set<string>();
   let url: string | null = assertOfficialFeedUrl(source, startUrl);
@@ -82,7 +84,7 @@ export async function fetchReleasePages(source: RadarSource, startUrl: string, f
   return { releases, pages, truncated };
 }
 
-export function parseReleases(source: RadarSource, releases: unknown[]) {
+export function parseReleases(source: TenderSource, releases: unknown[]) {
   const notices: ParsedNotice[] = [];
   let unrecognised = 0;
   for (const release of releases) {

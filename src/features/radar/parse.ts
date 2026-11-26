@@ -1,8 +1,10 @@
+import { estimatedValue, facilityTypes, publishedEmail, publishedPhone, scopeSummary, ukPostcode } from "@/features/radar/extract";
 import type { ParsedNotice, RadarSource } from "@/features/radar/types";
 
 const HOSTS: Record<RadarSource, string[]> = {
   "find-a-tender": ["www.find-tender.service.gov.uk"],
   "contracts-finder": ["www.contractsfinder.service.gov.uk"],
+  planit: ["www.planit.org.uk"],
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -114,6 +116,10 @@ export function fromOcdsRelease(source: RadarSource, raw: unknown): ParsedNotice
   const award = asRecord(tender.awardPeriod);
   const documents = asArray(tender.documents).map((item) => trim(asRecord(item).url, 500)).filter(Boolean);
   const description = trim(tender.description, 4_000);
+  const contact = asRecord(buyerParty?.contactPoint);
+  const addressText = addresses.map((address) => [trim(address.streetAddress, 200), trim(address.postalCode, 20)].filter(Boolean).join(", ")).find(Boolean) ?? "";
+  const postcode = ukPostcode(addressText) ?? ukPostcode(description);
+  const contactBlob = `${trim(contact.email, 200)} ${trim(contact.telephone, 40)} ${description}`;
   return {
     source,
     noticeId,
@@ -121,8 +127,8 @@ export function fromOcdsRelease(source: RadarSource, raw: unknown): ParsedNotice
     title: trim(tender.title, 300) || trim(release.title, 300) || "Untitled notice",
     description,
     buyer: trim(buyer.name, 250) || trim(buyerParty?.name, 250) || "Not published",
-    valueAmount: value.amount,
-    valueCurrency: value.currency,
+    valueAmount: value.amount ?? estimatedValue(description),
+    valueCurrency: value.currency ?? (estimatedValue(description) != null ? "GBP" : null),
     deadline: safeDate(asRecord(tender.tenderPeriod).endDate),
     expectedAwardDate: dateOnly(award.startDate) ?? dateOnly(award.endDate),
     cpvCodes: [...cpv].slice(0, 20),
@@ -131,5 +137,18 @@ export function fromOcdsRelease(source: RadarSource, raw: unknown): ParsedNotice
     publishedAt: safeDate(release.date),
     tags: asArray(release.tag).map((tag) => trim(tag, 40).toLowerCase()).filter(Boolean).slice(0, 8),
     raw,
+    opportunityType: "tender",
+    decisionStatus: null,
+    decisionDate: null,
+    lpa: null,
+    siteAddress: addressText || null,
+    postcode,
+    applicant: trim(buyer.name, 250) || trim(buyerParty?.name, 250) || null,
+    agent: null,
+    scopeSummary: scopeSummary(description),
+    facilityTypes: facilityTypes(`${trim(tender.title, 300)}\n${description}`),
+    contactName: trim(contact.name, 200) || null,
+    contactEmail: publishedEmail(contactBlob),
+    contactPhone: trim(contact.telephone, 40) || publishedPhone(contactBlob),
   };
 }

@@ -21,6 +21,19 @@ export type NoticeWrite = {
   match_reasons: string[];
   published_at: string | null;
   description: string;
+  opportunity_type: ParsedNotice["opportunityType"];
+  decision_status: string | null;
+  decision_date: string | null;
+  lpa: string | null;
+  site_address: string | null;
+  postcode: string | null;
+  applicant: string | null;
+  agent: string | null;
+  scope_summary: string;
+  facility_types: string[];
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
 };
 
 function openNotice(tags: string[]) {
@@ -51,6 +64,7 @@ export function planNoticeWrites(input: {
         buyer: notice.buyer,
         cpvCodes: notice.cpvCodes,
         valueAmount: notice.valueAmount,
+        decisionStatus: notice.decisionStatus,
       },
       input.config,
     );
@@ -76,6 +90,19 @@ export function planNoticeWrites(input: {
       match_reasons: scored.reasons,
       published_at: notice.publishedAt,
       description: notice.description,
+      opportunity_type: notice.opportunityType,
+      decision_status: notice.decisionStatus,
+      decision_date: notice.decisionDate,
+      lpa: notice.lpa,
+      site_address: notice.siteAddress,
+      postcode: notice.postcode,
+      applicant: notice.applicant,
+      agent: notice.agent,
+      scope_summary: notice.scopeSummary,
+      facility_types: notice.facilityTypes,
+      contact_name: notice.contactName,
+      contact_email: notice.contactEmail,
+      contact_phone: notice.contactPhone,
     });
     if (present) updated += 1;
     else inserted += 1;

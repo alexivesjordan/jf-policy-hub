@@ -18,6 +18,24 @@ export function RadarSettingsForm({ settings }: { settings: RadarScoringConfig }
       <Field label="CPV codes">
         <TextArea name="cpv_codes" defaultValue={form.cpvCodes} rows={4} />
       </Field>
+      <Field label="Exclusions">
+        <TextArea name="exclusions" defaultValue={form.exclusions} rows={6} />
+      </Field>
+      <fieldset className="grid gap-3 sm:grid-cols-2">
+        <legend className="text-sm font-semibold sm:col-span-2">HubSpot</legend>
+        <Field label="Pipeline">
+          <Input name="hubspot_pipeline_id" defaultValue={form.hubspotPipelineId} />
+        </Field>
+        <Field label="Stage">
+          <Input name="hubspot_stage_id" defaultValue={form.hubspotStageId} />
+        </Field>
+        <Field label="Owner">
+          <Input name="hubspot_owner_id" defaultValue={form.hubspotOwnerId} />
+        </Field>
+        <Field label="Portal">
+          <Input name="hubspot_portal_id" defaultValue={form.hubspotPortalId} />
+        </Field>
+      </fieldset>
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold">Value bands</legend>
         {form.bands.map((band, index) => (

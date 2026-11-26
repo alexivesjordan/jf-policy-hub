@@ -25,6 +25,7 @@ describe("radar reminders", () => {
   it("does not repeat a reminder or chase a dismissed or unassigned notice", () => {
     expect(dueReminders({ ...base, already: ["deadline_7"] })).toEqual([]);
     expect(dueReminders({ ...base, status: "dismissed" })).toEqual([]);
+    expect(dueReminders({ ...base, status: "pushed_to_hubspot" })).toEqual([]);
     expect(dueReminders({ ...base, ownerId: null })).toEqual([]);
     expect(dueReminders({ ...base, today: "2026-12-01" })).toEqual([]);
     expect(dueReminders({ ...base, today: "2026-12-21", deadline: "2026-12-20T12:00:00.000Z" })).toEqual([]);

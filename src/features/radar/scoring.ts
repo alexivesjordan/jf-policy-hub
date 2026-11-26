@@ -11,6 +11,7 @@ export type ScoreInput = {
   buyer: string;
   cpvCodes: string[];
   valueAmount: number | null;
+  decisionStatus?: string | null;
 };
 
 function escapeRegExp(value: string) {
@@ -59,22 +60,40 @@ export function matchingBand(amount: number | null, bands: ValueBand[]) {
   return best;
 }
 
+function equipmentBearing(keyword: string) {
+  return /equipment|treadmill|weights|cardio|machine|suite/.test(keyword);
+}
+
 export function scoreOpportunity(input: ScoreInput, config: RadarScoringConfig): ScoreResult {
   const text = `${input.title}\n${input.description}\n${input.buyer}`.slice(0, 20_000);
   const hits = keywordHits(text, config.keywords);
   const cpv = matchingCpv(input.cpvCodes, config.cpvCodes);
-  const relevant = hits.length > 0 || Boolean(cpv);
+  const excluded = keywordHits(text, config.exclusions);
+  const equipment = hits.some(equipmentBearing) || Boolean(cpv);
+  const knockedOut = excluded.length > 0 && !equipment;
+  const relevant = (hits.length > 0 || Boolean(cpv)) && !knockedOut;
   const band = relevant ? matchingBand(input.valueAmount, config.valueBands) : null;
+  const granted = input.decisionStatus === "Permitted" || input.decisionStatus === "Conditions";
   const reasons: string[] = [];
-  for (const hit of hits.slice(0, 6)) reasons.push(`Keyword: ${hit}`);
-  if (cpv) reasons.push(`CPV ${cpv}`);
-  if (band) reasons.push(`Value in ${band.label}`);
-  const score = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.min(KEYWORD_CAP, hits.length * KEYWORD_EACH) + (cpv ? CPV_POINTS : 0) + Math.min(BAND_CAP, band?.points ?? 0),
-    ),
-  );
+  if (knockedOut) {
+    reasons.push(`Excluded: ${excluded[0]}`);
+  } else {
+    for (const hit of hits.slice(0, 6)) reasons.push(`Keyword: ${hit}`);
+    if (cpv) reasons.push(`CPV ${cpv}`);
+    if (band) reasons.push(`Value in ${band.label}`);
+    if (relevant && granted && input.decisionStatus) reasons.push(`Decision: ${input.decisionStatus}`);
+  }
+  const score = knockedOut
+    ? 0
+    : Math.max(
+        0,
+        Math.min(
+          100,
+          Math.min(KEYWORD_CAP, hits.length * KEYWORD_EACH) +
+            (cpv ? CPV_POINTS : 0) +
+            Math.min(BAND_CAP, band?.points ?? 0) +
+            (relevant && granted ? 8 : 0),
+        ),
+      );
   return { score, relevant, reasons };
 }

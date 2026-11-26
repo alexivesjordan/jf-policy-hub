@@ -10,7 +10,12 @@ function lines(value: string) {
 export function parseRadarSettings(input: {
   keywords: string;
   cpvCodes: string;
+  exclusions?: string;
   bands: { label: string; min: string; max: string; points: string }[];
+  hubspotPipelineId?: string;
+  hubspotStageId?: string;
+  hubspotOwnerId?: string;
+  hubspotPortalId?: string;
 }): { ok: true; config: RadarScoringConfig } | { ok: false; message: string } {
   const keywords = [...new Set(lines(input.keywords).map((line) => line.toLowerCase()))];
   if (keywords.length < 1 || keywords.length > 40) return { ok: false, message: "Add between 1 and 40 keywords." };
@@ -51,7 +56,20 @@ export function parseRadarSettings(input: {
     valueBands.push({ label, min, max, points });
   }
   if (valueBands.length > 8) return { ok: false, message: "Use at most 8 value bands." };
-  return { ok: true, config: { keywords, cpvCodes, valueBands } };
+  const exclusions = [...new Set(lines(input.exclusions ?? "").map((line) => line.toLowerCase()))];
+  if (exclusions.length > 40) return { ok: false, message: "Use at most 40 exclusion words." };
+  if (exclusions.some((word) => word.length < 2 || word.length > 60)) {
+    return { ok: false, message: "Each exclusion needs 2 to 60 characters." };
+  }
+  const hubspot = {
+    hubspotPipelineId: (input.hubspotPipelineId ?? "").trim(),
+    hubspotStageId: (input.hubspotStageId ?? "").trim(),
+    hubspotOwnerId: (input.hubspotOwnerId ?? "").trim(),
+    hubspotPortalId: (input.hubspotPortalId ?? "").trim(),
+  };
+  if (Object.values(hubspot).some((value) => value.length > 40)) return { ok: false, message: "HubSpot ids are too long." };
+  if (hubspot.hubspotPortalId && !/^\d+$/.test(hubspot.hubspotPortalId)) return { ok: false, message: "The HubSpot portal id is numeric." };
+  return { ok: true, config: { keywords, cpvCodes, valueBands, exclusions, ...hubspot } };
 }
 
 export function settingsToForm(config: RadarScoringConfig) {
@@ -65,6 +83,11 @@ export function settingsToForm(config: RadarScoringConfig) {
   return {
     keywords: config.keywords.join("\n"),
     cpvCodes: config.cpvCodes.join("\n"),
+    exclusions: config.exclusions.join("\n"),
     bands,
+    hubspotPipelineId: config.hubspotPipelineId,
+    hubspotStageId: config.hubspotStageId,
+    hubspotOwnerId: config.hubspotOwnerId,
+    hubspotPortalId: config.hubspotPortalId,
   };
 }

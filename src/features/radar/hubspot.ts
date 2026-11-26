@@ -1,49 +1,85 @@
-import type { RadarSource } from "@/features/radar/types";
+const DEALS_URL = "https://api.hubapi.com/crm/v3/objects/deals";
 
-export type HubSpotDealIntent = {
-  opportunityId: string;
-  source: RadarSource;
-  noticeId: string;
-  title: string;
-  buyer: string;
-  valueAmount: number | null;
-  valueCurrency: string | null;
-  url: string;
+export type HubSpotDealDraft = {
+  name: string;
+  amount: number | null;
+  closeDate: string | null;
+  pipelineId: string;
+  stageId: string;
+  ownerId: string;
+  description: string;
+  sourceUrl: string;
 };
 
-export function buildHubSpotIntent(row: {
-  id: string;
-  source: RadarSource;
-  noticeId: string;
+export function hubspotConnected(token: string | undefined) {
+  return Boolean(token?.trim());
+}
+
+export function buildHubSpotDeal(input: {
   title: string;
   buyer: string;
   valueAmount: number | null;
-  valueCurrency: string | null;
+  closeDate: string | null;
+  scopeSummary: string;
   url: string;
-}): HubSpotDealIntent {
+  pipelineId: string;
+  stageId: string;
+  ownerId: string;
+}): HubSpotDealDraft {
+  const lines = [input.scopeSummary, input.buyer ? `Buyer: ${input.buyer}` : "", input.url ? `Source: ${input.url}` : ""]
+    .map((line) => line.trim())
+    .filter(Boolean);
   return {
-    opportunityId: row.id,
-    source: row.source,
-    noticeId: row.noticeId,
-    title: row.title,
-    buyer: row.buyer,
-    valueAmount: row.valueAmount,
-    valueCurrency: row.valueCurrency,
-    url: row.url,
+    name: input.title.slice(0, 200),
+    amount: input.valueAmount,
+    closeDate: input.closeDate,
+    pipelineId: input.pipelineId.trim(),
+    stageId: input.stageId.trim(),
+    ownerId: input.ownerId.trim(),
+    description: lines.join("\n"),
+    sourceUrl: input.url,
   };
 }
 
-/**
- * HubSpot owns deals. Pulse records the request and does not call HubSpot.
- * A later adapter can implement this. The review action must not call it.
- */
-export interface HubSpotDealAdapter {
-  pushDeal(intent: HubSpotDealIntent): Promise<{ externalId: string }>;
+export function hubspotDealUrl(portalId: string, dealId: string) {
+  if (!/^\d+$/.test(portalId) || !/^\d+$/.test(dealId)) return null;
+  return `https://app.hubspot.com/contacts/${portalId}/record/0-3/${dealId}`;
 }
 
-export class UnconfiguredHubSpotAdapter implements HubSpotDealAdapter {
-  async pushDeal(intent: HubSpotDealIntent): Promise<{ externalId: string }> {
-    void intent;
-    throw new Error("HubSpot is not connected. Pulse records the request only.");
+export function hubSpotProperties(draft: HubSpotDealDraft) {
+  const properties: Record<string, string> = {
+    dealname: draft.name,
+    description: draft.description,
+  };
+  if (draft.amount != null) properties.amount = String(draft.amount);
+  if (draft.closeDate) properties.closedate = draft.closeDate;
+  if (draft.pipelineId) properties.pipeline = draft.pipelineId;
+  if (draft.stageId) properties.dealstage = draft.stageId;
+  if (draft.ownerId) properties.hubspot_owner_id = draft.ownerId;
+  return properties;
+}
+
+export async function createHubSpotDeal(
+  draft: HubSpotDealDraft,
+  options: { token: string; fetchImpl?: typeof fetch },
+): Promise<{ id: string }> {
+  if (!draft.pipelineId || !draft.stageId) {
+    throw new Error("Set the HubSpot pipeline and stage.");
   }
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl(DEALS_URL, {
+    method: "POST",
+    redirect: "error",
+    headers: {
+      Authorization: `Bearer ${options.token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ properties: hubSpotProperties(draft) }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) throw new Error(`HubSpot returned HTTP ${response.status}`);
+  const body = (await response.json()) as { id?: unknown };
+  if (typeof body.id !== "string" || !body.id) throw new Error("HubSpot did not return a deal id.");
+  return { id: body.id };
 }

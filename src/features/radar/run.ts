@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_RADAR_SETTINGS } from "@/features/radar/defaults";
 import { fetchReleasePages, feedUrl, ingestWindow, parseReleases } from "@/features/radar/feed";
+import { fetchPlanitNotices } from "@/features/radar/planit";
 import { noticeKey } from "@/features/radar/dedupe";
 import { planNoticeWrites, type NoticeWrite } from "@/features/radar/plan";
 import { formatUkDate } from "@/features/radar/present";
@@ -18,9 +19,15 @@ type SourceResult = {
 
 function asConfig(row: unknown): RadarScoringConfig {
   if (!row || typeof row !== "object") return DEFAULT_RADAR_SETTINGS;
-  const record = row as { keywords?: unknown; cpv_codes?: unknown; value_bands?: unknown };
+  const record = row as {
+    keywords?: unknown;
+    cpv_codes?: unknown;
+    value_bands?: unknown;
+    exclusions?: unknown;
+  };
   const keywords = Array.isArray(record.keywords) ? record.keywords.filter((item): item is string => typeof item === "string") : [];
   const cpvCodes = Array.isArray(record.cpv_codes) ? record.cpv_codes.filter((item): item is string => typeof item === "string") : [];
+  const exclusions = Array.isArray(record.exclusions) ? record.exclusions.filter((item): item is string => typeof item === "string") : DEFAULT_RADAR_SETTINGS.exclusions;
   const valueBands = Array.isArray(record.value_bands)
     ? record.value_bands.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -37,11 +44,11 @@ function asConfig(row: unknown): RadarScoringConfig {
       })
     : [];
   if (keywords.length === 0) return DEFAULT_RADAR_SETTINGS;
-  return { keywords, cpvCodes, valueBands };
+  return { ...DEFAULT_RADAR_SETTINGS, keywords, cpvCodes, valueBands, exclusions };
 }
 
 async function loadSettings(admin: SupabaseClient) {
-  const { data } = await admin.from("radar_settings").select("keywords, cpv_codes, value_bands").eq("id", true).maybeSingle();
+  const { data } = await admin.from("radar_settings").select("keywords, cpv_codes, value_bands, exclusions").eq("id", true).maybeSingle();
   return asConfig(data);
 }
 
@@ -69,7 +76,7 @@ async function saveWrites(admin: SupabaseClient, writes: NoticeWrite[]) {
   }
 }
 
-async function readSource(source: RadarSource, from: string, fetchImpl: typeof fetch): Promise<{ result: SourceResult; notices: ReturnType<typeof parseReleases>["notices"] }> {
+async function readSource(source: "find-a-tender" | "contracts-finder", from: string, fetchImpl: typeof fetch): Promise<{ result: SourceResult; notices: ReturnType<typeof parseReleases>["notices"] }> {
   const batch = await fetchReleasePages(source, feedUrl(source, from), fetchImpl);
   const parsed = parseReleases(source, batch.releases);
   return {
@@ -84,6 +91,7 @@ async function sendReminders(admin: SupabaseClient, today: string) {
     .select("id, title, buyer, deadline, expected_award_date, owner_id, status")
     .not("owner_id", "is", null)
     .neq("status", "dismissed")
+    .neq("status", "pushed_to_hubspot")
     .limit(500);
   if (error || !Array.isArray(data) || data.length === 0) return 0;
   const rows = data as {
@@ -144,10 +152,14 @@ export async function runRadarIngest(admin: SupabaseClient, input: { now?: Date;
   const window = ingestWindow(now, input.lookbackDays ?? 2);
   const fetchImpl = input.fetchImpl ?? fetch;
   const config = await loadSettings(admin);
-  const empty: SourceResult = { ok: false, pages: 0, read: 0, truncated: false };
+  const empty = (): SourceResult => ({ ok: false, pages: 0, read: 0, truncated: false });
   const collected: Awaited<ReturnType<typeof readSource>>["notices"] = [];
-  const sources: Record<RadarSource, SourceResult> = { "find-a-tender": empty, "contracts-finder": { ...empty } };
-  const jobs: { source: RadarSource; from: string }[] = [
+  const sources: Record<RadarSource, SourceResult> = {
+    "find-a-tender": empty(),
+    "contracts-finder": empty(),
+    planit: empty(),
+  };
+  const jobs: { source: "find-a-tender" | "contracts-finder"; from: string }[] = [
     { source: "find-a-tender", from: window.ftsFrom },
     { source: "contracts-finder", from: window.cfFrom },
   ];
@@ -160,8 +172,15 @@ export async function runRadarIngest(admin: SupabaseClient, input: { now?: Date;
       collected.push(...result.value.notices);
     }
   }
-  if (results.every((result) => result.status === "rejected")) {
-    throw new Error("Both tender feeds failed.");
+  try {
+    const planning = await fetchPlanitNotices(window.cfFrom, fetchImpl);
+    sources.planit = { ok: true, pages: planning.pages, read: planning.read, truncated: planning.truncated };
+    collected.push(...planning.notices);
+  } catch {
+    sources.planit = empty();
+  }
+  if (!sources["find-a-tender"].ok && !sources["contracts-finder"].ok && !sources.planit.ok) {
+    throw new Error("The tender and planning feeds failed.");
   }
   const known = await existingKeys(admin, collected);
   const plan = planNoticeWrites({ notices: collected, existingKeys: known, config });
@@ -171,6 +190,7 @@ export async function runRadarIngest(admin: SupabaseClient, input: { now?: Date;
     lookbackDays: window.days,
     findATender: sources["find-a-tender"],
     contractsFinder: sources["contracts-finder"],
+    planit: sources.planit,
     inserted: plan.inserted,
     updated: plan.updated,
     skipped: plan.skipped,
