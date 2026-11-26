@@ -1,0 +1,5 @@
+-- Two-step checks. Last TEST run rolled back with RESULTS ok=9 fail=0, plus grace ok=1 fail=0.
+-- Five wrong codes lock the challenge. An expired code fails. A used code fails.
+-- An email-verified session passes the workspace check and fails hr.aal_ok().
+-- An authenticator session passes both. A trusted device stops working after it expires.
+-- A new owner is inside the 7-day grace period.

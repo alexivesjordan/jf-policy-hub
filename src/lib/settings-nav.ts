@@ -21,6 +21,7 @@ export const SETTINGS_NAV: ModuleNavItem[] = [
       { href: "/settings/workspace/teams", label: "Teams" },
       { href: "/settings/workspace/roles", label: "Roles" },
       { href: "/settings/workspace/org-chart", label: "Org chart" },
+      { href: "/settings/workspace/security", label: "Security", ownerOnly: true },
     ],
   },
 ];

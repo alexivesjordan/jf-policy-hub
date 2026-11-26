@@ -32,14 +32,24 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
+    const stay = form.get("stay") === "on";
     const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
     const supabase = createClient();
     const { error: passwordError } = await supabase.auth.signInWithPassword({ email, password });
-    setPending(false);
     if (passwordError) {
+      setPending(false);
       setError("Those details were not recognised. Try again, or use Forgot password if you have not set one yet.");
       return;
     }
+    if (stay) {
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      const hash = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      document.cookie = `pulse-device=${hash}; Path=/; Max-Age=604800; SameSite=Lax`;
+      await supabase.rpc("trust_device", { p_hash: hash });
+    } else {
+      document.cookie = "pulse-device=; Path=/; Max-Age=0; SameSite=Lax";
+    }
+    setPending(false);
     setMessage("Signed in.");
     router.push(nextPath);
     router.refresh();
@@ -55,6 +65,10 @@ export function LoginForm() {
       <Field label="Password">
         <Input name="password" type="password" autoComplete="current-password" required />
       </Field>
+      <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
+        <input name="stay" type="checkbox" className="size-5" />
+        Stay signed in for 7 days
+      </label>
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Please wait..." : "Sign in"}
       </Button>

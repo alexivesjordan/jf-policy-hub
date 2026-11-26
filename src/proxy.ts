@@ -64,6 +64,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  if (user && path !== "/settings/account/security" && !path.startsWith("/settings/account/security/")) {
+    const trust = request.cookies.get("pulse-device")?.value ?? "";
+    const [{ data: due }, { data: trusted }] = await Promise.all([
+      supabase.rpc("two_step_due"),
+      trust ? supabase.rpc("device_trusted", { p_hash: trust }) : Promise.resolve({ data: false }),
+    ]);
+    if (due === true && trusted !== true) {
+      const redirect = NextResponse.redirect(new URL("/settings/account/security", request.url));
+      for (const cookie of response.headers.getSetCookie()) redirect.headers.append("set-cookie", cookie);
+      return redirect;
+    }
+  }
+
   if (user && (path.startsWith("/logistics") || (path.startsWith("/operations") && !path.startsWith("/operations/documents")))) {
     const { data } = await supabase.rpc("install_field_role");
     if (data === "engineer") {
