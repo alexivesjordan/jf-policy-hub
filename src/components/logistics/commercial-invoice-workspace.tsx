@@ -11,6 +11,11 @@ import { dimensionsWereEdited, dimensionRowsFromBoxes, emptyDimension, incomingD
 
 const TERMS = ["DAP", "DDP", "EXW", "FCA", "CPT", "CIP", "DPU", "FOB", "CIF"];
 
+/** A missing customs value must stay a controlled empty input. */
+function shown<T extends string | number>(value: T | null | undefined) {
+  return value ?? "";
+}
+
 export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: InvoicePrefill | null }) {
   const [numbers, setNumbers] = useState(prefill?.orderNumbers ?? "");
   const [draft, setDraft] = useState<InvoiceDraft | null>(prefill?.draft ?? null);
@@ -28,6 +33,13 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
   function edit(key: string, recipe: (current: InvoiceDraft) => InvoiceDraft) {
     touched.current.add(key);
     setDraft((current) => current ? recipe(current) : current);
+  }
+
+  function patchLine(lineId: string, patch: Partial<InvoiceDraft["lines"][number]>) {
+    edit("lines", (current) => ({
+      ...current,
+      lines: current.lines.map((item) => item.id === lineId ? { ...item, ...patch } : item),
+    }));
   }
 
   function markDimensions() {
@@ -200,7 +212,7 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
   const net = draft ? summedNetWeightKg(draft.lines) : 0;
   const shipment = draft?.shipment;
   const gross = palletGrossKg(enteredPallets().pallets);
-  const suggested = draft ? applyBuyerVat(matchCustomsStatement(rules, { incoterm: draft.incoterm, destinationCountry: draft.destinationCountry, carrier: shipment?.courier ?? "" }), draft.buyer.vat) : "";
+  const suggested = draft ? applyBuyerVat(matchCustomsStatement(rules, { incoterm: shown(draft.incoterm), destinationCountry: shown(draft.destinationCountry), carrier: shipment?.courier ?? "" }), shown(draft.buyer.vat)) : "";
   return (
     <div className="space-y-6">
       <section className="space-y-3 rounded-3xl border border-line bg-card p-5">
@@ -253,7 +265,7 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
           <p className="text-sm">{draft.currency} · {draft.destinationCountry}</p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="text-sm font-semibold">Incoterm
-              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.incoterm} onChange={(event) => {
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.incoterm)} onChange={(event) => {
                 const incoterm = event.currentTarget.value;
                 edit("incoterm", (current) => ({
                   ...current,
@@ -267,7 +279,7 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
               </select>
             </label>
             <label className="text-sm font-semibold">Destination country
-              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.destinationCountry} onChange={(event) => {
+              <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.destinationCountry)} onChange={(event) => {
                 const destinationCountry = event.currentTarget.value;
                 edit("destinationCountry", (current) => ({ ...current, destinationCountry, namedPlace: incotermPlace(current.deliveryCity ?? "", destinationCountry) }));
               }}>
@@ -278,22 +290,22 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
             {draft.incoterm === "DDP" ? (
               <>
                 <label className="text-sm font-semibold">Importer name
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.name} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, name: event.currentTarget.value } }))} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.importer.name)} onChange={(event) => { const name = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, name } })); }} />
                 </label>
                 <label className="text-sm font-semibold md:col-span-2">Importer address
-                  <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.address} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, address: event.currentTarget.value } }))} />
+                  <textarea rows={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.importer.address)} onChange={(event) => { const address = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, address } })); }} />
                 </label>
                 <label className="text-sm font-semibold">Importer VAT
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.vat} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, vat: event.currentTarget.value } }))} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.importer.vat)} onChange={(event) => { const vat = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, vat } })); }} />
                 </label>
                 <label className="text-sm font-semibold">Importer EORI
-                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.importer.eori} onChange={(event) => edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, eori: event.currentTarget.value } }))} />
+                  <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.importer.eori)} onChange={(event) => { const eori = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, importer: { ...current.importer, eori } })); }} />
                 </label>
                 <label className="text-sm font-semibold">Clearance country
-                  <input maxLength={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.clearanceCountry} onChange={(event) => edit("incoterm", (current) => ({ ...current, clearanceCountry: event.currentTarget.value.toUpperCase() }))} />
+                  <input maxLength={2} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.clearanceCountry)} onChange={(event) => { const clearanceCountry = event.currentTarget.value.toUpperCase(); edit("incoterm", (current) => ({ ...current, clearanceCountry })); }} />
                 </label>
                 <label className="text-sm font-semibold">Customs procedure
-                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.procedure} onChange={(event) => edit("incoterm", (current) => ({ ...current, procedure: event.currentTarget.value as InvoiceDraft["procedure"] }))}>
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.procedure)} onChange={(event) => { const procedure = event.currentTarget.value as InvoiceDraft["procedure"]; edit("incoterm", (current) => ({ ...current, procedure })); }}>
                     <option value="unconfirmed">Unconfirmed</option>
                     <option value="40">40</option>
                     <option value="42">42</option>
@@ -302,7 +314,7 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
                   </select>
                 </label>
                 <label className="text-sm font-semibold">DDP model
-                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.ddpModel} onChange={(event) => edit("incoterm", (current) => ({ ...current, ddpModel: event.currentTarget.value as InvoiceDraft["ddpModel"] }))}>
+                  <select className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.ddpModel)} onChange={(event) => { const ddpModel = event.currentTarget.value as InvoiceDraft["ddpModel"]; edit("incoterm", (current) => ({ ...current, ddpModel })); }}>
                     <option value="not_applicable">Not applicable</option>
                     <option value="unspecified">Unspecified</option>
                     <option value="importers_signature">Importer signature</option>
@@ -311,21 +323,21 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
                 </label>
                 {draft.ddpModel === "own_french_vat" ? (
                   <label className="text-sm font-semibold">French VAT
-                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.frenchVatNumber} onChange={(event) => edit("incoterm", (current) => ({ ...current, frenchVatNumber: event.currentTarget.value }))} />
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.frenchVatNumber)} onChange={(event) => { const frenchVatNumber = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, frenchVatNumber })); }} />
                   </label>
                 ) : null}
                 {draft.procedure === "42" || draft.procedure === "other" ? (
                   <label className="text-sm font-semibold">Statement reviewer
-                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.statementApprovedBy} onChange={(event) => edit("incoterm", (current) => ({ ...current, statementApprovedBy: event.currentTarget.value }))} />
+                    <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.statementApprovedBy)} onChange={(event) => { const statementApprovedBy = event.currentTarget.value; edit("incoterm", (current) => ({ ...current, statementApprovedBy })); }} />
                   </label>
                 ) : null}
               </>
             ) : null}
             <label className="text-sm font-semibold">Buyer VAT
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.vat} onChange={(event) => edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, vat: event.currentTarget.value } }))} />
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.buyer.vat)} onChange={(event) => { const vat = event.currentTarget.value; edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, vat } })); }} />
             </label>
             <label className="text-sm font-semibold">Buyer EORI
-              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={draft.buyer.eori} onChange={(event) => edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, eori: event.currentTarget.value } }))} />
+              <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(draft.buyer.eori)} onChange={(event) => { const eori = event.currentTarget.value; edit("buyer", (current) => ({ ...current, buyer: { ...current.buyer, eori } })); }} />
             </label>
             <label className="text-sm font-semibold">FAO
               <input className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment?.fao ?? ""} onChange={(event) => patchShipment({ fao: event.currentTarget.value })} />
@@ -369,7 +381,7 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
             {draft.incoterm === "DDP" && shipment?.customsStatementId === "matched" ? <p className="text-sm md:col-span-2">{suggested || "None"}</p> : null}
             {draft.incoterm === "DDP" && shipment?.customsStatementId === "custom" ? (
               <label className="text-sm font-semibold md:col-span-2">Statement
-                <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shipment.customsStatementText} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
+                <textarea rows={3} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" value={shown(shipment.customsStatementText)} onChange={(event) => patchShipment({ customsStatementText: event.currentTarget.value })} />
               </label>
             ) : null}
             <p className="text-sm font-semibold md:col-span-3">Special instructions</p>
@@ -378,19 +390,19 @@ export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: Invoi
           <div className="space-y-3">
             {draft.lines.map((line) => (
               <div key={line.id} className="grid gap-3 rounded-xl border border-line p-3 md:grid-cols-4">
-                <p className="font-semibold md:col-span-4">{line.orderNumber} · {line.sku} — {line.productName}</p>
+                <p className="font-semibold md:col-span-4">{line.orderNumber} · {line.sku} — {shown(line.productName)}</p>
                 <label className="text-sm font-semibold">
                   <span className="flex items-baseline justify-between gap-2">Shipped qty <span className="text-xs font-normal opacity-70">of {line.orderedQuantity} ordered</span></span>
-                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.shippedQuantity} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, shippedQuantity: Number(event.currentTarget.value) } : item) }))} />
+                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={shown(line.shippedQuantity)} onChange={(event) => { const shippedQuantity = Number(event.currentTarget.value); patchLine(line.id, { shippedQuantity }); }} />
                 </label>
                 <label className="text-sm font-semibold">HS code
-                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.hsCode} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, hsCode: event.currentTarget.value } : item) }))} />
+                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={shown(line.hsCode)} onChange={(event) => { const hsCode = event.currentTarget.value; patchLine(line.id, { hsCode }); }} />
                 </label>
                 <label className="text-sm font-semibold">Origin
-                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.originCountry} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, originCountry: event.currentTarget.value.toUpperCase() } : item) }))} />
+                  <input className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={shown(line.originCountry)} onChange={(event) => { const originCountry = event.currentTarget.value.toUpperCase(); patchLine(line.id, { originCountry }); }} />
                 </label>
                 <label className="text-sm font-semibold">Unit kg
-                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={line.unitWeightKg ?? ""} onChange={(event) => edit("lines", (current) => ({ ...current, lines: current.lines.map((item) => item.id === line.id ? { ...item, unitWeightKg: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) } : item) }))} />
+                  <input type="number" min={0} className="mt-1 w-full rounded-xl border border-line px-3 py-2" value={shown(line.unitWeightKg)} onChange={(event) => { const unitWeightKg = event.currentTarget.value === "" ? null : Number(event.currentTarget.value); patchLine(line.id, { unitWeightKg }); }} />
                 </label>
               </div>
             ))}
