@@ -1,7 +1,20 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { oneParam } from "@/lib/utils";
 
-export default async function PasswordRedirect({
+export default function PasswordRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <PasswordTarget searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function PasswordTarget({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

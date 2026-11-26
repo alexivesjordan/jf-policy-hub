@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SetPasswordForm } from "@/components/password-forms";
 import { PageHeader } from "@/components/pulse/page-header";
 import { TwoStepForm } from "@/components/two-step-form";
@@ -6,7 +7,19 @@ import { oneParam } from "@/lib/utils";
 
 export const metadata = { title: "Security" };
 
-export default async function AccountSecurityPage({
+export default function AccountSecurityPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <SecurityBody searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SecurityBody({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
