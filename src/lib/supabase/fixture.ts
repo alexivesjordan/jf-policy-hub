@@ -309,9 +309,29 @@ function visibleCalendar() {
   ];
 }
 
+const FIXTURE_LOAD_SPACES = [
+  { code: "uk-standard", kind: "pallet", name: "UK standard", length_cm: 120, width_cm: 100, height_cm: 180, max_weight_kg: 1000, tare_kg: 25, deck_cm: 15, active: true, sort_order: 10 },
+  { code: "euro", kind: "pallet", name: "Euro", length_cm: 120, width_cm: 80, height_cm: 180, max_weight_kg: 1000, tare_kg: 20, deck_cm: 14, active: true, sort_order: 20 },
+];
+
+const FIXTURE_PACKING_SETTINGS: Record<string, unknown>[] = [
+  { id: "default", pallet_code: "uk-standard", max_pallet_height_cm: 180, max_pallet_weight_kg: 1000, max_parcel_weight_kg: 30, max_parcel_length_cm: 120 },
+];
+const fixturePackEstimates: Record<string, unknown>[] = ((globalThis as { __jfFixturePackEstimates?: Record<string, unknown>[] }).__jfFixturePackEstimates ??= []);
+
+const FIXTURE_SKU_PACKAGES: Record<string, unknown>[] = [
+  { id: 1, sku: "JF-RACK", product_name: "Rig upright", cin7_category: "Rigs", package_no: 1, length_cm: 110, width_cm: 40, height_cm: 25, gross_weight_kg: 48, stackable: true, max_stack: 3, can_be_on_side: false, ships_on_pallet_only: false },
+  { id: 2, sku: "JF-BAND", product_name: "Band set", cin7_category: "Accessories", package_no: 1, length_cm: 30, width_cm: 20, height_cm: 12, gross_weight_kg: 4, stackable: true, max_stack: null, can_be_on_side: false, ships_on_pallet_only: false },
+  { id: 3, sku: "JF-BAR", product_name: "Olympic bar", cin7_category: "Bars", package_no: 1, length_cm: null, width_cm: null, height_cm: null, gross_weight_kg: null, stackable: true, max_stack: null, can_be_on_side: true, ships_on_pallet_only: false },
+];
+
 function tables(): Record<string, Record<string, unknown>[]> {
   return {
     profiles: [sessionProfile()],
+    load_spaces: FIXTURE_LOAD_SPACES,
+    packing_settings: FIXTURE_PACKING_SETTINGS,
+    sku_packages: FIXTURE_SKU_PACKAGES,
+    pack_estimates: fixturePackEstimates,
     categories,
     policies,
     policy_versions: [],
@@ -903,6 +923,19 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       { id: "00000000-0000-4000-8000-000000000003", full_name: "Riley Hart" },
     ];
   }
+  if (fn === "logistics_list_sku_packages") {
+    const search = String(args?.p_search ?? "").trim().toLowerCase();
+    const missing = Boolean(args?.p_missing);
+    const limit = Number(args?.p_limit ?? 50);
+    const offset = Number(args?.p_offset ?? 0);
+    const matched = FIXTURE_SKU_PACKAGES.filter((row) => {
+      const haystack = `${row.sku} ${row.product_name} ${row.cin7_category}`.toLowerCase();
+      if (search && !haystack.includes(search)) return false;
+      if (!missing) return true;
+      return row.length_cm == null || row.width_cm == null || row.height_cm == null || row.gross_weight_kg == null;
+    });
+    return { total: matched.length, rows: matched.slice(offset, offset + limit) };
+  }
   return null;
 }
 
@@ -998,6 +1031,7 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   private asSingle = false;
   private head = false;
   private write: Record<string, unknown> | null = null;
+  private inserted: Record<string, unknown> | null = null;
 
   constructor(private table: string) {}
 
@@ -1043,20 +1077,7 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
     return this;
   }
 
-  update(patch?: Record<string, unknown>) {
-    this.write = patch ?? {};
-    return this;
-  }
-
-  insert() {
-    return this;
-  }
-
   upsert() {
-    return this;
-  }
-
-  delete() {
     return this;
   }
 
@@ -1074,6 +1095,59 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
     return this;
   }
 
+  insert(values?: Record<string, unknown> | Record<string, unknown>[]) {
+    if (!values || (this.table !== "pack_estimates" && this.table !== "sku_packages")) {
+      this.write = {};
+      return this;
+    }
+    const rows = (Array.isArray(values) ? values : [values]).map((row) => ({ ...row }));
+    if (this.table === "pack_estimates") {
+      for (const row of rows) {
+        if (!row.id) row.id = crypto.randomUUID();
+        fixturePackEstimates.push(row);
+      }
+    } else {
+      for (const row of rows) {
+        if (row.id == null) row.id = FIXTURE_SKU_PACKAGES.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
+        FIXTURE_SKU_PACKAGES.push(row);
+      }
+    }
+    this.inserted = rows[0] ?? null;
+    return this;
+  }
+
+  update(values?: Record<string, unknown>) {
+    if (values && ["sku_packages", "packing_settings", "pack_estimates", "load_spaces"].includes(this.table)) {
+      for (const row of this.matched()) Object.assign(row, values);
+      return this;
+    }
+    this.write = values ?? {};
+    return this;
+  }
+
+  delete() {
+    if (!["sku_packages", "pack_estimates"].includes(this.table)) return this;
+    const doomed = new Set(this.matched());
+    const list = tables()[this.table];
+    if (!list) return this;
+    for (let index = list.length - 1; index >= 0; index -= 1) {
+      if (doomed.has(list[index]!)) list.splice(index, 1);
+    }
+    return this;
+  }
+
+  private matched() {
+    return (tables()[this.table] ?? []).filter((row) => this.filters.every((filter) => {
+      const value = row[filter.column];
+      if (filter.kind === "eq") return value === filter.value;
+      if (filter.kind === "neq") return value !== filter.value;
+      if (filter.kind === "null") return value == null;
+      if (filter.kind === "notnull") return value != null;
+      if (filter.kind === "lte") return String(value ?? "") <= String(filter.value ?? "");
+      return true;
+    }));
+  }
+
   then<TResult1 = { data: unknown; error: null; count: number | null }, TResult2 = never>(
     onfulfilled?: ((value: { data: unknown; error: null; count: number | null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -1082,6 +1156,7 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 
   private result() {
+    if (this.inserted) return { data: this.asSingle ? this.inserted : [this.inserted], error: null, count: 1 };
     let rows = tables()[this.table] ?? [];
     for (const filter of this.filters) {
       rows = rows.filter((row) => {

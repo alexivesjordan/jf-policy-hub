@@ -16,18 +16,24 @@ function shown<T extends string | number>(value: T | null | undefined) {
   return value ?? "";
 }
 
-export function CommercialInvoiceWorkspace({ prefill = null }: { prefill?: InvoicePrefill | null }) {
-  const [numbers, setNumbers] = useState(prefill?.orderNumbers ?? "");
+export function CommercialInvoiceWorkspace({
+  prefill = null,
+  pack = null,
+}: {
+  prefill?: InvoicePrefill | null;
+  pack?: { orderNumbers: string; rows: DimensionRow[] } | null;
+}) {
+  const [numbers, setNumbers] = useState(prefill?.orderNumbers ?? pack?.orderNumbers ?? "");
   const [draft, setDraft] = useState<InvoiceDraft | null>(prefill?.draft ?? null);
   const idempotencyKey = useRef<string | null>(null);
   const lookupSeq = useRef(0);
   const touched = useRef(new Set<string>(prefill ? ["destinationCountry", "incoterm", "buyer", "lines", "shipment"] : []));
-  const dimensionsTouched = useRef(prefill ? dimensionsWereEdited(prefill.pallets) : false);
+  const dimensionsTouched = useRef(prefill ? dimensionsWereEdited(prefill.pallets) : Boolean(pack?.rows.length && dimensionsWereEdited(pack.rows)));
   const [working, setWorking] = useState<"lookup" | "preview" | "issue" | null>(null);
   const [error, setError] = useState("");
   const [details, setDetails] = useState<string[]>([]);
   const [issued, setIssued] = useState("");
-  const [palletRows, setPalletRows] = useState<DimensionRow[]>(prefill?.pallets ?? [emptyDimension()]);
+  const [palletRows, setPalletRows] = useState<DimensionRow[]>(prefill?.pallets ?? (pack?.rows.length ? pack.rows : [emptyDimension()]));
   const [rules, setRules] = useState<StatementRule[]>([]);
 
   function edit(key: string, recipe: (current: InvoiceDraft) => InvoiceDraft) {
