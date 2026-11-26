@@ -531,6 +531,24 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     return [{ email: "new.person@jordanfitness.com", full_name: "New Person", role: "staff", created_at: "2026-11-01T00:00:00.000Z" }];
   }
   if (fn === "workspace_revoke_invite") return null;
+  if (fn === "org_chart") {
+    return {
+      companies: [
+        { id: "co-jf", name: "Jordan Fitness" },
+        { id: "co-jm", name: "Jordan Metalwork" },
+      ],
+      positions: [
+        { id: "pos-dir", title: "Directors", reports_to: null, company_id: "co-jf", allow_multiple: true, archived: false, holders: [{ id: "e-neil", name: "Neil" }, { id: "e-deb", name: "Deborah" }] },
+        { id: "pos-sales", title: "Sales Director", reports_to: "pos-dir", company_id: "co-jf", allow_multiple: false, archived: false, holders: [] },
+        { id: "pos-ops", title: "Operations Manager", reports_to: "pos-dir", company_id: "co-jf", allow_multiple: false, archived: false, holders: [{ id: "e-simon", name: "Simon" }] },
+      ],
+      people: [
+        { id: "e-neil", name: "Neil", position_id: "pos-dir", company_id: "co-jf", company: "Jordan Fitness", lead_id: null, lead: null, manager: null, director: true },
+        { id: "e-simon", name: "Simon", position_id: "pos-ops", company_id: "co-jf", company: "Jordan Fitness", lead_id: null, lead: null, manager: "Neil", director: false },
+        { id: "e-open", name: "Unassigned Person", position_id: null, company_id: "co-jf", company: "Jordan Fitness", lead_id: null, lead: null, manager: null, director: false },
+      ],
+    };
+  }
   if (fn === "workspace_teams") {
     return [
       { id: "team-sales", name: "Sales", members: 4 },

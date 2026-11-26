@@ -30,6 +30,7 @@ describe("settings nav", () => {
       "/settings/workspace/members",
       "/settings/workspace/teams",
       "/settings/workspace/roles",
+      "/settings/workspace/org-chart",
     ]);
   });
 
