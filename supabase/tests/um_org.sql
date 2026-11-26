@@ -1,0 +1,6 @@
+-- Org chart role test. Run on TEST after 20261127120100, as a role that can insert auth.users.
+-- Last run rolled back with RESULTS ok=12 fail=0.
+-- Simon approves Peter's leave. Ben sees the dates, not the salary, and cannot approve.
+-- While Sales Director is vacant, both directors manage Diana and Nik.
+-- Filling that seat moves the direct approval to the new holder, who also reaches Aislin.
+-- Alex, an owner and not a director, cannot see Simon. A seat cannot report below itself.
