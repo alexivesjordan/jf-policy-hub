@@ -5,6 +5,7 @@ import { Card } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/pulse/states";
 import { getOfficeContext, listCategoriesWithoutDefault, listCin7CategoryDefaults, listSkuEffort, readOwnerSettings, readTerms } from "@/features/operations/queries";
+import { canAdminOperations } from "@/lib/access";
 import { requireOperationsUser } from "@/lib/auth";
 
 function one(value: string | string[] | undefined) {
@@ -32,7 +33,7 @@ async function SettingsBody({
 }) {
   const profile = await requireOperationsUser();
   const context = await getOfficeContext();
-  const canEditEffort = profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "edit";
+  const canEditEffort = canAdminOperations(profile) || profile.levels?.operations === "edit";
   const params = await searchParams;
   const search = one(params.search);
   const category = one(params.category);
@@ -48,7 +49,7 @@ async function SettingsBody({
     );
   }
 
-  if (!context.is_owner) {
+  if (!context.is_owner && !canAdminOperations(profile)) {
     const effort = await listSkuEffort({ search, category, status, needsAssembly: needs, offset: page * 50 }).catch(() => null);
     return (
       <div className="space-y-8">
