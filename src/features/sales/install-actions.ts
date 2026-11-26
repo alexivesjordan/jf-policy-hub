@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { messageFromError } from "@/lib/errors";
 import { canCancelInstall, canManageInstall, closedInstallMessage } from "@/lib/installs/access-auth";
 import { issueInstallAccess } from "@/lib/installs/issue-access";
+import { kitFollowUpFrom, type KitFollowUp } from "@/lib/installs/kit-follow-up";
 import { dropWeekendStarts } from "@/lib/pulse/install-booking";
 import { createClient } from "@/lib/supabase/server";
 
@@ -193,6 +194,14 @@ export async function listInstalls(from: string, to: string, mine = false): Prom
   if (listed.error) return { ok: false, message: messageFromError(listed.error, "Could not read installs."), installs: [] };
   const rows = Array.isArray(listed.data) ? (listed.data as Record<string, unknown>[]) : [];
   return { ok: true, message: "", installs: rows };
+}
+
+export async function readKitFollowUp(installId: string): Promise<KitFollowUp | null> {
+  if (!ID.test(installId)) return null;
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("install_kit_follow_up", { p_id: installId });
+  if (loaded.error) return null;
+  return kitFollowUpFrom(loaded.data);
 }
 
 export async function readInstall(installId: string): Promise<InstallActionResult> {

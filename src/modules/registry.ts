@@ -112,6 +112,7 @@ export const pulseModules: PulseModule[] = [
     nav: [
       { href: "/sales", label: "Overview" },
       { href: "/sales/installs", label: "Installs" },
+      { href: "/sales/radar", label: "Radar" },
       {
         href: "/sales/quote",
         label: "Quotes",
@@ -139,7 +140,10 @@ export const pulseModules: PulseModule[] = [
           { href: "/logistics/commercial-invoices/search", label: "Search Commercial Invoices" },
         ],
       },
+      { href: "/logistics/pack-estimate", label: "Pack estimate" },
+      { href: "/logistics/packaging", label: "Packaging" },
       { href: "/logistics/customs-statements", label: "Customs statements" },
+      { href: "/logistics/landed-cost", label: "Landed cost" },
     ],
   },
   {

@@ -232,7 +232,7 @@ export async function listMyNotifications() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, title, body, link, read_at, created_at")
+    .select("id, title, body, kind, link, read_at, created_at")
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) {
@@ -243,6 +243,7 @@ export async function listMyNotifications() {
     id: string;
     title: string;
     body: string;
+    kind: string;
     link: string | null;
     read_at: string | null;
     created_at: string;

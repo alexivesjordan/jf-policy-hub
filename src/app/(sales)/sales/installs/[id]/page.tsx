@@ -6,7 +6,8 @@ import { InstallSalesView } from "@/components/install-sales-view";
 import { SubcontractorInstallSection } from "@/components/subcontractor-install-section";
 import { PageSkeleton } from "@/components/pulse/states";
 import { InstallVisitPhotos } from "@/components/install-visit-photos";
-import { installProposalUrl, listVisitPhotos, readInstall } from "@/features/sales/install-actions";
+import { KitFollowUpPanel } from "@/components/kit-follow-up";
+import { installProposalUrl, listVisitPhotos, readInstall, readKitFollowUp } from "@/features/sales/install-actions";
 import { OwnerPicker } from "@/components/owner-picker";
 import { listPeople } from "@/features/policies/queries";
 import { requireSalesUser } from "@/lib/auth";
@@ -58,6 +59,7 @@ async function SalesInstall({ params }: { params: Promise<{ id: string }> }) {
           people={(await listPeople().catch(() => [])).map((person) => ({ id: person.id, name: person.full_name || person.email }))}
         />
       ) : null}
+      <KitFollowUpPanel followUp={await readKitFollowUp(id)} />
       <InstallAccessPanel install={loaded.install} />
       <InstallVisitPhotos photos={photos} />
       <SubcontractorInstallSection profile={profile} install={loaded.install} />

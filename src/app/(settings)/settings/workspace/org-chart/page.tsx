@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/pulse/page-header";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { positionRows, seatLabel, type OrgPerson, type OrgPosition } from "@/lib/org-chart";
 import { createClient } from "@/lib/supabase/server";
 import { cn, oneParam } from "@/lib/utils";
@@ -32,7 +32,10 @@ async function OrgChartBody({
   const tab = TABS.includes(oneParam(params.tab) as (typeof TABS)[number]) ? (oneParam(params.tab) as (typeof TABS)[number]) : "Chart";
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("org_chart");
-  if (error) throw new Error(error.message);
+  if (error) {
+    denyWorkspace(error);
+    throw new Error(error.message);
+  }
   const chart = (data ?? {}) as { positions?: OrgPosition[]; people?: OrgPerson[] };
   const positions = chart.positions ?? [];
   const people = chart.people ?? [];
