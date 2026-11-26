@@ -1,5 +1,8 @@
-export const RADAR_SOURCES = ["find-a-tender", "contracts-finder"] as const;
+export const RADAR_SOURCES = ["find-a-tender", "contracts-finder", "planit"] as const;
 export type RadarSource = (typeof RADAR_SOURCES)[number];
+
+export const OPPORTUNITY_TYPES = ["tender", "planning"] as const;
+export type OpportunityType = (typeof OPPORTUNITY_TYPES)[number];
 
 export const RADAR_STATUSES = ["new", "worth_pursuing", "dismissed", "pushed_to_hubspot"] as const;
 export type RadarStatus = (typeof RADAR_STATUSES)[number];
@@ -15,6 +18,11 @@ export type RadarScoringConfig = {
   keywords: string[];
   cpvCodes: string[];
   valueBands: ValueBand[];
+  exclusions: string[];
+  hubspotPipelineId: string;
+  hubspotStageId: string;
+  hubspotOwnerId: string;
+  hubspotPortalId: string;
 };
 
 export type ParsedNotice = {
@@ -34,6 +42,19 @@ export type ParsedNotice = {
   publishedAt: string | null;
   tags: string[];
   raw: unknown;
+  opportunityType: OpportunityType;
+  decisionStatus: string | null;
+  decisionDate: string | null;
+  lpa: string | null;
+  siteAddress: string | null;
+  postcode: string | null;
+  applicant: string | null;
+  agent: string | null;
+  scopeSummary: string;
+  facilityTypes: string[];
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
 };
 
 export type ScoreResult = {

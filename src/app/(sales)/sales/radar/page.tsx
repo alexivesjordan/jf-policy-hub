@@ -5,6 +5,7 @@ import { OpportunityCard } from "@/components/radar/opportunity-card";
 import { PageHeader } from "@/components/pulse/page-header";
 import { PageSkeleton } from "@/components/pulse/states";
 import { Button, Field, Input } from "@/components/pulse/ui";
+import { hubspotConnected } from "@/features/radar/hubspot";
 import { canEditRadar, requireRadarUser } from "@/features/radar/access";
 import { formatWhen, loadRadarQueue, RADAR_QUEUES } from "@/features/radar/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -87,7 +88,7 @@ async function RadarScreen({
       {!radar.error && radar.cards.length === 0 ? <p className="rounded-3xl border border-line bg-card p-5 text-sm text-grey">No opportunities in this queue.</p> : null}
       <div className="space-y-4">
         {radar.cards.map((item) => (
-          <OpportunityCard key={item.id} item={item} canEdit={canEditRadar(profile)} owners={radar.owners} />
+          <OpportunityCard key={item.id} item={item} canEdit={canEditRadar(profile)} owners={radar.owners} hubspotConnected={hubspotConnected(process.env.HUBSPOT_PRIVATE_APP_TOKEN)} />
         ))}
       </div>
     </div>

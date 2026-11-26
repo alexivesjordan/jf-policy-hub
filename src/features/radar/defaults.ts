@@ -28,4 +28,9 @@ export const DEFAULT_RADAR_SETTINGS: RadarScoringConfig = {
     { label: "Core supply", min: 25000, max: 150000, points: 15 },
     { label: "Major fit-out", min: 150000, max: 1000000, points: 12 },
   ],
+  exclusions: ["flooring", "roofing", "cleaning", "catering", "lighting", "householder"],
+  hubspotPipelineId: "",
+  hubspotStageId: "",
+  hubspotOwnerId: "",
+  hubspotPortalId: "",
 };

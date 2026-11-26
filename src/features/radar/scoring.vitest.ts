@@ -55,7 +55,31 @@ describe("radar scoring", () => {
       buyer: "School",
       cpvCodes: [],
       valueAmount: 80000,
-    }, config)).toMatchObject({ relevant: false, score: 0, reasons: [] });
+    }, config)).toMatchObject({ relevant: false, score: 0, reasons: ["Excluded: cleaning"] });
+  });
+
+  it("knocks out a flooring tender that has no equipment signal", () => {
+    const result = scoreOpportunity({
+      title: "Radmoor Sports Hall Flooring Replacement",
+      description: "Replacement of sprung sports hall flooring",
+      buyer: "Loughborough College",
+      cpvCodes: ["45432100"],
+      valueAmount: 500000,
+    }, config);
+    expect(result.relevant).toBe(false);
+    expect(result.reasons).toContain("Excluded: flooring");
+  });
+
+  it("keeps an equipment notice that also mentions flooring", () => {
+    const result = scoreOpportunity({
+      title: "Supply of gym equipment and replacement flooring",
+      description: "Fitness equipment for a leisure centre",
+      buyer: "Council",
+      cpvCodes: ["37420000"],
+      valueAmount: 40000,
+    }, config);
+    expect(result.relevant).toBe(true);
+    expect(result.reasons.some((reason) => reason.startsWith("Excluded:"))).toBe(false);
   });
 
   it("caps the score at 100", () => {

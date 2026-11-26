@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { assertOfficialFeedUrl, fetchReleasePages, feedUrl } from "@/features/radar/feed";
 import { fromOcdsRelease } from "@/features/radar/parse";
 import { authorisedCron } from "@/features/radar/cron-auth";
-import { buildHubSpotIntent, UnconfiguredHubSpotAdapter } from "@/features/radar/hubspot";
 import { parseRadarSettings } from "@/features/radar/settings";
 
 const release = {
@@ -71,21 +70,6 @@ describe("radar feed and review handoff", () => {
     expect(batch.truncated).toBe(false);
     expect(calls).toHaveLength(2);
     expect(calls[1]).toMatch(/^https:\/\/www\.find-tender\.service\.gov\.uk\//);
-  });
-
-  it("records a HubSpot intent without calling HubSpot", async () => {
-    const intent = buildHubSpotIntent({
-      id: "11111111-1111-4111-8111-111111111111",
-      source: "find-a-tender",
-      noticeId: "112323-2026",
-      title: "Gym equipment",
-      buyer: "Council",
-      valueAmount: 50000,
-      valueCurrency: "GBP",
-      url: "https://www.find-tender.service.gov.uk/Notice/112323-2026",
-    });
-    expect(intent).not.toHaveProperty("externalId");
-    await expect(new UnconfiguredHubSpotAdapter().pushDeal(intent)).rejects.toThrow(/not connected/);
   });
 
   it("authorises the cron header and checks settings input", () => {
