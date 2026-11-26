@@ -138,6 +138,7 @@ export const pulseModules: PulseModule[] = [
         ],
       },
       { href: "/logistics/customs-statements", label: "Customs statements" },
+      { href: "/logistics/landed-cost", label: "Landed cost" },
     ],
   },
   {

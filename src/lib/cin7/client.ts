@@ -35,6 +35,13 @@ export function getCin7Client(): Cin7ReadClient {
   };
 }
 
+/** Allowlisted GET for the landed-cost purchase reader. Null when Cin7 is not connected. */
+export function connectedCin7Get() {
+  const keys = credentials();
+  if (!keys) return null;
+  return (path: string, query: Record<string, string>) => cin7Get({ ...keys, path, query });
+}
+
 /** Address and contact for the install record. Null when Cin7 is not connected. */
 export async function loadCin7BookingDetails(orderNumber: string) {
   const keys = credentials();

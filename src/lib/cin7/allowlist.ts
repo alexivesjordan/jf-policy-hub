@@ -1,7 +1,7 @@
 /** Cin7 Core reads pricing is allowed to make. Anything else throws before fetch. */
 export const CIN7_BASE_URL = "https://inventory.dearsystems.com/ExternalApi/v2";
 
-export const CIN7_ALLOWED_PATHS = ["sale", "saleList", "product", "customer"] as const;
+export const CIN7_ALLOWED_PATHS = ["sale", "saleList", "product", "customer", "purchase", "purchaseList"] as const;
 
 export type Cin7AllowedPath = (typeof CIN7_ALLOWED_PATHS)[number];
 
@@ -10,6 +10,8 @@ const QUERY_KEYS: Record<Cin7AllowedPath, readonly string[]> = {
   saleList: ["Search", "Page", "Limit"],
   product: ["ID", "Sku", "Page", "Limit", "IncludeDeprecated"],
   customer: ["ID", "Limit"],
+  purchase: ["ID"],
+  purchaseList: ["Search", "Page", "Limit"],
 };
 
 export class Cin7RequestBlocked extends Error {
@@ -47,6 +49,8 @@ export function assertCin7Get(method: string, path: string, query: Record<string
     throw new Cin7RequestBlocked("Cin7 product requires an ID, a SKU, or a page.");
   }
   if (name === "customer" && !query.ID) throw new Cin7RequestBlocked("Cin7 customer requires an ID.");
+  if (name === "purchase" && !query.ID) throw new Cin7RequestBlocked("Cin7 purchase requires an ID.");
+  if (name === "purchaseList" && !query.Search) throw new Cin7RequestBlocked("Cin7 purchaseList requires an order number search.");
 
   return { path: name as Cin7AllowedPath, query };
 }
