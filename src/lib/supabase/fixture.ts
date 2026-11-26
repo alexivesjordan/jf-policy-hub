@@ -322,6 +322,11 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     }
     return { role: "owner", mode: "follow", people: "edit", service: "edit", supply: "edit", operations: "edit", sales: "edit", finance: "edit" };
   }
+  if (fn === "two_step_owner_notice") return process.env.PULSE_FIXTURE_ROLE == null;
+  if (fn === "two_step_enforcement") return true;
+  if (fn === "two_step_due") return false;
+  if (fn === "device_trusted") return false;
+  if (fn === "trust_device" || fn === "set_two_step_enforcement") return null;
   if (fn === "logistics_search_commercial_invoices") {
     const query = String(args?.p_query ?? "").trim().toLowerCase();
     const rows = [

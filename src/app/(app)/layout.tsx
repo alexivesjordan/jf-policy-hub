@@ -7,6 +7,7 @@ import { canUseLogistics } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
 
 export const instant = false;
@@ -69,7 +70,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
     .slice(0, 20)
     .map(({ createdAt: _createdAt, ...item }) => item);
   return (
-    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
+    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );

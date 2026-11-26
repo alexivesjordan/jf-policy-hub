@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Banner, Button, Field, Input } from "@/components/pulse/ui";
 import { safeNextPath } from "@/lib/access";
+import { shouldTrustDeviceNow } from "@/lib/two-step-device";
 
 export function LinkError() {
   const params = useSearchParams();
@@ -45,7 +46,8 @@ export function LoginForm() {
       const bytes = crypto.getRandomValues(new Uint8Array(16));
       const hash = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
       document.cookie = `pulse-device=${hash}; Path=/; Max-Age=604800; SameSite=Lax`;
-      await supabase.rpc("trust_device", { p_hash: hash });
+      const { data: due } = await supabase.rpc("two_step_due");
+      if (shouldTrustDeviceNow(true, due === true)) await supabase.rpc("trust_device", { p_hash: hash });
     } else {
       document.cookie = "pulse-device=; Path=/; Max-Age=0; SameSite=Lax";
     }

@@ -4,6 +4,7 @@ import { canUseLogistics } from "@/lib/access";
 import { requireWorkspaceAdmin } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 
 export const instant = false;
 
@@ -33,7 +34,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 async function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const profile = await requireWorkspaceAdmin();
   return (
-    <AppShell profile={profile} pending={0} unread={0} nav={nav} showLogistics={canUseLogistics(profile)}>
+    <AppShell profile={profile} pending={0} unread={0} nav={nav} showLogistics={canUseLogistics(profile)} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );

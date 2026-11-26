@@ -5,6 +5,7 @@ import { getOfficeContext } from "@/features/operations/queries";
 import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { ENGINEER_NAV, visibleNav } from "@/lib/shell-nav";
 import { pulseModules } from "@/modules/registry";
 
@@ -46,7 +47,7 @@ async function FieldShell({ children }: { children: ReactNode }) {
     isOwner = profile.workspace_role === "owner";
   }
   return (
-    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)} fieldEngineer={role === "engineer"}>
+    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)} fieldEngineer={role === "engineer"} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );

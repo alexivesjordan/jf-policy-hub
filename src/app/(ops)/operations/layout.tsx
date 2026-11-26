@@ -11,6 +11,7 @@ import { canAdminOperations } from "@/lib/access";
 import { requireOperationsUser } from "@/lib/auth";
 import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
+import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { ENGINEER_NAV } from "@/lib/shell-nav";
 import { pulseModules } from "@/modules/registry";
 
@@ -90,7 +91,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
   const nav = role === "engineer" ? ENGINEER_NAV : officeNav;
 
   return (
-    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner || canAdminOperations(profile)} nav={nav} notifications={notifications} showLogistics={role !== "engineer"} fieldEngineer={role === "engineer"}>
+    <AppShell profile={profile} pending={0} unread={unread} isOwner={isOwner || canAdminOperations(profile)} nav={nav} notifications={notifications} showLogistics={role !== "engineer"} fieldEngineer={role === "engineer"} ownerNotice={await ownerTwoStepNotice()}>
       <Cin7Notice />
       {children}
     </AppShell>

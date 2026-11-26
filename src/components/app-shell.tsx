@@ -14,6 +14,7 @@ import { navItemActive, visibleNav } from "@/lib/shell-nav";
 import { SETTINGS_NAV, switcherModules } from "@/lib/settings-nav";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
+import { OwnerTwoStepBanner } from "@/components/owner-two-step-banner";
 import { cn } from "@/lib/utils";
 
 function pulseLabel(module: PulseModule) {
@@ -29,6 +30,7 @@ export function AppShell({
   notifications = [],
   showLogistics = false,
   fieldEngineer = false,
+  ownerNotice = false,
   children,
 }: {
   profile: Profile;
@@ -39,6 +41,7 @@ export function AppShell({
   notifications?: BellItem[];
   showLogistics?: boolean;
   fieldEngineer?: boolean;
+  ownerNotice?: boolean;
   children: ReactNode;
 }) {
   const path = usePathname();
@@ -77,6 +80,7 @@ export function AppShell({
             <ThemeToggle />
           </div>
         </header>
+        <OwnerTwoStepBanner show={ownerNotice} />
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>
     </div>
