@@ -221,10 +221,19 @@ export async function deleteWorkspaceUser(_prev: WorkspaceFormState, formData: F
 
 export async function resendWorkspaceInvite(formData: FormData) {
   await requireWorkspaceAdmin();
+  revalidatePath("/settings/workspace/members");
   if (!hasServiceRole()) return;
   const service = createAdminClient();
   if (!service) return;
   await service.auth.admin.inviteUserByEmail(clean(formData.get("email")), {
     redirectTo: authConfirmRedirect(passwordSetupPath()),
   });
+}
+
+export async function revokeWorkspaceInvite(formData: FormData) {
+  await requireWorkspaceAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("workspace_revoke_invite", { p_email: clean(formData.get("email")) });
+  if (error) throw new Error(messageFromError(error, "Could not revoke that invite."));
+  revalidatePath("/settings/workspace/members");
 }

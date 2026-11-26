@@ -27,7 +27,7 @@ describe("settings nav", () => {
     const adminNav = visibleNav(SETTINGS_NAV, admin, false);
     expect(adminNav.map((item) => item.label)).toEqual(["Account", "Workspace"]);
     expect(adminNav[1]?.children?.map((item) => item.href)).toEqual([
-      "/settings/workspace/users",
+      "/settings/workspace/members",
       "/settings/workspace/teams",
       "/settings/workspace/roles",
     ]);

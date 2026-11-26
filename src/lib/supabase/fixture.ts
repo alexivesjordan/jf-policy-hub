@@ -509,6 +509,28 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       },
     ];
   }
+  if (fn === "workspace_member_list") {
+    const rows = rpcData("workspace_directory") as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      ...row,
+      last_sign_in_at: row.id === USER_ID ? "2026-11-20T09:00:00.000Z" : null,
+      two_step: row.id === USER_ID,
+      teams: ((row.teams as string[]) ?? []).map((name) => ({ id: name, name })),
+      access: ["people", "operations", "sales", "logistics"].map((pulse) => ({
+        pulse,
+        level: ((row.effective as Record<string, string>) ?? {})[pulse] ?? (row.workspace_role === "owner" ? "edit" : "none"),
+        source: row.access_mode === "custom" ? "Override" : row.workspace_role === "owner" ? "Owner" : String((row.teams as string[])?.[0] ?? "None"),
+      })),
+    }));
+  }
+  if (fn === "workspace_member") {
+    const rows = rpcData("workspace_member_list") as Array<{ id: string }>;
+    return rows.find((row) => row.id === args?.p_id) ?? null;
+  }
+  if (fn === "workspace_pending_invites") {
+    return [{ email: "new.person@jordanfitness.com", full_name: "New Person", role: "staff", created_at: "2026-11-01T00:00:00.000Z" }];
+  }
+  if (fn === "workspace_revoke_invite") return null;
   if (fn === "workspace_teams") {
     return [
       { id: "team-sales", name: "Sales", members: 4 },

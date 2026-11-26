@@ -17,7 +17,7 @@ export const SETTINGS_NAV: ModuleNavItem[] = [
     label: "Workspace",
     workspaceAdminOnly: true,
     children: [
-      { href: "/settings/workspace/users", label: "Users" },
+      { href: "/settings/workspace/members", label: "Members" },
       { href: "/settings/workspace/teams", label: "Teams" },
       { href: "/settings/workspace/roles", label: "Roles" },
     ],
