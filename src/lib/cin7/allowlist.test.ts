@@ -9,6 +9,8 @@ describe("Cin7 GET allowlist", () => {
     assert.equal(assertCin7Get("GET", "product", { Sku: "JF-C2SE-2" }).path, "product");
     assert.equal(assertCin7Get("GET", "product", { Page: "2", Limit: "100", IncludeDeprecated: "false" }).path, "product");
     assert.equal(assertCin7Get("GET", "customer", { ID: "cust-1" }).path, "customer");
+    assert.equal(assertCin7Get("GET", "purchase", { ID: "po-1" }).path, "purchase");
+    assert.equal(assertCin7Get("GET", "purchaseList", { Search: "PO-00123" }).path, "purchaseList");
   });
 
   for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
@@ -25,6 +27,8 @@ describe("Cin7 GET allowlist", () => {
 
   it("blocks filters that are not needed for pricing", () => {
     assert.throws(() => assertCin7Get("GET", "saleList", {}), Cin7RequestBlocked);
+    assert.throws(() => assertCin7Get("GET", "purchase", {}), Cin7RequestBlocked);
+    assert.throws(() => assertCin7Get("GET", "purchaseList", {}), Cin7RequestBlocked);
     assert.throws(() => assertCin7Get("GET", "customer", { Name: "Someone" }), Cin7RequestBlocked);
     assert.throws(() => assertCin7Get("GET", "product", { Name: "Bench", IncludeBOM: "true" }), Cin7RequestBlocked);
     assert.throws(() => assertCin7Get("GET", "sale", { ID: "sale-1", Void: "true" }), Cin7RequestBlocked);
