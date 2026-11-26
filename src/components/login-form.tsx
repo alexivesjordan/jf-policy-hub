@@ -33,21 +33,23 @@ export function LoginForm() {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const stay = form.get("stay") === "on";
+    const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+    const supabase = createClient();
+    const { error: passwordError } = await supabase.auth.signInWithPassword({ email, password });
+    if (passwordError) {
+      setPending(false);
+      setError("Those details were not recognised. Try again, or use Forgot password if you have not set one yet.");
+      return;
+    }
     if (stay) {
       const bytes = crypto.getRandomValues(new Uint8Array(16));
       const hash = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
       document.cookie = `pulse-device=${hash}; Path=/; Max-Age=604800; SameSite=Lax`;
+      await supabase.rpc("trust_device", { p_hash: hash });
     } else {
       document.cookie = "pulse-device=; Path=/; Max-Age=0; SameSite=Lax";
     }
-    const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
-    const supabase = createClient();
-    const { error: passwordError } = await supabase.auth.signInWithPassword({ email, password });
     setPending(false);
-    if (passwordError) {
-      setError("Those details were not recognised. Try again, or use Forgot password if you have not set one yet.");
-      return;
-    }
     setMessage("Signed in.");
     router.push(nextPath);
     router.refresh();
