@@ -7,7 +7,7 @@ import { Choice, YesNo } from "@/components/field/yes-no";
 import { Input, TextArea } from "@/components/pulse/ui";
 import { createSubcontractorLink, saveVisitRisk, submitVisit } from "@/features/field/actions";
 import { orderKitLines } from "@/lib/installs/kit-lines";
-import { FORM_NOTICES, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, kitProblem, vehicleChoiceProblem, type KitFulfilment, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { FORM_NOTICES, INSTALL_CHECKS, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, kitProblem, vehicleChoiceProblem, type KitFulfilment, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { Select } from "@/components/pulse/ui";
 
 export type VisitScreen = {
@@ -64,6 +64,9 @@ function draftFrom(screen: VisitScreen): SheetDraft {
     locationOk: null,
     workOk: null,
     siteOk: null,
+    floorSheeting: null,
+    builtCheckedTag: null,
+    dustCover: null,
     engineerName: screen.engineerName,
     vehicleReg: "",
     customerName: screen.customerName,
@@ -318,6 +321,10 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Satisfied with rig / product location?" value={sheet.locationOk} onChange={(next) => patch({ locationOk: next })} />
       <YesNo label="Customer satisfied with work?" value={sheet.workOk} onChange={(next) => patch({ workOk: next })} />
       <YesNo label="Site left in satisfactory condition?" value={sheet.siteOk} onChange={(next) => patch({ siteOk: next })} />
+      <h3 className="text-base font-semibold">Handover</h3>
+      {INSTALL_CHECKS.map((item) => (
+        <YesNo key={item.key} label={item.label} value={sheet[item.key]} onChange={(next) => patch({ [item.key]: next })} />
+      ))}
       {note ? <p className="text-sm font-semibold text-red">{note}</p> : null}
       <button type="button" onClick={() => { const problem = kitProblem(sheet); if (problem) { setNote(problem); return; } onNext(); }} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
         Photos

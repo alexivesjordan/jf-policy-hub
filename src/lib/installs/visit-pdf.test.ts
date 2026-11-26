@@ -34,6 +34,9 @@ function sheet(): SheetDraft {
     locationOk: true,
     workOk: true,
     siteOk: true,
+    floorSheeting: true,
+    builtCheckedTag: true,
+    dustCover: true,
     engineerName: "Lewis",
     vehicleReg: "AB12 CDE",
     customerName: "Jordan Gym",
@@ -91,6 +94,9 @@ describe("visit PDF pack", () => {
     expect(text).toContain("Installed");
     expect(text).toContain("3 tier kettlebell rack");
     expect(text).toContain("To follow");
+    expect(text).toContain("Floor sheeting laid from");
+    expect(text).toContain("built-and-checked");
+    expect(text).toContain("Dust cover fitted at");
   });
 
   it("still builds a sheet when optional rows are empty", async () => {

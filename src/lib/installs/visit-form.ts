@@ -6,6 +6,13 @@ export const RISK_ITEMS = [
   { key: "peopleBriefed", label: "People on site are briefed" },
 ] as const;
 
+export const INSTALL_CHECKS = [
+  { key: "floorSheeting", label: "Floor sheeting laid from the vehicle to the install spot" },
+  { key: "builtCheckedTag", label: "Signed built-and-checked tag on each machine" },
+  { key: "dustCover", label: "Dust cover fitted at handover" },
+] as const;
+
+export type InstallCheckKey = (typeof INSTALL_CHECKS)[number]["key"];
 export type RiskKey = (typeof RISK_ITEMS)[number]["key"];
 export type RiskAnswers = Record<RiskKey, boolean | null> & { notes: string };
 export type SheetLine = { code: string; description: string; reportedJob: string; qty?: string; fromOrder?: boolean };
@@ -39,6 +46,9 @@ export type SheetDraft = {
   locationOk: boolean | null;
   workOk: boolean | null;
   siteOk: boolean | null;
+  floorSheeting: boolean | null;
+  builtCheckedTag: boolean | null;
+  dustCover: boolean | null;
   engineerName: string;
   vehicleReg: string;
   customerName: string;
@@ -135,7 +145,10 @@ export function validateSheet(sheet: SheetDraft) {
   return (
     boolAnswer(sheet.locationOk, "the location question") ||
     boolAnswer(sheet.workOk, "whether the customer is satisfied") ||
-    boolAnswer(sheet.siteOk, "whether the site was left satisfactory")
+    boolAnswer(sheet.siteOk, "whether the site was left satisfactory") ||
+    boolAnswer(sheet.floorSheeting, "the floor sheeting check") ||
+    boolAnswer(sheet.builtCheckedTag, "the built-and-checked tag") ||
+    boolAnswer(sheet.dustCover, "the dust cover check")
   );
 }
 
@@ -225,6 +238,9 @@ export function sheetPayload(
     locationOk: sheet.locationOk,
     workOk: sheet.workOk,
     siteOk: sheet.siteOk,
+    floorSheeting: sheet.floorSheeting,
+    builtCheckedTag: sheet.builtCheckedTag,
+    dustCover: sheet.dustCover,
     engineerName: sheet.engineerName.trim(),
     vehicleReg: sheet.vehicleReg.trim(),
     customerName: sheet.customerName.trim(),
