@@ -49,7 +49,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
   const notifications: BellItem[] = [
     ...people.map((item) => ({
       id: item.id,
-      source: "people" as const,
+      source: item.kind === "radar" ? "sales" as const : "people" as const,
       title: item.title,
       body: item.body,
       href: item.link,

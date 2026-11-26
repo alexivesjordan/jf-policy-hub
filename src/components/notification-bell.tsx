@@ -9,12 +9,18 @@ import { EmptyState } from "@/components/pulse/states";
 
 export type BellItem = {
   id: string;
-  source: "people" | "operations";
+  source: "people" | "operations" | "sales";
   title: string;
   body: string;
   href: string | null;
   read: boolean;
 };
+
+function sourceLabel(source: BellItem["source"]) {
+  if (source === "sales") return "Sales";
+  if (source === "operations") return "Operations";
+  return "People";
+}
 
 export function NotificationBell({ items }: { items: BellItem[] }) {
   const unread = items.filter((item) => !item.read).length;
@@ -35,11 +41,11 @@ export function NotificationBell({ items }: { items: BellItem[] }) {
           <PopoverTitle>Notifications</PopoverTitle>
           <PopoverDescription>{unread > 0 ? `${unread} unread` : "You are up to date."}</PopoverDescription>
         </PopoverHeader>
-        {items.length === 0 ? <EmptyState title="No notifications" description="Updates from People and Operations will land here." /> : null}
+        {items.length === 0 ? <EmptyState title="No notifications" description="Updates from People, Sales, and Operations will land here." /> : null}
         <ul className="max-h-96 space-y-1 overflow-auto">
           {items.map((item) => (
             <li key={`${item.source}-${item.id}`} className="rounded-xl px-2 py-2">
-              <p className="text-xs uppercase tracking-wide text-grey">{item.source === "people" ? "People" : "Operations"}</p>
+              <p className="text-xs uppercase tracking-wide text-grey">{sourceLabel(item.source)}</p>
               <p className="text-sm font-semibold text-ink">{item.title}</p>
               <p className="mt-1 text-sm text-grey">{item.body}</p>
               <div className="mt-2 flex gap-3 text-sm">

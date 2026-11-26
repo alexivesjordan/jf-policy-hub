@@ -15,6 +15,10 @@
     {
       "path": "/api/hr/bank-holidays",
       "schedule": "0 5 * * 1"
+    },
+    {
+      "path": "/api/sales/radar/ingest",
+      "schedule": "15 6 * * *"
     }
   ]
 }
