@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
 import { JobBriefingView } from "@/components/field/job-briefing";
 import { VisitFlow, type VisitScreen } from "@/components/field/visit-flow";
+import { KitFollowUpPanel } from "@/components/kit-follow-up";
 import { listActiveVans, mySignature, visitContext } from "@/features/field/queries";
+import { readKitFollowUp } from "@/features/sales/install-actions";
 import { getCurrentProfile } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
@@ -65,6 +67,7 @@ async function Job({ params }: { params: Promise<{ id: string }> }) {
   return (
     <FieldFrame title={visit.job.orderNumber} back={{ href: "/field", label: "My jobs" }}>
       <div className="space-y-8">
+        <KitFollowUpPanel followUp={await readKitFollowUp(id)} plain />
         <JobBriefingView
           installId={id}
           orderNumber={visit.job.orderNumber}

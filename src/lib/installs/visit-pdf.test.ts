@@ -27,6 +27,7 @@ function sheet(): SheetDraft {
     warranty: false,
     kitAsOrdered: true,
     kitNotes: "One collar scuffed.",
+    kitLines: [],
     lines: [{ code: "EL-1", description: "Elite lat pulldown", reportedJob: "Install" }],
     workCarriedOut: "Installed the lat pulldown and levelled it.",
     parts: [{ code: "BOLT", description: "Anchor bolt", qty: "8" }],
@@ -75,6 +76,21 @@ describe("visit PDF pack", () => {
     expect(text).not.toContain("fixing to floor");
     expect(text).not.toContain("suitability of floors");
     expect(text).not.toContain("Ladder");
+  });
+
+  it("prints installed kit and the lines still to follow", async () => {
+    const draft = sheet();
+    draft.kitLines = [
+      { code: "JF-C2SE-2", description: "Concept2 SkiErg", qty: "1", fulfilment: "installed" },
+      { code: "JF-KBR-3", description: "3 tier kettlebell rack", qty: "2", fulfilment: "to_follow" },
+    ];
+    const text = await pdfBytesToLayoutText(await buildVisitPdf({ sheet: draft, riskLines: [], riskNotes: "" }));
+    expect(text).toContain("All kit installed as ordered");
+    expect(text).toContain("No");
+    expect(text).toContain("Concept2 SkiErg");
+    expect(text).toContain("Installed");
+    expect(text).toContain("3 tier kettlebell rack");
+    expect(text).toContain("To follow");
   });
 
   it("still builds a sheet when optional rows are empty", async () => {

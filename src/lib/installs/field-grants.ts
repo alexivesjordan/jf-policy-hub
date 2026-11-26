@@ -14,6 +14,7 @@ export const FIELD_ENGINEER_ALLOW = [
   "install_save_staff_signature",
   "install_list_visit_documents",
   "install_read",
+  "install_kit_follow_up",
   "install_calendar",
   "install_field_role",
   "install_visit_upload_gate",

@@ -10,6 +10,8 @@ export type RiskKey = (typeof RISK_ITEMS)[number]["key"];
 export type RiskAnswers = Record<RiskKey, boolean | null> & { notes: string };
 export type SheetLine = { code: string; description: string; reportedJob: string; qty?: string; fromOrder?: boolean };
 export type SheetPart = { code: string; description: string; qty: string };
+export type KitFulfilment = "installed" | "to_follow";
+export type KitLine = { code: string; description: string; qty: string; fulfilment: KitFulfilment | null };
 
 export type SheetDraft = {
   visitType: "install" | "service";
@@ -30,6 +32,7 @@ export type SheetDraft = {
   warranty: boolean;
   kitAsOrdered: boolean;
   kitNotes: string;
+  kitLines: KitLine[];
   lines: SheetLine[];
   workCarriedOut: string;
   parts: SheetPart[];
@@ -91,12 +94,43 @@ function boolAnswer(value: boolean | null, label: string) {
   return null;
 }
 
+export function trackedKitLines(sheet: Pick<SheetDraft, "kitLines">) {
+  return (sheet.kitLines ?? [])
+    .map((line) => ({
+      code: line.code.trim(),
+      description: line.description.trim(),
+      qty: (line.qty ?? "").trim(),
+      fulfilment: line.fulfilment,
+    }))
+    .filter((line) => line.code || line.description);
+}
+
+/** True when every tracked line was installed, or when a sheet with no lines was confirmed. */
+export function kitInstalledAsOrdered(sheet: Pick<SheetDraft, "kitAsOrdered" | "kitLines">) {
+  const lines = trackedKitLines(sheet);
+  if (lines.length === 0) return sheet.kitAsOrdered;
+  return lines.every((line) => line.fulfilment === "installed");
+}
+
+export function kitProblem(sheet: Pick<SheetDraft, "kitAsOrdered" | "kitLines">) {
+  const lines = trackedKitLines(sheet);
+  if (lines.length === 0) {
+    if (!sheet.kitAsOrdered) return "Confirm all kit was installed as ordered.";
+    return null;
+  }
+  if (lines.some((line) => line.fulfilment !== "installed" && line.fulfilment !== "to_follow")) {
+    return "Mark each line as installed or to follow.";
+  }
+  return null;
+}
+
 export function validateSheet(sheet: SheetDraft) {
   if (sheet.visitType !== "install" && sheet.visitType !== "service") return "Choose install or service.";
   if (!sheet.sheetOn) return "Add the date.";
   if (!sheet.customerName.trim()) return "Add the customer name.";
   if (!sheet.engineerName.trim()) return "Add the engineer name.";
-  if (!sheet.kitAsOrdered) return "Confirm all kit was installed as ordered.";
+  const kit = kitProblem(sheet);
+  if (kit) return kit;
   if (!sheet.workCarriedOut.trim()) return "Add the work carried out.";
   return (
     boolAnswer(sheet.locationOk, "the location question") ||
@@ -181,6 +215,12 @@ export function sheetPayload(
     delivery: sheet.delivery,
     installation: sheet.installation,
     warranty: sheet.warranty,
+    kitAsOrdered: kitInstalledAsOrdered(sheet),
+    kitLines: trackedKitLines(sheet).flatMap((line) =>
+      line.fulfilment === "installed" || line.fulfilment === "to_follow"
+        ? [{ code: line.code, description: line.description, qty: line.qty, fulfilment: line.fulfilment }]
+        : [],
+    ),
     workCarriedOut: sheet.workCarriedOut.trim(),
     locationOk: sheet.locationOk,
     workOk: sheet.workOk,
