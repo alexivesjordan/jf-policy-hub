@@ -469,7 +469,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         id,
         orderNumber: "SO-00526",
         customerName: "Sample Gym",
-        siteAddress: "1 High Street",
+        siteAddress: "1 High Street, King's Lynn, PE30 4JJ",
         contactName: "Alex",
         contactPhone: "01553 000000",
         contactEmail: null,

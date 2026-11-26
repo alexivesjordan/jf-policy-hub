@@ -8,6 +8,7 @@ import { saveHqBuildPhoto, startInstallJob } from "@/features/field/prep-actions
 import type { JobBriefing } from "@/features/field/queries";
 import { orderedAnswers } from "@/lib/installs/access-ui";
 import type { OrderLineView } from "@/lib/installs/visit-form";
+import { SiteNavLinks } from "@/components/field/site-nav";
 import { formatDate } from "@/lib/format";
 
 export function JobBriefingView({
@@ -38,6 +39,7 @@ export function JobBriefingView({
         <h2 className="font-display text-3xl">Briefing</h2>
         <p className="text-base font-semibold">{customerName}</p>
         <p>{siteAddress || "No site address yet."}</p>
+        <SiteNavLinks address={siteAddress} />
         <p className="text-sm text-grey">{formatDate(startOn)} – {formatDate(endOn)} · {orderNumber}</p>
       </section>
 
