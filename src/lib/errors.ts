@@ -1,3 +1,8 @@
+export function isWorkspaceDenial(error: { message?: string; details?: string } | null | undefined) {
+  const message = `${error?.message ?? ""} ${error?.details ?? ""}`;
+  return /only a workspace owner or admin/i.test(message);
+}
+
 export function messageFromError(
   error: { message?: string; details?: string } | null | undefined,
   fallback: string,

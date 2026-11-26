@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { prepareSignaturePng } from "@/lib/installs/signature-image";
-import { FORM_NOTICES, type SheetDraft } from "@/lib/installs/visit-form";
+import { FORM_NOTICES, INSTALL_CHECKS, kitInstalledAsOrdered, trackedKitLines, type SheetDraft } from "@/lib/installs/visit-form";
 
 const A4 = [595.28, 841.89] as const;
 const MARGIN = 36;
@@ -256,8 +256,17 @@ export async function buildVisitPdf(input: VisitPdfInput) {
     ["Location satisfactory", yesNo(sheet.locationOk)],
     ["Customer satisfied", yesNo(sheet.workOk)],
     ["Site left satisfactory", yesNo(sheet.siteOk)],
+    ...INSTALL_CHECKS.map((item) => [item.label, yesNo(sheet[item.key])] as [string, string]),
   ], 2);
-  pdf.grid([["All kit installed as ordered", sheet.kitAsOrdered ? "Yes" : "No"]], 1);
+  pdf.grid([["All kit installed as ordered", kitInstalledAsOrdered(sheet) ? "Yes" : "No"]], 1);
+  const kit = trackedKitLines(sheet);
+  if (kit.length > 0) {
+    pdf.heading("Kit");
+    pdf.grid(kit.map((line) => [
+      `${line.qty ? `${line.qty} x ` : ""}${line.description || line.code}`.trim(),
+      line.fulfilment === "to_follow" ? "To follow" : "Installed",
+    ]), 1);
+  }
   pdf.grid([["Anything missing or damaged", sheet.kitNotes.trim() || "None"]], 1);
   pdf.heading("Work carried out");
   pdf.box(sheet.workCarriedOut || "-");

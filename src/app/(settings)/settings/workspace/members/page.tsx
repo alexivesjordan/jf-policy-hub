@@ -3,7 +3,7 @@ import { PendingInvites } from "@/components/pending-invites";
 import { PageHeader } from "@/components/pulse/page-header";
 import { WorkspaceInviteForm } from "@/components/workspace-invite-form";
 import type { FieldResourceOption } from "@/components/workspace-user-card";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import type { MemberRow } from "@/lib/members";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,9 +18,18 @@ export default async function MembersPage() {
     supabase.rpc("workspace_pending_invites"),
     supabase.rpc("install_field_resources"),
   ]);
-  if (peopleResult.error) throw new Error(peopleResult.error.message);
-  if (teamResult.error) throw new Error(teamResult.error.message);
-  if (inviteResult.error) throw new Error(inviteResult.error.message);
+  if (peopleResult.error) {
+    denyWorkspace(peopleResult.error);
+    throw new Error(peopleResult.error.message);
+  }
+  if (teamResult.error) {
+    denyWorkspace(teamResult.error);
+    throw new Error(teamResult.error.message);
+  }
+  if (inviteResult.error) {
+    denyWorkspace(inviteResult.error);
+    throw new Error(inviteResult.error.message);
+  }
   const peopleData = peopleResult.data;
   const teamData = teamResult.data;
   const inviteData = inviteResult.data;

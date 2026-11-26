@@ -6,7 +6,8 @@ import { SignaturePad } from "@/components/field/signature-pad";
 import { Choice, YesNo } from "@/components/field/yes-no";
 import { Input, TextArea } from "@/components/pulse/ui";
 import { createSubcontractorLink, saveVisitRisk, submitVisit } from "@/features/field/actions";
-import { FORM_NOTICES, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, vehicleChoiceProblem, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
+import { orderKitLines } from "@/lib/installs/kit-lines";
+import { FORM_NOTICES, INSTALL_CHECKS, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, kitProblem, vehicleChoiceProblem, type KitFulfilment, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { Select } from "@/components/pulse/ui";
 
 export type VisitScreen = {
@@ -51,12 +52,21 @@ function draftFrom(screen: VisitScreen): SheetDraft {
     warranty: false,
     kitAsOrdered: false,
     kitNotes: "",
+    kitLines: orderKitLines(screen.lines).map((line) => ({
+      code: line.sku,
+      description: line.description,
+      qty: line.qty == null ? "" : String(line.qty),
+      fulfilment: null,
+    })),
     lines: [],
     workCarriedOut: "",
     parts: [blankPart()],
     locationOk: null,
     workOk: null,
     siteOk: null,
+    floorSheeting: null,
+    builtCheckedTag: null,
+    dustCover: null,
     engineerName: screen.engineerName,
     vehicleReg: "",
     customerName: screen.customerName,
@@ -245,7 +255,11 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
   function setPart(index: number, partial: Partial<SheetDraft["parts"][number]>) {
     patch({ parts: sheet.parts.map((part, item) => (item === index ? { ...part, ...partial } : part)) });
   }
+  function setKit(index: number, fulfilment: KitFulfilment) {
+    patch({ kitLines: sheet.kitLines.map((line, item) => (item === index ? { ...line, fulfilment } : line)) });
+  }
   const [note, setNote] = useState("");
+  const tracked = sheet.kitLines.some((line) => line.code.trim() || line.description.trim());
   return (
     <section className="space-y-4">
       <h2 className="font-display text-3xl">Job sheet</h2>
@@ -270,10 +284,25 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Delivery" value={sheet.delivery} onChange={(next) => patch({ delivery: next })} />
       <YesNo label="Installation" value={sheet.installation} onChange={(next) => patch({ installation: next })} />
       <YesNo label="Warranty" value={sheet.warranty} onChange={(next) => patch({ warranty: next })} />
-      <label className="flex min-h-12 items-start gap-3 text-base font-semibold">
-        <input type="checkbox" className="mt-1 size-5" checked={sheet.kitAsOrdered} onChange={(event) => { patch({ kitAsOrdered: event.target.checked }); if (event.target.checked) setNote(""); }} />
-        All kit installed as ordered
-      </label>
+      {tracked ? (
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold">Kit</h3>
+          {sheet.kitLines.map((line, index) => line.code.trim() || line.description.trim() ? (
+            <div key={`${line.code}-${index}`} className="space-y-2">
+              <p className="text-sm font-semibold">{[line.qty ? `${line.qty}×` : "", line.description || line.code].filter(Boolean).join(" ")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Choice label="Installed" selected={line.fulfilment === "installed"} onClick={() => { setKit(index, "installed"); setNote(""); }} />
+                <Choice label="To follow" selected={line.fulfilment === "to_follow"} onClick={() => { setKit(index, "to_follow"); setNote(""); }} />
+              </div>
+            </div>
+          ) : null)}
+        </div>
+      ) : (
+        <label className="flex min-h-12 items-start gap-3 text-base font-semibold">
+          <input type="checkbox" className="mt-1 size-5" checked={sheet.kitAsOrdered} onChange={(event) => { patch({ kitAsOrdered: event.target.checked }); if (event.target.checked) setNote(""); }} />
+          All kit installed as ordered
+        </label>
+      )}
       <Field label="Anything missing or damaged"><TextArea value={sheet.kitNotes} onChange={(event) => patch({ kitNotes: event.target.value })} /></Field>
       <Field label="Work carried out"><TextArea value={sheet.workCarriedOut} onChange={(event) => patch({ workCarriedOut: event.target.value })} /></Field>
       <div className="space-y-3">
@@ -292,8 +321,12 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
       <YesNo label="Satisfied with rig / product location?" value={sheet.locationOk} onChange={(next) => patch({ locationOk: next })} />
       <YesNo label="Customer satisfied with work?" value={sheet.workOk} onChange={(next) => patch({ workOk: next })} />
       <YesNo label="Site left in satisfactory condition?" value={sheet.siteOk} onChange={(next) => patch({ siteOk: next })} />
+      <h3 className="text-base font-semibold">Handover</h3>
+      {INSTALL_CHECKS.map((item) => (
+        <YesNo key={item.key} label={item.label} value={sheet[item.key]} onChange={(next) => patch({ [item.key]: next })} />
+      ))}
       {note ? <p className="text-sm font-semibold text-red">{note}</p> : null}
-      <button type="button" onClick={() => { if (!sheet.kitAsOrdered) { setNote("Confirm all kit was installed as ordered."); return; } onNext(); }} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
+      <button type="button" onClick={() => { const problem = kitProblem(sheet); if (problem) { setNote(problem); return; } onNext(); }} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white">
         Photos
       </button>
     </section>

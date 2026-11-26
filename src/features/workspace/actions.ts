@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { authConfirmRedirect } from "@/lib/site-url";
 import { passwordSetupPath } from "@/lib/auth-link";
 import { hasServiceRole } from "@/lib/env";
@@ -59,14 +59,21 @@ export async function saveWorkspaceTeam(formData: FormData) {
     p_id: id || null,
     p_name: clean(formData.get("name")),
   });
-  if (error) throw new Error(messageFromError(error, "Could not save that team."));
+  if (error) {
+    denyWorkspace(error);
+    throw new Error(messageFromError(error, "Could not save that team."));
+  }
   revalidatePath("/settings/workspace/teams");
 }
 
 export async function deleteWorkspaceTeam(formData: FormData) {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
-  await supabase.rpc("workspace_delete_team", { p_id: clean(formData.get("teamId")) });
+  const { error } = await supabase.rpc("workspace_delete_team", { p_id: clean(formData.get("teamId")) });
+  if (error) {
+    denyWorkspace(error);
+    throw new Error(messageFromError(error, "Could not delete that team."));
+  }
   revalidatePath("/settings/workspace/teams");
 }
 
@@ -92,6 +99,7 @@ export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: For
     p_active: formData.get("isActive") === "yes",
   });
   if (error) {
+    denyWorkspace(error);
     if (opened.createdId) await discardFieldEngineer(opened.createdId);
     return { message: messageFromError(error, "Could not save that user.") };
   }
@@ -143,6 +151,7 @@ export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: F
     p_workspace_role: clean(formData.get("workspaceRole")),
   });
   if (error) {
+    denyWorkspace(error);
     if (opened.createdId) await discardFieldEngineer(opened.createdId);
     return { message: messageFromError(error, "We could not save that invite.") };
   }
@@ -181,7 +190,10 @@ export async function setRecordOwner(_prev: WorkspaceFormState, formData: FormDa
     p_id: clean(formData.get("recordId")),
     p_owner: owner || null,
   });
-  if (error) return { message: messageFromError(error, "Could not save the owner.") };
+  if (error) {
+    denyWorkspace(error);
+    return { message: messageFromError(error, "Could not save the owner.") };
+  }
   const recordId = clean(formData.get("recordId"));
   revalidatePath("/operations/jobs");
   revalidatePath(`/operations/jobs/${recordId}`);
@@ -197,7 +209,10 @@ export async function deleteWorkspaceUser(_prev: WorkspaceFormState, formData: F
   const userId = clean(formData.get("userId"));
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_delete_user", { p_profile: userId });
-  if (error) return { message: messageFromError(error, "Could not delete that user.") };
+  if (error) {
+    denyWorkspace(error);
+    return { message: messageFromError(error, "Could not delete that user.") };
+  }
   const mode = (data as { mode?: string } | null)?.mode;
   if (!hasServiceRole()) {
     return { message: mode === "hard"
@@ -234,6 +249,9 @@ export async function revokeWorkspaceInvite(formData: FormData) {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
   const { error } = await supabase.rpc("workspace_revoke_invite", { p_email: clean(formData.get("email")) });
-  if (error) throw new Error(messageFromError(error, "Could not revoke that invite."));
+  if (error) {
+    denyWorkspace(error);
+    throw new Error(messageFromError(error, "Could not revoke that invite."));
+  }
   revalidatePath("/settings/workspace/members");
 }

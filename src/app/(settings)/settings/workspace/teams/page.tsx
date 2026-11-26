@@ -1,7 +1,7 @@
 import { Button, Input } from "@/components/pulse/ui";
 import { PageHeader } from "@/components/pulse/page-header";
 import { deleteWorkspaceTeam, saveWorkspaceTeam } from "@/features/workspace/actions";
-import { requireWorkspaceAdmin } from "@/lib/auth";
+import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Teams" };
@@ -9,7 +9,8 @@ export const metadata = { title: "Teams" };
 export default async function TeamsPage() {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
-  const { data } = await supabase.rpc("workspace_teams");
+  const { data, error } = await supabase.rpc("workspace_teams");
+  denyWorkspace(error);
   const teams = (Array.isArray(data) ? data : []) as { id: string; name: string; members: number }[];
 
   return (

@@ -5,7 +5,8 @@ import { InstallOpsView } from "@/components/install-ops-view";
 import { SubcontractorInstallSection } from "@/components/subcontractor-install-section";
 import { PageSkeleton } from "@/components/pulse/states";
 import { InstallVisitPhotos } from "@/components/install-visit-photos";
-import { installProposalUrl, listVisitPhotos, readInstall } from "@/features/sales/install-actions";
+import { KitFollowUpPanel } from "@/components/kit-follow-up";
+import { installProposalUrl, listVisitPhotos, readInstall, readKitFollowUp } from "@/features/sales/install-actions";
 import { requireOperationsUser } from "@/lib/auth";
 import { moduleAllows } from "@/lib/access";
 
@@ -32,6 +33,7 @@ async function OpsInstall({ params }: { params: Promise<{ id: string }> }) {
     <div className="space-y-4">
       <Link href="/operations/installs" className="text-sm font-semibold underline decoration-primary">All installs</Link>
       <InstallOpsView install={loaded.install} proposalUrl={proposalUrl} canEdit={moduleAllows(profile, "operations", "edit")} />
+      <KitFollowUpPanel followUp={await readKitFollowUp(id)} />
       <InstallAccessPanel install={loaded.install} />
       <InstallVisitPhotos photos={photos} />
       <SubcontractorInstallSection profile={profile} install={loaded.install} />

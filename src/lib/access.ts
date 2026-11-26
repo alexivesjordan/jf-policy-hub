@@ -88,6 +88,17 @@ export function canManageWorkspace(profile: Profile) {
   return profile.role === "admin" || profile.workspace_role === "owner" || profile.workspace_role === "admin";
 }
 
+/** Signed-in people who are not workspace admins. The no-access page stays put for this reason. */
+export const WORKSPACE_DENIAL_PATH = "/no-access?reason=workspace";
+
+export function workspaceDenialRedirect(profile: Profile | null) {
+  if (!profile) return "/login";
+  if (!profile.access_granted) return "/no-access";
+  if (!profile.is_active) return "/account-inactive";
+  if (!canManageWorkspace(profile)) return WORKSPACE_DENIAL_PATH;
+  return null;
+}
+
 /** Approve or reject a policy suggestion. A flag, not a role. Owners can always review. */
 export function canReviewSuggestions(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;

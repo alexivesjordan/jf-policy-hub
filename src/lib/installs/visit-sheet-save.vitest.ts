@@ -28,12 +28,16 @@ function currentFormSheet(): SheetDraft {
     warranty: false,
     kitAsOrdered: true,
     kitNotes: "",
+    kitLines: [],
     lines: [],
     workCarriedOut: "Installed the kit and levelled it.",
     parts: [{ code: "", description: "", qty: "1" }],
     locationOk: true,
     workOk: true,
     siteOk: true,
+    floorSheeting: true,
+    builtCheckedTag: true,
+    dustCover: true,
     engineerName: "Lewis",
     vehicleReg: "",
     customerName: "Harbour Leisure",
@@ -91,6 +95,8 @@ describe("job sheet save matches the form", () => {
     expect(payload.visitType).toBe("install");
     expect(save).toContain("insert into ops.visit_sheets");
     expect(save).toContain("insert into ops.visit_sheet_lines");
+    expect(save).toContain("to_follow");
+    expect(save).toContain("core.tasks");
   });
 
   it("does not require a field the form no longer collects", () => {

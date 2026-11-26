@@ -514,6 +514,15 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         : [],
     };
   }
+  if (fn === "install_kit_follow_up") {
+    return {
+      lines: [
+        { code: "JF-C2SE-2", description: "Concept2 SkiErg", qty: 1, fulfilment: "installed" },
+        { code: "JF-KBR-3", description: "3 tier kettlebell rack", qty: 2, fulfilment: "to_follow" },
+      ],
+      followUp: { id: "task-kit", title: "Kit still to follow", status: "open", body: "2 x 3 tier kettlebell rack" },
+    };
+  }
   if (fn === "install_visit_context") {
     const id = String(args?.p_install ?? "");
     const submitted = id.endsWith("2222");
@@ -530,7 +539,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
         id,
         orderNumber: "SO-00526",
         customerName: "Sample Gym",
-        siteAddress: "1 High Street",
+        siteAddress: "1 High Street, King's Lynn, PE30 4JJ",
         contactName: "Alex",
         contactPhone: "01553 000000",
         contactEmail: null,
