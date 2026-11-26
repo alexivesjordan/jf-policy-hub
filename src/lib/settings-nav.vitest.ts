@@ -48,9 +48,8 @@ describe("settings nav", () => {
 
   it("hides coming-soon pulses and shows Logistics only when allowed", () => {
     const names = (showLogistics: boolean) => switcherModules(pulseModules, member, showLogistics).map((item) => item.id);
-    expect(names(false)).toEqual(["people", "operations", "sales"]);
-    expect(names(true)).toEqual(["people", "operations", "sales", "logistics"]);
-    expect(names(true)).not.toContain("service");
+    expect(names(false)).toEqual(["people", "service", "operations", "sales"]);
+    expect(names(true)).toEqual(["people", "service", "operations", "sales", "logistics"]);
     expect(names(true)).not.toContain("finance");
   });
 

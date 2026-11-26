@@ -425,6 +425,38 @@ export async function readCin7BookingDetails(orderNumberOrId: string, get: Cin7G
   };
 }
 
+/** Address and contact for a service visit. Read only. No quote fields. */
+export async function readCin7ServicePrefill(orderNumberOrId: string, get: Cin7Getter) {
+  const lookup = orderNumberOrId.trim();
+  if (!lookup) return null;
+  let sale: Record<string, unknown> | null = null;
+  if (GUID.test(lookup)) {
+    sale = record(await get("sale", { ID: lookup }));
+  } else {
+    if (!ORDER_NUMBER.test(lookup)) return null;
+    const listed = await findSale(lookup, get);
+    const id = listed ? saleId(listed) : null;
+    if (!id) return null;
+    sale = record(await get("sale", { ID: id }));
+  }
+  if (!sale) return null;
+  const customerId = text(sale.CustomerID);
+  const customer = customerId ? customerOf(await get("customer", { ID: customerId, Limit: "1" })) : null;
+  const address = deliveryAddress(customer, sale);
+  const postcode = text(address?.Postcode);
+  const contact = defaultContact(customer);
+  return {
+    customerName: text(sale.Customer) ?? text(customer?.Name) ?? "",
+    addressLine1: text(address?.Line1) ?? "",
+    addressLine2: text(address?.Line2) ?? "",
+    city: text(address?.City) ?? "",
+    postcode: postcode ? normaliseUkPostcode(postcode) : "",
+    contactName: text(sale.Contact) ?? text(contact?.Name) ?? text(customer?.Name) ?? "",
+    contactEmail: orderContactEmail(sale, customer) ?? "",
+    contactPhone: text(sale.Phone) ?? text(customer?.Phone) ?? text(contact?.Phone) ?? "",
+  };
+}
+
 /** Chosen delivery address, postcode, and email, with the rung each one came from. */
 export async function readCin7AddressReport(orderNumberOrId: string, get: Cin7Getter) {
   const lookup = orderNumberOrId.trim();

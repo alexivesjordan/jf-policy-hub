@@ -55,12 +55,15 @@ export const pulseModules: PulseModule[] = [
   {
     id: "service",
     name: "Pulse Service",
-    tagline: "Aftersales & support",
-    href: "/modules/service",
-    status: "coming-soon",
+    tagline: "Service visits",
+    href: "/service",
+    status: "active",
     icon: "service",
-    paths: ["/modules/service"],
-    nav: [],
+    paths: ["/service"],
+    nav: [
+      { href: "/service", label: "Board", exact: true },
+      { href: "/service/day", label: "My day" },
+    ],
   },
   {
     id: "supply",

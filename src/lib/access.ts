@@ -62,6 +62,10 @@ export function canUseOperations(profile: Profile) {
   return moduleAllows(profile, "operations", "view");
 }
 
+export function canUseService(profile: Profile) {
+  return moduleAllows(profile, "service", "view");
+}
+
 /** Logistics is its own Pulse. Owners and admins can open it. */
 export function canUseLogistics(profile: Profile) {
   if (!profile.access_granted || !profile.is_active) return false;
@@ -100,6 +104,6 @@ export function homeRedirect(profile: Profile | null) {
   if (!profile) return "/login";
   if (!profile.access_granted) return "/no-access";
   if (!profile.is_active) return "/account-inactive";
-  if (canUsePeople(profile) || canUseOperations(profile) || canUseSales(profile)) return null;
+  if (canUsePeople(profile) || canUseOperations(profile) || canUseSales(profile) || canUseService(profile)) return null;
   return "/no-access";
 }
