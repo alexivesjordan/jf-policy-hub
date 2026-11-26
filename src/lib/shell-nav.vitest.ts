@@ -59,7 +59,7 @@ describe("module nav", () => {
 
   it("keeps Quotes as a parent over the existing quote pages", () => {
     const sales = visibleNav(pulseModules.find((module) => module.id === "sales")?.nav ?? [], profile, false);
-    expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Quotes"]);
+    expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Radar", "Quotes"]);
     expect(sales.find((item) => item.label === "Quotes")?.children?.map((item) => item.label)).toEqual([
       "Install quoting",
       "Warranties & servicing",

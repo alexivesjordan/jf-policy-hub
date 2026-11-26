@@ -3,6 +3,65 @@ import { effortRowForSku, priceInstall } from "@/lib/pricer/engine";
 import { fixtureSubcontractorRpc } from "@/lib/subcontractors/fixture-board";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
+const radarOpportunities: Record<string, unknown>[] = [
+  {
+    id: "22222222-2222-4222-8222-222222222201",
+    source: "find-a-tender",
+    title: "Supply and installation of fitness equipment",
+    buyer: "North Norfolk District Council",
+    value_amount: 65000,
+    value_currency: "GBP",
+    deadline: "2026-12-18T12:00:00.000Z",
+    expected_award_date: "2027-02-02",
+    cpv_codes: ["37420000"],
+    region: "East of England",
+    url: "https://www.find-tender.service.gov.uk/Notice/000111-2026",
+    score: 92,
+    match_reasons: ["Keyword: fitness", "Keyword: leisure centre", "CPV 3742", "Value in Core supply"],
+    status: "new",
+    dismiss_reason: null,
+    owner_id: "",
+    updated_at: "2026-11-26T06:15:00.000Z",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222202",
+    source: "contracts-finder",
+    title: "Gym equipment for a school sports hall",
+    buyer: "Example Academy Trust",
+    value_amount: 28000,
+    value_currency: "GBP",
+    deadline: "2026-12-12T17:00:00.000Z",
+    expected_award_date: null,
+    cpv_codes: ["37440000"],
+    region: "London",
+    url: "https://www.contractsfinder.service.gov.uk/Notice/example-school",
+    score: 70,
+    match_reasons: ["Keyword: gym", "CPV 3744"],
+    status: "new",
+    dismiss_reason: null,
+    owner_id: USER_ID,
+    updated_at: "2026-11-26T06:15:00.000Z",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222203",
+    source: "find-a-tender",
+    title: "Cleaning contract for a leisure centre",
+    buyer: "Example Borough Council",
+    value_amount: 120000,
+    value_currency: "GBP",
+    deadline: "2026-12-01T12:00:00.000Z",
+    expected_award_date: null,
+    cpv_codes: ["90910000"],
+    region: "North West",
+    url: "https://www.find-tender.service.gov.uk/Notice/000333-2026",
+    score: 22,
+    match_reasons: ["Keyword: leisure centre"],
+    status: "dismissed",
+    dismiss_reason: "Cleaning only. No equipment.",
+    owner_id: "",
+    updated_at: "2026-11-25T09:00:00.000Z",
+  },
+];
 let fixtureServiceQuote: { id: string; prices: unknown } | null = null;
 const JOB_BOOKED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
 const JOB_PRICED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
@@ -296,6 +355,17 @@ function tables(): Record<string, Record<string, unknown>[]> {
       { module_id: "operations", enabled: true, profile_id: USER_ID },
       { module_id: "sales", enabled: true, profile_id: USER_ID },
     ],
+    radar_settings: [
+      {
+        id: true,
+        keywords: ["gym", "fitness", "leisure centre"],
+        cpv_codes: ["3742", "3744"],
+        value_bands: [
+          { label: "Core supply", min: 25000, max: 150000, points: 15 },
+        ],
+      },
+    ],
+    radar_opportunities: radarOpportunities,
   };
 }
 
@@ -818,6 +888,12 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   }
   if (fn === "install_set_status") return fixtureInstall("2026-11-16", "annual", true, String(args?.p_status ?? "booked"));
   if (fn === "install_cancel") return fixtureInstall("2026-11-16", "annual", true, "cancelled");
+  if (fn === "radar_owner_choices") {
+    return [
+      { id: USER_ID, full_name: "Alex Ives" },
+      { id: "00000000-0000-4000-8000-000000000003", full_name: "Riley Hart" },
+    ];
+  }
   return null;
 }
 
@@ -912,6 +988,7 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   private filters: Filter[] = [];
   private asSingle = false;
   private head = false;
+  private write: Record<string, unknown> | null = null;
 
   constructor(private table: string) {}
 
@@ -957,6 +1034,23 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
     return this;
   }
 
+  update(patch?: Record<string, unknown>) {
+    this.write = patch ?? {};
+    return this;
+  }
+
+  insert() {
+    return this;
+  }
+
+  upsert() {
+    return this;
+  }
+
+  delete() {
+    return this;
+  }
+
   in() {
     return this;
   }
@@ -992,6 +1086,12 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
       });
     }
     if (this.head) return { data: null, error: null, count: rows.length };
+    if (this.write) {
+      if (this.table === "radar_opportunities") {
+        for (const row of rows) Object.assign(row, this.write);
+      }
+      return { data: rows, error: null, count: rows.length };
+    }
     if (this.asSingle) return { data: rows[0] ?? null, error: null, count: null };
     return { data: rows, error: null, count: null };
   }
