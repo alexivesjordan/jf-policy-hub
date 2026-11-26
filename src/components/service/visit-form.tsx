@@ -46,6 +46,7 @@ export function VisitForm({
   const [assets, setAssets] = useState<VisitAsset[]>(visit?.assets.length ? visit.assets : [{ make: "", model: "", serial: "" }]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [overlap, setOverlap] = useState<string | null>(null);
 
   function draft(): VisitDraft {
     return {
@@ -75,15 +76,18 @@ export function VisitForm({
     if (prefill.contactEmail) setContactEmail(prefill.contactEmail);
   }
 
-  async function save() {
+  async function save(confirmOverlap = false) {
     setPending(true);
     setError(null);
-    const result = await saveServiceVisit(visit?.id ?? null, draft());
+    if (!confirmOverlap) setOverlap(null);
+    const result = await saveServiceVisit(visit?.id ?? null, draft(), confirmOverlap);
     setPending(false);
     if (!result.ok) {
-      setError(result.message);
+      if (result.overlap) setOverlap(result.message);
+      else setError(result.message);
       return;
     }
+    setOverlap(null);
     toast.success(result.message);
     router.push(`/service/visits/${result.id}`);
     router.refresh();
@@ -115,6 +119,15 @@ export function VisitForm({
       }}
     >
       {error ? <p className="text-sm font-semibold text-red">{error}</p> : null}
+      {overlap ? (
+        <div className="rounded-2xl border border-line bg-card p-4">
+          <p className="font-semibold">{overlap}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" disabled={pending} onClick={() => void save(true)}>Keep this time</Button>
+            <Button type="button" variant="secondary" disabled={pending} onClick={() => setOverlap(null)}>Cancel</Button>
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Customer">
           <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} required disabled={!canEdit} />
@@ -146,16 +159,16 @@ export function VisitForm({
           <Input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} inputMode="email" disabled={!canEdit} />
         </Field>
         <Field label="Date">
-          <Input type="date" value={visitOn} onChange={(event) => setVisitOn(event.target.value)} required disabled={!canEdit} />
+          <Input type="date" value={visitOn} onChange={(event) => { setOverlap(null); setVisitOn(event.target.value); }} required disabled={!canEdit} />
         </Field>
         <Field label="Duration (minutes)">
           <Input type="number" min={15} max={480} step={15} value={durationMinutes} onChange={(event) => setDurationMinutes(event.target.value)} required disabled={!canEdit} />
         </Field>
         <Field label="Window start">
-          <Input type="time" value={windowStart} onChange={(event) => setWindowStart(event.target.value)} disabled={!canEdit} />
+          <Input type="time" value={windowStart} onChange={(event) => { setOverlap(null); setWindowStart(event.target.value); }} disabled={!canEdit} />
         </Field>
         <Field label="Window end">
-          <Input type="time" value={windowEnd} onChange={(event) => setWindowEnd(event.target.value)} disabled={!canEdit} />
+          <Input type="time" value={windowEnd} onChange={(event) => { setOverlap(null); setWindowEnd(event.target.value); }} disabled={!canEdit} />
         </Field>
         <Field label="Cin7 order">
           <div className="flex gap-2">
@@ -181,6 +194,7 @@ export function VisitForm({
                   checked={assigneeIds.includes(person.id)}
                   disabled={!canEdit}
                   onChange={(event) => {
+                    setOverlap(null);
                     setAssigneeIds((current) => event.target.checked ? [...current, person.id] : current.filter((id) => id !== person.id));
                   }}
                 />

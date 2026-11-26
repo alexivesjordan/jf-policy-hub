@@ -10,7 +10,15 @@ import { storePulseFile } from "@/lib/pulse/files";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 
-export type ServiceActionResult = { ok: true; id?: string; message: string } | { ok: false; message: string };
+export type ServiceActionResult =
+  | { ok: true; id?: string; message: string }
+  | { ok: false; overlap?: boolean; message: string };
+
+function fromRpc(error: { message?: string; details?: string } | null, fallback: string): ServiceActionResult {
+  const message = messageFromError(error, fallback);
+  if (message.startsWith("These times overlap")) return { ok: false, overlap: true, message };
+  return { ok: false, message };
+}
 
 function refresh(id?: string) {
   revalidatePath("/service");
@@ -36,7 +44,7 @@ export async function lookupServiceOrder(orderNumber: string) {
   }
 }
 
-export async function saveServiceVisit(id: string | null, draft: VisitDraft): Promise<ServiceActionResult> {
+export async function saveServiceVisit(id: string | null, draft: VisitDraft, confirmOverlap = false): Promise<ServiceActionResult> {
   const parsed = parseVisitDraft(draft);
   if (!parsed.ok) return parsed;
   const postcode = String(parsed.payload.postcode ?? "");
@@ -45,10 +53,11 @@ export async function saveServiceVisit(id: string | null, draft: VisitDraft): Pr
     parsed.payload.latitude = coords.latitude;
     parsed.payload.longitude = coords.longitude;
   }
+  if (confirmOverlap) parsed.payload.confirmOverlap = true;
   const supabase = await createClient();
   const saved = await supabase.rpc("service_visit_save", { p_id: id, p_payload: parsed.payload });
   if (saved.error || !saved.data) {
-    return { ok: false, message: messageFromError(saved.error, "That visit could not be saved.") };
+    return fromRpc(saved.error, "That visit could not be saved.");
   }
   const visitId = String(saved.data);
   refresh(visitId);
@@ -61,6 +70,7 @@ export async function arrangeServiceVisit(input: {
   toResourceId: string | null;
   day: string;
   index: number;
+  confirmOverlap?: boolean;
 }): Promise<ServiceActionResult> {
   const supabase = await createClient();
   const moved = await supabase.rpc("service_visit_arrange", {
@@ -69,8 +79,9 @@ export async function arrangeServiceVisit(input: {
     p_to: input.toResourceId,
     p_day: input.day,
     p_index: input.index,
+    p_confirm: input.confirmOverlap === true,
   });
-  if (moved.error) return { ok: false, message: messageFromError(moved.error, "That stop could not be moved.") };
+  if (moved.error) return fromRpc(moved.error, "That stop could not be moved.");
   refresh(input.visitId);
   return { ok: true, message: "Moved." };
 }

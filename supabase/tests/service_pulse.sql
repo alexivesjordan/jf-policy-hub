@@ -8,6 +8,8 @@ declare
   v_eng uuid := gen_random_uuid();
   v_other uuid := gen_random_uuid();
   v_none uuid := gen_random_uuid();
+  v_after uuid := gen_random_uuid();
+  v_ops uuid := gen_random_uuid();
   v_lewis uuid;
   v_peter uuid;
   v_quote uuid;
@@ -25,6 +27,8 @@ declare
   v_count integer;
   v_free boolean;
   v_err text;
+  v_level text;
+  v_clash uuid;
 begin
   perform set_config('orbit.profile_sync', 'on', true);
   insert into auth.users (
@@ -35,11 +39,14 @@ begin
   select '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated',
          'svc-test-' || id::text || '@example.com', '', now(),
          '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
-  from (values (v_office), (v_view), (v_eng), (v_other), (v_none)) as people(id);
+  from (values (v_office), (v_view), (v_eng), (v_other), (v_none), (v_after), (v_ops)) as people(id);
 
   update public.profiles
   set role = 'staff', workspace_role = 'member', access_mode = 'custom', access_granted = true, is_active = true
   where id in (v_office, v_view, v_eng, v_other, v_none);
+  update public.profiles
+  set role = 'staff', workspace_role = 'member', access_mode = 'follow', access_granted = true, is_active = true
+  where id in (v_after, v_ops);
   update public.module_access set access_level = 'edit', enabled = true where profile_id = v_office and module_id = 'service';
   update public.module_access set access_level = 'view', enabled = true where profile_id = v_view and module_id = 'service';
   update public.module_access set access_level = 'none', enabled = false where profile_id in (v_eng, v_other, v_none) and module_id = 'service';
@@ -274,6 +281,102 @@ begin
   if v_asset is not null then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' asset missing;'; end if;
   select count(*) into v_count from svc.visits where site_id = v_site;
   if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' site reuse ' || v_count::text || ';'; end if;
+
+  select a.access_level into v_level
+  from public.workspace_team_access a
+  join public.workspace_teams t on t.id = a.team_id
+  where t.name = 'Aftersales' and a.module_id = 'service';
+  if v_level = 'edit' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' aftersales ' || coalesce(v_level, 'null') || ';'; end if;
+  select a.access_level into v_level
+  from public.workspace_team_access a
+  join public.workspace_teams t on t.id = a.team_id
+  where t.name = 'Operations' and a.module_id = 'service';
+  if v_level = 'edit' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' operations ' || coalesce(v_level, 'null') || ';'; end if;
+
+  insert into public.workspace_team_members (team_id, profile_id)
+  select t.id, member.profile_id
+  from public.workspace_teams t
+  join (values ('Aftersales', v_after), ('Operations', v_ops)) as member(team_name, profile_id)
+    on member.team_name = t.name
+  where t.archived_at is null;
+
+  perform set_config('request.jwt.claim.sub', v_after::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_after, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    v_clash := public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Aftersales Gym', 'addressLine1', '8 Yard', 'postcode', 'PE30 1AA',
+      'visitType', 'service', 'visitOn', '2026-12-10', 'durationMinutes', 60,
+      'windowStart', '09:00', 'windowEnd', '11:00',
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_ok := v_ok + 1;
+  exception when others then
+    v_fail := v_fail + 1; v_notes := v_notes || ' aftersales save ' || sqlerrm || ';';
+  end;
+  begin
+    perform public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Clash Gym', 'addressLine1', '8 Yard', 'postcode', 'PE30 1AA',
+      'visitType', 'repair', 'visitOn', '2026-12-10', 'durationMinutes', 60,
+      'windowStart', '10:00', 'windowEnd', '12:00',
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_fail := v_fail + 1; v_notes := v_notes || ' overlap saved;';
+  exception when others then
+    if sqlerrm ilike '%These times overlap%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' overlap ' || sqlerrm || ';'; end if;
+  end;
+  begin
+    perform public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Clash Gym', 'addressLine1', '8 Yard', 'postcode', 'PE30 1AA',
+      'visitType', 'repair', 'visitOn', '2026-12-10', 'durationMinutes', 60,
+      'windowStart', '10:00', 'windowEnd', '12:00',
+      'confirmOverlap', true,
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_ok := v_ok + 1;
+  exception when others then
+    v_fail := v_fail + 1; v_notes := v_notes || ' confirm overlap ' || sqlerrm || ';';
+  end;
+  begin
+    perform public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Beside Gym', 'addressLine1', '9 Yard', 'postcode', 'PE30 1AB',
+      'visitType', 'repair', 'visitOn', '2026-12-10', 'durationMinutes', 30,
+      'windowStart', '08:00', 'windowEnd', '09:00',
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_ok := v_ok + 1;
+  exception when others then
+    v_fail := v_fail + 1; v_notes := v_notes || ' adjacent ' || sqlerrm || ';';
+  end;
+  begin
+    perform public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Still blocked', 'addressLine1', '1 High Street', 'postcode', 'NR3 3CC',
+      'visitType', 'repair', 'visitOn', '2026-12-03', 'durationMinutes', 60,
+      'confirmOverlap', true,
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_fail := v_fail + 1; v_notes := v_notes || ' confirm bypassed install;';
+  exception when others then
+    if sqlerrm ilike '%install%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' confirm install ' || sqlerrm || ';'; end if;
+  end;
+
+  reset role;
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_ops, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  v_board := public.service_board('2026-12-10', '2026-12-10');
+  if (v_board->'canEdit')::boolean then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' operations board;'; end if;
+
+  reset role;
+  perform set_config('request.jwt.claim.sub', v_eng::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_eng, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform public.service_board('2026-12-10', '2026-12-10');
+    v_fail := v_fail + 1; v_notes := v_notes || ' engineer board after grant;';
+  exception when others then
+    if sqlerrm ilike '%cannot see%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' engineer still ' || sqlerrm || ';'; end if;
+  end;
 
   raise exception 'RESULTS ok=% fail=% %', v_ok, v_fail, v_notes;
 end

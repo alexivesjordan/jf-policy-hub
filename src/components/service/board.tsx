@@ -53,6 +53,7 @@ export function ServiceBoardView({
   const router = useRouter();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [overlap, setOverlap] = useState<{ message: string; move: Parameters<typeof arrangeServiceVisit>[0] } | null>(null);
   const dragReady = useSyncExternalStore(() => () => {}, () => true, () => false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -93,18 +94,38 @@ export function ServiceBoardView({
     const samePlace = from.resourceId === over.resourceId && from.day === over.day
       && source.findIndex((stop) => stop.id === from.visitId) + 1 === index;
     if (samePlace) return;
-    setPending(true);
-    const result = await arrangeServiceVisit({
+    const move = {
       visitId: from.visitId,
       fromResourceId: from.resourceId,
       toResourceId: over.resourceId,
       day: over.day,
       index,
-    });
+    };
+    await place(move, false);
+  }
+
+  async function place(move: Parameters<typeof arrangeServiceVisit>[0], confirmOverlap: boolean) {
+    setPending(true);
+    const result = await arrangeServiceVisit({ ...move, confirmOverlap });
     setPending(false);
+    if (!result.ok && result.overlap) {
+      setOverlap({ message: result.message, move });
+      return;
+    }
+    setOverlap(null);
     if (!result.ok) toast.error(result.message);
     router.refresh();
   }
+
+  const warning = overlap ? (
+    <div className="rounded-2xl border border-line bg-card p-4">
+      <p className="font-semibold">{overlap.message}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="inline-flex min-h-11 items-center rounded-full bg-red px-4 text-sm font-semibold text-white" disabled={pending} onClick={() => void place(overlap.move, true)}>Keep this time</button>
+        <button type="button" className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold" disabled={pending} onClick={() => setOverlap(null)}>Cancel</button>
+      </div>
+    </div>
+  ) : null;
 
   const body = mode === "day"
     ? (
@@ -157,8 +178,17 @@ export function ServiceBoardView({
       </div>
     );
 
-  if (!dragReady || !board.canEdit) return body;
+  if (!dragReady || !board.canEdit) {
+    return (
+      <div className="space-y-4">
+        {warning}
+        {body}
+      </div>
+    );
+  }
   return (
+    <div className="space-y-4">
+      {warning}
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
@@ -169,6 +199,7 @@ export function ServiceBoardView({
       {body}
       <DragOverlay>{active ? <StopCard stop={active} overlay /> : null}</DragOverlay>
     </DndContext>
+    </div>
   );
 }
 

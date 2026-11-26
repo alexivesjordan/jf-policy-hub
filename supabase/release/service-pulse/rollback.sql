@@ -28,12 +28,30 @@ $$;
 
 revoke all on function ops.resource_free_for_days(uuid, date[]) from public, anon, authenticated;
 
+update public.workspace_team_access a
+set access_level = 'view'
+from public.workspace_teams t
+where t.id = a.team_id
+  and t.name = 'Aftersales'
+  and a.module_id = 'service';
+
+delete from public.workspace_team_access a
+using public.workspace_teams t
+where t.id = a.team_id
+  and t.name = 'Operations'
+  and a.module_id = 'service';
+
+drop function if exists public.service_visit_arrange(uuid, uuid, uuid, date, integer, boolean);
+drop function if exists public.service_visit_save(uuid, jsonb);
+drop function if exists public.service_visit_arrange_body(uuid, uuid, uuid, date, integer);
+drop function if exists public.service_visit_save_body(uuid, jsonb);
+drop function if exists svc.overlap_warning(uuid);
+
 drop function if exists public.service_visit_add_photo(uuid, uuid);
 drop function if exists public.service_visit_photo_allowed(uuid);
 drop function if exists public.service_visit_set_progress(uuid, text, text, text);
 drop function if exists public.service_visit_delete(uuid);
 drop function if exists public.service_visit_arrange(uuid, uuid, uuid, date, integer);
-drop function if exists public.service_visit_save(uuid, jsonb);
 drop function if exists public.service_visit_day();
 drop function if exists public.service_visit_open(uuid);
 drop function if exists public.service_board(date, date);
