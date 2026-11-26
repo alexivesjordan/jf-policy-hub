@@ -1,0 +1,4 @@
+-- Guest access. Last TEST run rolled back with RESULTS ok=6 fail=0.
+-- A member invite still requires @jordanfitness.com. A guest invite does not.
+-- A guest with an authenticator session sees only the case they were added to, not employees or other cases.
+-- An end date in the past blocks the guest.

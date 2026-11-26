@@ -77,6 +77,15 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  if (user && !path.startsWith("/guest") && path !== "/settings/account/security") {
+    const { data: guest } = await supabase.rpc("guest_home_only");
+    if (guest === true) {
+      const redirect = NextResponse.redirect(new URL("/guest", request.url));
+      for (const cookie of response.headers.getSetCookie()) redirect.headers.append("set-cookie", cookie);
+      return redirect;
+    }
+  }
+
   if (user && (path.startsWith("/logistics") || (path.startsWith("/operations") && !path.startsWith("/operations/documents")))) {
     const { data } = await supabase.rpc("install_field_role");
     if (data === "engineer") {
