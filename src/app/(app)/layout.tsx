@@ -69,7 +69,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
     .slice(0, 20)
     .map(({ createdAt: _createdAt, ...item }) => item);
   return (
-    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer}>
+    <AppShell profile={profile} pending={pending} unread={unread} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
       {children}
     </AppShell>
   );

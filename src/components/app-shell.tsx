@@ -10,8 +10,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { canManageWorkspace } from "@/lib/access";
 import { navItemActive, visibleNav } from "@/lib/shell-nav";
+import { SETTINGS_NAV, switcherModules } from "@/lib/settings-nav";
 import type { Profile } from "@/lib/types";
 import { moduleFromPath, pulseModules, type ModuleNavItem, type PulseModule } from "@/modules/registry";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ export function AppShell({
   nav,
   notifications = [],
   showLogistics = false,
+  fieldEngineer = false,
   children,
 }: {
   profile: Profile;
@@ -37,24 +38,26 @@ export function AppShell({
   nav?: ModuleNavItem[];
   notifications?: BellItem[];
   showLogistics?: boolean;
+  fieldEngineer?: boolean;
   children: ReactNode;
 }) {
   const path = usePathname();
-  const inWorkspace = path.startsWith("/workspace");
+  const inSettings = path.startsWith("/settings");
   const current = moduleFromPath(path);
-  const heading = inWorkspace ? "Workspace" : current ? pulseLabel(current) : "Jordan Pulse";
+  const heading = inSettings ? "Settings" : current ? pulseLabel(current) : "Jordan Pulse";
   const counts = { pending, unread };
-  const items = visibleNav(nav ?? current?.nav ?? [], profile, isOwner);
+  const items = visibleNav(inSettings ? SETTINGS_NAV : (nav ?? current?.nav ?? []), profile, isOwner);
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[16.5rem_1fr]">
       <aside className="hidden flex-col border-line bg-pine text-ink md:sticky md:top-0 md:flex md:h-screen md:border-r">
         <div className="px-3 py-4">
-          <PulseSwitcher profile={profile} heading={heading} currentId={inWorkspace ? "workspace" : current?.id} showLogistics={showLogistics} />
+          <PulseSwitcher profile={profile} heading={heading} currentId={current?.id} showLogistics={showLogistics} />
         </div>
         <SideNav items={items} counts={counts} />
         <div className="mt-auto border-t border-line px-3 py-3">
-          <UserMenu profile={profile} placement="up" />
+          <SettingsLink />
+          <UserMenu profile={profile} placement="up" fieldEngineer={fieldEngineer} />
         </div>
       </aside>
       <div className="min-w-0">
@@ -64,8 +67,9 @@ export function AppShell({
             counts={counts}
             title={heading}
             profile={profile}
-            currentId={inWorkspace ? "workspace" : current?.id}
+            currentId={current?.id}
             showLogistics={showLogistics}
+            fieldEngineer={fieldEngineer}
           />
           <p className="mr-auto text-sm font-semibold md:hidden">{heading}</p>
           <div className="ml-auto flex items-center gap-2">
@@ -90,12 +94,7 @@ function PulseSwitcher({
   currentId?: string;
   showLogistics?: boolean;
 }) {
-  const choices = pulseModules.filter((module) => {
-    if (module.id === "logistics" && !showLogistics) return false;
-    const level = profile.levels?.[module.id as keyof NonNullable<Profile["levels"]>];
-    if (level === "none") return false;
-    return true;
-  });
+  const choices = switcherModules(pulseModules, profile, showLogistics);
   return (
     <Popover>
       <PopoverTrigger className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-left outline-none hover:bg-ink/5 focus-visible:ring-3 focus-visible:ring-ring/50">
@@ -109,47 +108,22 @@ function PulseSwitcher({
         <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Switch Pulse</p>
         <ul>
           {choices.map((module) => {
-            const soon = module.status === "coming-soon";
             const active = module.id === currentId;
-            const body = (
-              <>
-                <ModuleGlyph name={module.icon} className="size-4" />
-                <span className="min-w-0 flex-1 truncate">{pulseLabel(module)}</span>
-                {soon ? <span className="text-[11px] uppercase tracking-wide text-grey">Soon</span> : null}
-              </>
-            );
             return (
               <li key={module.id}>
-                {soon ? (
-                  <span className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-grey">{body}</span>
-                ) : (
-                  <Link
-                    href={module.href}
-                    className={cn(
-                      "flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                      active ? "bg-red text-white" : "text-ink hover:bg-muted",
-                    )}
-                  >
-                    {body}
-                  </Link>
-                )}
+                <Link
+                  href={module.href}
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    active ? "bg-red text-white" : "text-ink hover:bg-muted",
+                  )}
+                >
+                  <ModuleGlyph name={module.icon} className="size-4" />
+                  <span className="min-w-0 flex-1 truncate">{pulseLabel(module)}</span>
+                </Link>
               </li>
             );
           })}
-          {canManageWorkspace(profile) ? (
-            <li>
-              <Link
-                href="/workspace"
-                className={cn(
-                  "flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  currentId === "workspace" ? "bg-red text-white" : "text-ink hover:bg-muted",
-                )}
-              >
-                <span className="size-4" aria-hidden="true" />
-                Workspace
-              </Link>
-            </li>
-          ) : null}
         </ul>
       </PopoverContent>
     </Popover>
@@ -163,6 +137,7 @@ export function MobileNav({
   profile,
   currentId,
   showLogistics = false,
+  fieldEngineer = false,
 }: {
   items: ModuleNavItem[];
   counts: { pending: number; unread: number };
@@ -170,6 +145,7 @@ export function MobileNav({
   profile: Profile;
   currentId?: string;
   showLogistics?: boolean;
+  fieldEngineer?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -203,10 +179,28 @@ export function MobileNav({
         </SheetHeader>
         <SideNav items={items} counts={counts} onNavigate={() => setOpen(false)} />
         <SheetFooter>
-          <UserMenu profile={profile} />
+          <SettingsLink />
+          <UserMenu profile={profile} fieldEngineer={fieldEngineer} />
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function SettingsLink() {
+  const path = usePathname();
+  const active = path.startsWith("/settings");
+  return (
+    <Link
+      href="/settings"
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "mb-2 flex min-h-11 items-center rounded-2xl px-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        active ? "bg-red text-white" : "text-ink hover:bg-ink/5",
+      )}
+    >
+      Settings
+    </Link>
   );
 }
 

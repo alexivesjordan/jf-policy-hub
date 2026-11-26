@@ -33,7 +33,7 @@ async function Signature() {
     <FieldFrame title="Signature" back={{ href: "/field", label: "Jobs" }}>
       <p className="mb-4 text-base">Draw it once. It is ready on your jobs.</p>
       <SignatureForm existingUrl={existing?.url ?? null} />
-      <Link href="/account/name" className="mt-6 inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
+      <Link href="/settings/account/profile" className="mt-6 inline-flex min-h-12 items-center text-base font-semibold underline decoration-red">
         Your name
       </Link>
     </FieldFrame>

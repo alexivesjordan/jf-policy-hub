@@ -60,14 +60,14 @@ export async function saveWorkspaceTeam(formData: FormData) {
     p_name: clean(formData.get("name")),
   });
   if (error) throw new Error(messageFromError(error, "Could not save that team."));
-  revalidatePath("/workspace/teams");
+  revalidatePath("/settings/workspace/teams");
 }
 
 export async function deleteWorkspaceTeam(formData: FormData) {
   await requireWorkspaceAdmin();
   const supabase = await createClient();
   await supabase.rpc("workspace_delete_team", { p_id: clean(formData.get("teamId")) });
-  revalidatePath("/workspace/teams");
+  revalidatePath("/settings/workspace/teams");
 }
 
 export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: FormData): Promise<WorkspaceFormState> {
@@ -114,7 +114,7 @@ export async function saveWorkspaceUser(_prev: WorkspaceFormState, formData: For
       return { message: messageFromError(linked.error, "Could not link that engineer.") };
     }
   }
-  revalidatePath("/workspace/users");
+  revalidatePath("/settings/workspace/users");
   return null;
 }
 
@@ -168,7 +168,7 @@ export async function inviteWorkspaceUser(_prev: WorkspaceFormState, formData: F
       return { message: "Their access is saved, but the invite email was not sent. Try again in a moment." };
     }
   }
-  revalidatePath("/workspace/users");
+  revalidatePath("/settings/workspace/users");
   return null;
 }
 
@@ -215,7 +215,7 @@ export async function deleteWorkspaceUser(_prev: WorkspaceFormState, formData: F
     const banned = await service.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
     if (banned.error) return { message: "They are removed from Pulse, but the sign-in ban did not save. Try again in a moment." };
   }
-  revalidatePath("/workspace/users");
+  revalidatePath("/settings/workspace/users");
   return { message: mode === "hard" ? "User deleted." : "User deleted. Their name stays on past records." };
 }
 

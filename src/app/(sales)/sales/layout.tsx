@@ -75,7 +75,7 @@ async function SalesShell({ children }: { children: React.ReactNode }) {
   }
   const nav = (pulseModules.find((module) => module.id === "sales")?.nav ?? []).filter((item) => !item.ownerOnly || isOwner);
   return (
-    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer}>
+    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={nav} notifications={notifications} showLogistics={canUseLogistics(profile) && !engineer} fieldEngineer={engineer}>
       {children}
     </AppShell>
   );
