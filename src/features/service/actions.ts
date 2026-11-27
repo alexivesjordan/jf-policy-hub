@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { loadCin7ServicePrefill } from "@/lib/cin7/client";
 import { cin7IsConnected } from "@/lib/cin7/client";
 import { commitServiceVisit } from "@/features/service/commit-sheet";
+import type { RouteStopRow } from "@/features/service/queries";
 import { getCurrentProfile } from "@/lib/auth";
 import { messageFromError } from "@/lib/errors";
 import type { StorageTicket } from "@/lib/installs/upload-ticket";
@@ -26,6 +27,8 @@ function fromRpc(error: { message?: string; details?: string } | null, fallback:
 function refresh(id?: string) {
   revalidatePath("/service");
   revalidatePath("/service/day");
+  revalidatePath("/service/routes");
+  revalidatePath("/service/plans");
   if (id) {
     revalidatePath(`/service/visits/${id}`);
     revalidatePath(`/service/day/${id}`);
@@ -190,7 +193,78 @@ export async function submitServiceVisit(formData: FormData): Promise<ServiceAct
     return { ok: true, message: result.message };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save the job sheet.";
-    if (message.includes("already in")) return { ok: true, message: "This job sheet is already in." };
+    if (message.includes("already in")) {
+      const supabase = await createClient();
+      const rolled = await supabase.rpc("svc_advance_plan", { p_visit: visitId });
+      if (rolled.error) return { ok: false, message: messageFromError(rolled.error, "The maintenance date could not be moved.") };
+      refresh(visitId);
+      return { ok: true, message: "This job sheet is already in." };
+    }
     return { ok: false, message };
   }
+}
+
+export async function saveServiceRoute(resourceId: string, day: string, visitIds: string[]): Promise<ServiceActionResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || visitIds.length === 0) {
+    return { ok: false, message: "Choose an engineer and a date." };
+  }
+  const supabase = await createClient();
+  const saved = await supabase.rpc("svc_set_route", {
+    p_resource: resourceId,
+    p_day: day,
+    p_visits: visitIds,
+  });
+  if (saved.error) return { ok: false, message: messageFromError(saved.error, "That route could not be saved.") };
+  refresh();
+  return { ok: true, message: "Saved." };
+}
+
+export async function fillRoutePoints(stops: RouteStopRow[]): Promise<RouteStopRow[]> {
+  const supabase = await createClient();
+  const pending = new Map<string, Promise<{ latitude: number; longitude: number } | null>>();
+  for (const stop of stops) {
+    if (stop.latitude != null && stop.longitude != null) continue;
+    if (pending.has(stop.siteId)) continue;
+    pending.set(stop.siteId, geocodeUkPostcode(stop.postcode));
+  }
+  const found = new Map<string, { latitude: number; longitude: number }>();
+  await Promise.all([...pending.entries()].map(async ([siteId, lookup]) => {
+    const coords = await lookup;
+    if (!coords) return;
+    const saved = await supabase.rpc("svc_set_site_point", {
+      p_site: siteId,
+      p_lat: coords.latitude,
+      p_lng: coords.longitude,
+    });
+    if (!saved.error) found.set(siteId, coords);
+  }));
+  return stops.map((stop) => {
+    if (stop.latitude != null && stop.longitude != null) return stop;
+    const coords = found.get(stop.siteId);
+    if (!coords) return stop;
+    return { ...stop, latitude: coords.latitude, longitude: coords.longitude };
+  });
+}
+
+export async function createMaintenancePlan(installId: string, startsOn: string, nextDueOn: string): Promise<ServiceActionResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(nextDueOn)) {
+    return { ok: false, message: "Check the plan dates." };
+  }
+  const supabase = await createClient();
+  const created = await supabase.rpc("svc_create_plan", {
+    p_install: installId,
+    p_starts_on: startsOn,
+    p_next_due_on: nextDueOn,
+  });
+  if (created.error || !created.data) return { ok: false, message: messageFromError(created.error, "That plan could not be created.") };
+  refresh();
+  return { ok: true, id: String(created.data), message: "Saved." };
+}
+
+export async function setMaintenancePlanStatus(planId: string, status: "active" | "paused" | "ended"): Promise<ServiceActionResult> {
+  const supabase = await createClient();
+  const saved = await supabase.rpc("svc_set_plan_status", { p_plan: planId, p_status: status });
+  if (saved.error) return { ok: false, message: messageFromError(saved.error, "That plan could not be updated.") };
+  refresh();
+  return { ok: true, message: "Saved." };
 }

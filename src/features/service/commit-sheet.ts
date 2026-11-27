@@ -121,6 +121,8 @@ export async function commitServiceVisit(input: {
     p_photo_ids: photoIds,
   });
   if (committed.error) throw new Error(messageFromError(committed.error as RpcError, "Could not save the job sheet."));
+  const rolled = await supabase.rpc("svc_advance_plan", { p_visit: input.visitId });
+  if (rolled.error) throw new Error(messageFromError(rolled.error as RpcError, "The maintenance date could not be moved."));
   const saved = (committed.data ?? {}) as { contactEmail?: string | null; customerName?: string; orderNumber?: string };
   const orderNumber = saved.orderNumber || sheet.orderNo || "service visit";
   const customerName = saved.customerName || sheet.customerName;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newVisitHref, visitFormInstanceKey } from "@/lib/service/form-key";
+import { newVisitHref, planVisitHref, visitFormInstanceKey } from "@/lib/service/form-key";
 
 describe("new visit form", () => {
   it("opens a blank form for each new visit and keeps an existing visit on its own key", () => {
@@ -12,5 +12,9 @@ describe("new visit form", () => {
     expect(newVisitHref("2026-12-11", "draft-a")).not.toBe(newVisitHref("2026-12-11", "draft-b"));
     expect(newVisitHref("2026-12-11", "draft-a")).toBe("/service/visits/new?on=2026-12-11&draft=draft-a");
     expect(newVisitHref("2026-12-11", "draft-a", saved)).not.toContain(`/visits/${saved}`);
+    expect(newVisitHref("2026-12-11", "draft-a")).not.toContain("plan=");
+    expect(planVisitHref(saved, "2026-07-31", "draft-a")).toBe(
+      `/service/visits/new?on=2026-07-31&plan=${saved}&draft=draft-a`,
+    );
   });
 });

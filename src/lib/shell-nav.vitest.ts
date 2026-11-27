@@ -59,6 +59,12 @@ describe("module nav", () => {
     expect(navItemActive(children[0]!.href, "/logistics/commercial-invoices", children[0]!.exact)).toBe(true);
   });
 
+  it("adds Routes and Plans to Service", () => {
+    const service = visibleNav(pulseModules.find((module) => module.id === "service")?.nav ?? [], profile, false);
+    expect(service.map((item) => item.label)).toEqual(["Board", "My day", "Routes", "Plans"]);
+    expect(service.map((item) => item.href)).toEqual(["/service", "/service/day", "/service/routes", "/service/plans"]);
+  });
+
   it("keeps Quotes as a parent over the existing quote pages", () => {
     const sales = visibleNav(pulseModules.find((module) => module.id === "sales")?.nav ?? [], profile, false);
     expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Radar", "Quotes"]);

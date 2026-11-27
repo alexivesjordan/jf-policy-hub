@@ -12,3 +12,11 @@ export function newVisitHref(day: string, draft: string, personId?: string) {
   params.set("draft", draft);
   return `/service/visits/new?${params.toString()}`;
 }
+
+export function planVisitHref(planId: string, day: string, draft: string) {
+  const params = new URLSearchParams();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) params.set("on", day);
+  params.set("plan", planId);
+  params.set("draft", draft);
+  return `/service/visits/new?${params.toString()}`;
+}

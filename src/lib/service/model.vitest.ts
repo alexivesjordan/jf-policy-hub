@@ -33,10 +33,20 @@ describe("service visit draft", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.payload.postcode).toBe("PE30 4JJ");
+    expect(parsed.payload.maintenancePlanId).toBeUndefined();
     expect(parsed.payload.durationMinutes).toBe(90);
     expect(parsed.payload.lines).toEqual([
       { kind: "work", sku: "JF-1", serial: "SN1", fault: "Belt", parts: "Belt kit", description: "" },
     ]);
+  });
+
+  it("passes a maintenance plan through and rejects a bad id", () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+    const parsed = parseVisitDraft(draft({ maintenancePlanId: id }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.payload.maintenancePlanId).toBe(id);
+    expect(parseVisitDraft(draft({ maintenancePlanId: "nope" })).ok).toBe(false);
   });
 
   it("rejects a half-filled time window and swap lines on a repair", () => {

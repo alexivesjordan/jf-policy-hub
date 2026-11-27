@@ -63,6 +63,8 @@ export const pulseModules: PulseModule[] = [
     nav: [
       { href: "/service", label: "Board", exact: true },
       { href: "/service/day", label: "My day" },
+      { href: "/service/routes", label: "Routes" },
+      { href: "/service/plans", label: "Plans" },
     ],
   },
   {
