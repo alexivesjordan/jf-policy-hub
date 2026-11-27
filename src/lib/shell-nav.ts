@@ -13,6 +13,7 @@ export const ENGINEER_NAV: ModuleNavItem[] = [
 const EXACT_NAV = new Set(["/dashboard", "/operations", "/sales", "/workspace", "/people", "/field", "/service"]);
 
 export function navItemActive(href: string, path: string, exact = false) {
+  if (href === "/service/day" && path.startsWith("/service/job/")) return true;
   if (exact || EXACT_NAV.has(href)) return path === href;
   return path === href || path.startsWith(`${href}/`);
 }

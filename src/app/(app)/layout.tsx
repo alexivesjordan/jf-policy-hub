@@ -9,6 +9,7 @@ import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { listMyNotifications, pendingCount, unreadCount } from "@/features/policies/queries";
+import { destinationForVisitLink, visitAudience } from "@/lib/service/visit-route";
 
 export const instant = false;
 
@@ -52,7 +53,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
       source: item.kind === "radar" ? "sales" as const : "people" as const,
       title: item.title,
       body: item.body,
-      href: item.link,
+      href: destinationForVisitLink(visitAudience(engineer ? "engineer" : "office"), item.link),
       read: Boolean(item.read_at),
       createdAt: item.created_at,
     })),
@@ -61,7 +62,7 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
       source: "operations" as const,
       title: item.title,
       body: item.body,
-      href: item.link,
+      href: destinationForVisitLink(visitAudience(engineer ? "engineer" : "office"), item.link),
       read: Boolean(item.read_at),
       createdAt: item.created_at,
     })),

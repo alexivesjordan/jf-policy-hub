@@ -7,6 +7,7 @@ import { UnavailabilityForm } from "@/components/calendar-forms";
 import { PageHeader } from "@/components/pulse/page-header";
 import { PageSkeleton } from "@/components/pulse/states";
 import { loadSchedule } from "@/features/operations/office-pulse";
+import { scheduleEventClass } from "@/lib/operations/schedule-events";
 import { requireOperationsUser } from "@/lib/auth";
 import { oneParam } from "@/lib/utils";
 
@@ -80,7 +81,7 @@ async function Schedule({
                     <td key={key} className="px-2 py-2">
                       <ul className="space-y-1">
                         {events.map((event, index) => (
-                          <li key={`${event.kind}-${event.label}-${index}`} className={event.kind === "absence" ? "text-red" : ""}>
+                          <li key={`${event.kind}-${event.label}-${index}`} className={scheduleEventClass(event.kind)}>
                             {event.href ? <Link className="underline" href={event.href}>{event.label}</Link> : <span>{event.label.replaceAll("_", " ")}</span>}
                           </li>
                         ))}
