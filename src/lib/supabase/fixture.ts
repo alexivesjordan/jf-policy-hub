@@ -521,6 +521,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       vans: [{ id: "van-1", registration: "AB12 CDE", makeModel: "Ford Transit" }],
       events: [
         { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "job", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
+        { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "service", label: "Service 09:00 · Riverside Gym", href: "/service/visits/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1" },
         { rowKind: "engineer", rowId: "f3000000-0000-4000-8000-000000000001", day: from, kind: "absence", label: "leave", href: null },
         { rowKind: "van", rowId: "van-1", day: from, kind: "booking", label: "EXAMPLE-00490", href: "/operations/installs/11111111-1111-4111-8111-1111111111a1" },
       ],

@@ -29,6 +29,8 @@ function refresh(id?: string) {
   if (id) {
     revalidatePath(`/service/visits/${id}`);
     revalidatePath(`/service/day/${id}`);
+    revalidatePath(`/service/job/${id}`);
+    revalidatePath("/operations/schedule");
   }
 }
 

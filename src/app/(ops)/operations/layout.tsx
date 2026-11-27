@@ -13,6 +13,7 @@ import { PageSkeleton } from "@/components/pulse/states";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { ENGINEER_NAV } from "@/lib/shell-nav";
+import { destinationForVisitLink, visitAudience } from "@/lib/service/visit-route";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
@@ -65,7 +66,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
         source: item.kind === "radar" ? "sales" as const : "people" as const,
         title: item.title,
         body: item.body,
-        href: item.link,
+        href: destinationForVisitLink(visitAudience(role), item.link),
         read: Boolean(item.read_at),
         createdAt: item.created_at,
       })),
@@ -74,7 +75,7 @@ async function OperationsShell({ children }: { children: React.ReactNode }) {
         source: "operations" as const,
         title: item.title,
         body: item.body,
-        href: item.link,
+        href: destinationForVisitLink(visitAudience(role), item.link),
         read: Boolean(item.read_at),
         createdAt: item.created_at,
       })),

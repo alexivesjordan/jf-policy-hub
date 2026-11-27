@@ -10,6 +10,7 @@ import { ServiceSheetNote } from "@/components/service/sheet-note";
 import { Button, TextArea } from "@/components/pulse/ui";
 import { navigationLinks } from "@/lib/maps/navigation";
 import { formatAddress, mailHref, telHref, visitStatusLabel, visitTypeLabel, VISIT_STATUSES } from "@/lib/service/model";
+import { engineerJobPath } from "@/lib/service/visit-route";
 
 export function MyDayList({ dayLabel, stops }: { dayLabel: string; stops: ServiceVisit[] }) {
   return (
@@ -39,7 +40,7 @@ export function MyDayList({ dayLabel, stops }: { dayLabel: string; stops: Servic
                   <a className="inline-flex min-h-11 items-center font-semibold underline" href={links.google}>Google Maps</a>
                 </p>
               ) : null}
-              <Link href={`/service/day/${stop.id}`} className="mt-3 inline-flex min-h-12 items-center text-base font-semibold text-red">Open</Link>
+              <Link href={engineerJobPath(stop.id)} className="mt-3 inline-flex min-h-12 items-center text-base font-semibold text-red">Open</Link>
             </li>
           );
         })}

@@ -1,12 +1,15 @@
 import { Suspense, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import type { BellItem } from "@/components/notification-bell";
 import { fieldRole } from "@/features/field/queries";
-import { getOfficeContext } from "@/features/operations/queries";
+import { getOfficeContext, listPulseNotifications } from "@/features/operations/queries";
+import { listMyNotifications } from "@/features/policies/queries";
 import { canUseOperations, canUseSales } from "@/lib/access";
 import { getCurrentProfile } from "@/lib/auth";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 import { ownerTwoStepNotice } from "@/lib/owner-two-step-notice";
 import { ENGINEER_NAV, visibleNav } from "@/lib/shell-nav";
+import { destinationForVisitLink, visitAudience } from "@/lib/service/visit-route";
 import { pulseModules } from "@/modules/registry";
 
 export const instant = false;
@@ -40,14 +43,47 @@ async function FieldShell({ children }: { children: ReactNode }) {
   } catch {
     role = "none";
   }
+  const audience = visitAudience(role);
   let isOwner = profile.workspace_role === "owner";
+  let notifications: BellItem[] = [];
   try {
     isOwner = (await getOfficeContext()).is_owner;
   } catch {
     isOwner = profile.workspace_role === "owner";
   }
+  try {
+    const [operations, people] = await Promise.all([
+      listPulseNotifications(false).catch(() => []),
+      listMyNotifications(),
+    ]);
+    notifications = [
+      ...people.map((item) => ({
+        id: item.id,
+        source: item.kind === "radar" ? "sales" as const : "people" as const,
+        title: item.title,
+        body: item.body,
+        href: destinationForVisitLink(audience, item.link),
+        read: Boolean(item.read_at),
+        createdAt: item.created_at,
+      })),
+      ...operations.map((item) => ({
+        id: item.id,
+        source: "operations" as const,
+        title: item.title,
+        body: item.body,
+        href: destinationForVisitLink(audience, item.link),
+        read: Boolean(item.read_at),
+        createdAt: item.created_at,
+      })),
+    ]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 20)
+      .map((item) => ({ id: item.id, source: item.source, title: item.title, body: item.body, href: item.href, read: item.read }));
+  } catch {
+    notifications = [];
+  }
   return (
-    <AppShell profile={profile} pending={0} unread={0} isOwner={isOwner} nav={navForField(profile, role, isOwner)} fieldEngineer={role === "engineer"} ownerNotice={await ownerTwoStepNotice()}>
+    <AppShell profile={profile} pending={0} unread={notifications.filter((item) => !item.read).length} isOwner={isOwner} nav={navForField(profile, role, isOwner)} notifications={notifications} fieldEngineer={role === "engineer"} ownerNotice={await ownerTwoStepNotice()}>
       {children}
     </AppShell>
   );

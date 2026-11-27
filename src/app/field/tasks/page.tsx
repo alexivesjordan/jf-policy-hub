@@ -2,10 +2,12 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { FieldFrame } from "@/components/field/frame";
+import { fieldRole } from "@/features/field/queries";
 import { listPulseTasks } from "@/features/operations/queries";
 import { getCurrentProfile } from "@/lib/auth";
 import Link from "next/link";
 import { formatDate, formatTimestamp } from "@/lib/format";
+import { serviceVisitHref, visitAudience } from "@/lib/service/visit-route";
 import { isFixtureMode, isSupabaseConfigured } from "@/lib/env";
 
 export const metadata = { title: "My tasks" };
@@ -27,6 +29,12 @@ async function Tasks() {
   if (!profile) redirect("/login?next=/field/tasks");
   if (!profile.access_granted) redirect("/no-access");
   if (!profile.is_active) redirect("/account-inactive");
+  let audience: "engineer" | "office" = "engineer";
+  try {
+    audience = visitAudience(await fieldRole());
+  } catch {
+    audience = "engineer";
+  }
   const tasks = await listPulseTasks().catch(() => []);
   const mine = tasks.filter((task) => task.assignee_id === profile.id && task.status !== "done" && task.status !== "cancelled");
   return (
@@ -40,6 +48,9 @@ async function Tasks() {
               <p className="mt-2 text-xs text-grey">{task.status.replaceAll("_", " ")}{task.due_at ? ` · due ${formatDate(task.due_at)}` : ""} · {formatTimestamp(task.created_at)}</p>
               {task.entity_table === "installs" && task.entity_id ? (
                 <Link href={`/field/${task.entity_id}`} className="mt-2 inline-flex min-h-12 items-center font-semibold underline decoration-red">Open the job</Link>
+              ) : null}
+              {task.entity_table === "service_visits" && task.entity_id ? (
+                <Link href={serviceVisitHref(audience, task.entity_id)} className="mt-2 inline-flex min-h-12 items-center font-semibold underline decoration-red">Open the job</Link>
               ) : null}
             </li>
           ))}
