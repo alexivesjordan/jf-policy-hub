@@ -226,15 +226,21 @@ class SheetPdf {
 
 export async function buildVisitPdf(input: VisitPdfInput) {
   const sheet = input.sheet;
-  const pdf = await SheetPdf.create(`Installation / Service Form ${sheet.orderNo || sheet.jobNo || ""}`.trim(), sheet.customerName || "Jordan Fitness");
+  const serviceVisit = sheet.visitType === "service";
+  const pdf = await SheetPdf.create(
+    serviceVisit
+      ? `Service visit ${sheet.orderNo || sheet.jobNo || ""}`.trim()
+      : `Installation / Service Form ${sheet.orderNo || sheet.jobNo || ""}`.trim(),
+    sheet.customerName || "Jordan Fitness",
+  );
   pdf.text("JORDAN FITNESS", { bold: true, size: 13, color: RED });
-  pdf.text("INSTALLATION / SERVICE FORM", { bold: true, size: 12 });
+  pdf.text(serviceVisit ? "SERVICE VISIT" : "INSTALLATION / SERVICE FORM", { bold: true, size: 12 });
   pdf.gap(2);
   pdf.text("Jordan HQ, 56 Oldmedow Road, Hardwick Industrial Estate, King's Lynn, PE30 4PP", { size: 8, color: GREY });
   pdf.text("+44 (0)1553 763285    sales@jordanfitness.co.uk    www.jordanfitness.com", { size: 8, color: GREY });
   pdf.gap(8);
   pdf.grid([
-    ["Visit type", sheet.visitType === "service" ? "Service" : "Install"],
+    ["Visit type", serviceVisit ? "Service visit" : "Install"],
     ["Date", sheet.sheetOn || "-"],
     ["Contact", sheet.contactName || "-"],
     ["Order no.", sheet.orderNo || "-"],
@@ -276,10 +282,12 @@ export async function buildVisitPdf(input: VisitPdfInput) {
   else {
     pdf.grid(parts.map((part) => [`${part.code || "-"} · ${part.description || "-"}`, `Qty ${part.qty || "1"}`]), 1);
   }
-  pdf.heading("Risk assessment");
-  if (input.riskLines.length === 0) pdf.box("Not recorded.");
-  else pdf.grid(input.riskLines.map((row) => [row.label, row.answer || "-"]), 1);
-  if (input.riskNotes.trim()) pdf.grid([["Notes", input.riskNotes.trim()]], 1);
+  if (!serviceVisit) {
+    pdf.heading("Risk assessment");
+    if (input.riskLines.length === 0) pdf.box("Not recorded.");
+    else pdf.grid(input.riskLines.map((row) => [row.label, row.answer || "-"]), 1);
+    if (input.riskNotes.trim()) pdf.grid([["Notes", input.riskNotes.trim()]], 1);
+  }
   await pdf.signatures({
     date: sheet.sheetOn || "-",
     vehicle: sheet.vehicleReg || "-",

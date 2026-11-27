@@ -116,6 +116,14 @@ describe("job sheet save matches the form", () => {
     expect(Object.keys(answers).filter((key) => key !== "notes").sort()).toEqual([...RISK_ITEMS.map((item) => item.key)].sort());
   });
 
+  it("keeps the install risk gate and leaves it off the service sheet", () => {
+    expect(latestFunction("install_save_visit_sheet")).toContain("assert_visit_started");
+    const service = latestFunction("service_save_visit_sheet");
+    expect(service).not.toContain("assert_visit_started");
+    expect(service).toContain("service_visit_id");
+    expect(service).toContain("'service'");
+  });
+
   it("leaves the removed questions out of the PDF pack", async () => {
     const text = await pdfBytesToLayoutText(await buildVisitPdf({ sheet, riskLines: RISK_ITEMS.map((item) => ({ label: item.label, answer: "Yes" })), riskNotes: "" }));
     expect(text).toContain("All kit installed as ordered");

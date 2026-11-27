@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { compressImageFile } from "@/lib/installs/compress-image";
 import { putSignedUpload } from "@/lib/installs/browser-upload";
-import { issuePhotoUpload, registerPhotoUpload } from "@/features/field/actions";
+import { issuePhotoUpload, registerPhotoUpload, type FieldResult } from "@/features/field/actions";
 
 export type StoredPhoto = { id: string; url: string };
 
@@ -16,6 +16,8 @@ export function PhotoPicker({
   max = 8,
   label,
   onBusy,
+  issue = issuePhotoUpload,
+  register = registerPhotoUpload,
 }: {
   installId: string;
   token: string | null;
@@ -25,6 +27,8 @@ export function PhotoPicker({
   max?: number;
   label: string;
   onBusy?: (busy: boolean) => void;
+  issue?: (id: string, token: string | null, mimeType: string, byteSize: number, kind: string) => Promise<FieldResult>;
+  register?: (id: string, token: string | null, path: string, kind: string) => Promise<FieldResult>;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -39,10 +43,10 @@ export function PhotoPicker({
       for (const file of Array.from(list)) {
         if (next.length >= max) break;
         const compressed = await compressImageFile(file);
-        const issued = await issuePhotoUpload(installId, token, compressed.type, compressed.size, kind);
+        const issued = await issue(installId, token, compressed.type, compressed.size, kind);
         if (!issued.ok || !issued.ticket) throw new Error(issued.message);
         await putSignedUpload(issued.ticket, compressed, compressed.type || "image/jpeg");
-        const registered = await registerPhotoUpload(installId, token, issued.ticket.path, kind);
+        const registered = await register(installId, token, issued.ticket.path, kind);
         if (!registered.ok || !registered.fileId) throw new Error(registered.message);
         next.push({ id: registered.fileId, url: URL.createObjectURL(compressed) });
       }

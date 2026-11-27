@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { PhotoPicker, type StoredPhoto } from "@/components/field/photo-picker";
 import { SignaturePad } from "@/components/field/signature-pad";
 import { Choice, YesNo } from "@/components/field/yes-no";
 import { Input, TextArea } from "@/components/pulse/ui";
-import { createSubcontractorLink, saveVisitRisk, submitVisit } from "@/features/field/actions";
+import { createSubcontractorLink, issuePhotoUpload, registerPhotoUpload, saveVisitRisk, submitVisit } from "@/features/field/actions";
+import { issueServicePhotoUpload, registerServicePhotoUpload, submitServiceVisit } from "@/features/service/actions";
 import { orderKitLines } from "@/lib/installs/kit-lines";
 import { FORM_NOTICES, INSTALL_CHECKS, RISK_ITEMS, blankPart, emptyRisk, jobSheetCompleteLine, kitProblem, vehicleChoiceProblem, type KitFulfilment, type OrderLineView, type RiskAnswers, type SheetDraft } from "@/lib/installs/visit-form";
 import { Select } from "@/components/pulse/ui";
@@ -28,13 +30,16 @@ export type VisitScreen = {
   engineerName: string;
   signatureUrl: string | null;
   signatureFileId: string | null;
+  /** Service visits use this sheet and skip the risk step. Installs leave this unset. */
+  record?: "install" | "service";
 };
 
 const steps = ["Risk", "Sheet", "Photos", "Sign"];
 
 function draftFrom(screen: VisitScreen): SheetDraft {
+  const serviceVisit = screen.record === "service";
   return {
-    visitType: "install",
+    visitType: serviceVisit ? "service" : "install",
     sheetOn: screen.startOn || "",
     returnedOn: "",
     contactName: screen.contactName,
@@ -46,9 +51,9 @@ function draftFrom(screen: VisitScreen): SheetDraft {
     timeOn: "",
     timeOff: "",
     parkingFee: "",
-    service: false,
+    service: serviceVisit,
     delivery: false,
-    installation: true,
+    installation: !serviceVisit,
     warranty: false,
     kitAsOrdered: false,
     kitNotes: "",
@@ -74,7 +79,9 @@ function draftFrom(screen: VisitScreen): SheetDraft {
 }
 
 export function VisitFlow({ screen }: { screen: VisitScreen }) {
-  const [step, setStep] = useState(screen.risk ? 1 : 0);
+  const router = useRouter();
+  const serviceVisit = screen.record === "service";
+  const [step, setStep] = useState(serviceVisit || screen.risk ? 1 : 0);
   const [risk, setRisk] = useState<RiskAnswers>(screen.risk ?? emptyRisk());
   const [concerns, setConcerns] = useState<StoredPhoto[]>([]);
   const [sheet, setSheet] = useState<SheetDraft>(() => draftFrom(screen));
@@ -128,11 +135,14 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
     else if (screen.signatureFileId) body.set("engineerSignatureFileId", screen.signatureFileId);
     if (customerBlob) body.set("customerSignature", new File([customerBlob], "customer.png", { type: "image/png" }));
     if (keepSignature) body.set("saveSignature", "yes");
-    const result = await submitVisit(body);
+    const result = serviceVisit ? await submitServiceVisit(body) : await submitVisit(body);
     setPending(false);
     setOk(result.ok);
     setMessage(result.message);
-    if (result.ok) setDone(true);
+    if (result.ok) {
+      setDone(true);
+      if (serviceVisit) router.refresh();
+    }
   }
 
   if (done) {
@@ -151,21 +161,24 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
         {screen.customerName}
         {screen.siteAddress ? ` · ${screen.siteAddress}` : ""}
       </p>
-      <ol className="grid grid-cols-4 gap-2">
-        {steps.map((label, index) => (
-          <li key={label}>
-            <button
-              type="button"
-              className={`min-h-12 w-full rounded-2xl border text-sm font-semibold ${index === step ? "border-red bg-red text-white" : "border-line bg-card text-ink"}`}
-              onClick={() => {
-                if (photosBusy && index === 3) return;
-                if (index === 0 || screen.risk || risk.accessClear != null) setStep(index);
-              }}
-            >
-              {label}
-            </button>
-          </li>
-        ))}
+      <ol className={`grid gap-2 ${serviceVisit ? "grid-cols-3" : "grid-cols-4"}`}>
+        {(serviceVisit ? steps.slice(1) : steps).map((label, index) => {
+          const target = serviceVisit ? index + 1 : index;
+          return (
+            <li key={label}>
+              <button
+                type="button"
+                className={`min-h-12 w-full rounded-2xl border text-sm font-semibold ${target === step ? "border-red bg-red text-white" : "border-line bg-card text-ink"}`}
+                onClick={() => {
+                  if (photosBusy && target === 3) return;
+                  if (serviceVisit || index === 0 || screen.risk || risk.accessClear != null) setStep(target);
+                }}
+              >
+                {label}
+              </button>
+            </li>
+          );
+        })}
       </ol>
       {message ? <p className={`text-sm font-semibold ${ok ? "text-ink" : "text-red"}`}>{message}</p> : null}
       {step === 0 ? (
@@ -184,11 +197,21 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
           </button>
         </section>
       ) : null}
-      {step === 1 ? <SheetStep sheet={sheet} patch={patch} onNext={() => setStep(2)} /> : null}
+      {step === 1 ? <SheetStep sheet={sheet} patch={patch} onNext={() => setStep(2)} lockService={serviceVisit} /> : null}
       {step === 2 ? (
         <section className="space-y-4">
           <h2 className="font-display text-3xl">Equipment</h2>
-          <PhotoPicker installId={screen.installId} token={screen.token} kind="equipment" photos={photos} onChange={setPhotos} label="Add photos" onBusy={onUpload} />
+          <PhotoPicker
+            installId={screen.installId}
+            token={screen.token}
+            kind="equipment"
+            photos={photos}
+            onChange={setPhotos}
+            label="Add photos"
+            onBusy={onUpload}
+            issue={serviceVisit ? issueServicePhotoUpload : issuePhotoUpload}
+            register={serviceVisit ? registerServicePhotoUpload : registerPhotoUpload}
+          />
           {photosBusy ? <p className="text-sm font-semibold">Wait for the photo upload to finish.</p> : null}
           <button type="button" disabled={photosBusy} onClick={() => setStep(3)} className="min-h-14 w-full rounded-full bg-red text-base font-semibold text-white disabled:opacity-60">
             Signatures
@@ -251,7 +274,7 @@ export function VisitFlow({ screen }: { screen: VisitScreen }) {
   );
 }
 
-function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partial: Partial<SheetDraft>) => void; onNext: () => void }) {
+function SheetStep({ sheet, patch, onNext, lockService = false }: { sheet: SheetDraft; patch: (partial: Partial<SheetDraft>) => void; onNext: () => void; lockService?: boolean }) {
   function setPart(index: number, partial: Partial<SheetDraft["parts"][number]>) {
     patch({ parts: sheet.parts.map((part, item) => (item === index ? { ...part, ...partial } : part)) });
   }
@@ -263,10 +286,12 @@ function SheetStep({ sheet, patch, onNext }: { sheet: SheetDraft; patch: (partia
   return (
     <section className="space-y-4">
       <h2 className="font-display text-3xl">Job sheet</h2>
-      <div className="grid grid-cols-2 gap-2">
-        <Choice label="Install" selected={sheet.visitType === "install"} onClick={() => patch({ visitType: "install", installation: true, service: false })} />
-        <Choice label="Service" selected={sheet.visitType === "service"} onClick={() => patch({ visitType: "service", installation: false, service: true })} />
-      </div>
+      {lockService ? null : (
+        <div className="grid grid-cols-2 gap-2">
+          <Choice label="Install" selected={sheet.visitType === "install"} onClick={() => patch({ visitType: "install", installation: true, service: false })} />
+          <Choice label="Service" selected={sheet.visitType === "service"} onClick={() => patch({ visitType: "service", installation: false, service: true })} />
+        </div>
+      )}
       <Field label="Date"><Input type="date" value={sheet.sheetOn} onChange={(event) => patch({ sheetOn: event.target.value })} /></Field>
       <Field label="Date returned"><Input type="date" value={sheet.returnedOn} onChange={(event) => patch({ returnedOn: event.target.value })} /></Field>
       <Field label="Contact name"><Input value={sheet.contactName} onChange={(event) => patch({ contactName: event.target.value })} /></Field>

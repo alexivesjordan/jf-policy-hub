@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { addServicePhoto, setServiceProgress } from "@/features/service/actions";
+import { VisitFlow, type VisitScreen } from "@/components/field/visit-flow";
+import { setServiceProgress } from "@/features/service/actions";
 import type { ServiceVisit } from "@/features/service/queries";
+import { ServiceSheetNote } from "@/components/service/sheet-note";
 import { Button, TextArea } from "@/components/pulse/ui";
 import { navigationLinks } from "@/lib/maps/navigation";
 import { formatAddress, mailHref, telHref, visitStatusLabel, visitTypeLabel, VISIT_STATUSES } from "@/lib/service/model";
@@ -46,10 +48,17 @@ export function MyDayList({ dayLabel, stops }: { dayLabel: string; stops: Servic
   );
 }
 
-export function MyDayStop({ stop }: { stop: ServiceVisit }) {
+export function MyDayStop({
+  stop,
+  sheet,
+  flow,
+}: {
+  stop: ServiceVisit;
+  sheet: { submitted: boolean; pdfUrl: string | null } | null;
+  flow: VisitScreen | null;
+}) {
   const router = useRouter();
   const [status, setStatus] = useState(stop.status);
-  const [note, setNote] = useState(stop.completionNote);
   const [reason, setReason] = useState(stop.incompleteReason);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -61,32 +70,16 @@ export function MyDayStop({ stop }: { stop: ServiceVisit }) {
   const going = stop.lines.filter((line) => line.kind === "swap_out");
   const back = stop.lines.filter((line) => line.kind === "swap_back");
 
-  async function save(next = status) {
+  async function save(next: string) {
     setPending(true);
     setError(null);
-    const result = await setServiceProgress(stop.id, next, note, reason);
+    const result = await setServiceProgress(stop.id, next, reason);
     setPending(false);
     if (!result.ok) {
       setError(result.message);
       return;
     }
     setStatus(next);
-    router.refresh();
-  }
-
-  async function upload(list: FileList | null) {
-    const file = list?.[0];
-    if (!file) return;
-    setPending(true);
-    setError(null);
-    const body = new FormData();
-    body.set("photo", file);
-    const result = await addServicePhoto(stop.id, body);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
-    }
     router.refresh();
   }
 
@@ -126,39 +119,31 @@ export function MyDayStop({ stop }: { stop: ServiceVisit }) {
           </ul>
         </section>
       ) : null}
+      {stop.completionNote ? (
+        <section>
+          <h2 className="text-sm font-semibold">Earlier note</h2>
+          <p className="mt-2">{stop.completionNote}</p>
+        </section>
+      ) : null}
       {error ? <p className="text-sm font-semibold text-red">{error}</p> : null}
       <div className="grid grid-cols-2 gap-2">
-        {VISIT_STATUSES.map(([value, label]) => (
-          <Button key={value} type="button" variant={status === value ? "primary" : "secondary"} disabled={pending} onClick={() => void save(value)}>
+        {VISIT_STATUSES.filter(([value]) => value !== "done").map(([value, label]) => (
+          <Button key={value} type="button" variant={status === value ? "primary" : "secondary"} disabled={pending || Boolean(sheet?.submitted)} onClick={() => void save(value)}>
             {label}
           </Button>
         ))}
       </div>
-      {status === "incomplete" ? (
-        <label className="block space-y-1">
-          <span className="text-sm font-semibold">Reason</span>
-          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
-        </label>
+      {status === "incomplete" && !sheet?.submitted ? (
+        <div className="space-y-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-semibold">Reason</span>
+            <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          <Button type="button" disabled={pending} onClick={() => void save("incomplete")}>{pending ? "Saving" : "Save reason"}</Button>
+        </div>
       ) : null}
-      <label className="block space-y-1">
-        <span className="text-sm font-semibold">Completion note</span>
-        <TextArea value={note} onChange={(event) => setNote(event.target.value)} />
-      </label>
-      <Button type="button" disabled={pending} onClick={() => void save()}>{pending ? "Saving" : "Save"}</Button>
-      <label className="flex min-h-14 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-red bg-card px-4 text-base font-semibold">
-        Add photo
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          disabled={pending}
-          onChange={(event) => {
-            void upload(event.target.files);
-            event.target.value = "";
-          }}
-        />
-      </label>
+      <ServiceSheetNote sheet={sheet} />
+      {flow ? <VisitFlow screen={flow} /> : null}
       {stop.photos.length > 0 ? (
         <ul className="grid grid-cols-2 gap-2">
           {stop.photos.map((photo) => (

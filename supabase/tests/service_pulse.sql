@@ -29,6 +29,14 @@ declare
   v_err text;
   v_level text;
   v_clash uuid;
+  v_back_a uuid;
+  v_back_b uuid;
+  v_sheet jsonb;
+  v_eng_file uuid;
+  v_cust_file uuid;
+  v_pdf_file uuid;
+  v_photo_file uuid;
+  v_old_file uuid;
 begin
   perform set_config('orbit.profile_sync', 'on', true);
   insert into auth.users (
@@ -141,6 +149,50 @@ begin
     v_fail := v_fail + 1; v_notes := v_notes || ' stack ' || sqlerrm || ';';
   end;
 
+  if v_visit is distinct from v_second and v_second is not null then
+    v_ok := v_ok + 1;
+  else
+    v_fail := v_fail + 1; v_notes := v_notes || ' back to back same id;';
+  end if;
+
+  begin
+    v_back_a := public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'First Gym',
+      'addressLine1', '10 First Street',
+      'postcode', 'PE30 4AA',
+      'visitType', 'repair',
+      'visitOn', '2026-12-11',
+      'durationMinutes', 45,
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    v_back_b := public.service_visit_save(null, jsonb_build_object(
+      'customerName', 'Second Gym',
+      'addressLine1', '11 Second Street',
+      'postcode', 'PE30 4AB',
+      'visitType', 'service',
+      'visitOn', '2026-12-11',
+      'durationMinutes', 45,
+      'assigneeIds', jsonb_build_array(v_lewis)
+    ));
+    if v_back_a is distinct from v_back_b then
+      v_ok := v_ok + 1;
+    else
+      v_fail := v_fail + 1; v_notes := v_notes || ' pair same id;';
+    end if;
+  exception when others then
+    v_fail := v_fail + 1; v_notes := v_notes || ' pair ' || sqlerrm || ';';
+  end;
+
+  reset role;
+  select count(*) into v_count
+  from svc.visits v
+  join svc.visit_assignees a on a.visit_id = v.id
+  where v.visit_on = '2026-12-11' and a.resource_id = v_lewis;
+  if v_count = 2 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' pair count ' || coalesce(v_count::text, 'null') || ';'; end if;
+  perform set_config('request.jwt.claim.sub', v_office::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_office, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+
   v_board := public.service_board('2026-12-02', '2026-12-02');
   if (v_board->'canEdit')::boolean and jsonb_array_length(v_board->'stops') = 2 then
     v_ok := v_ok + 1;
@@ -230,10 +282,15 @@ begin
   else
     v_fail := v_fail + 1; v_notes := v_notes || ' own day ' || coalesce(v_day::text, 'null') || ';';
   end if;
-  perform public.service_visit_set_progress(v_visit, 'done', 'Belt replaced', null);
+  begin
+    perform public.service_visit_set_progress(v_visit, 'done', 'Belt replaced', null);
+    v_fail := v_fail + 1; v_notes := v_notes || ' done without sheet;';
+  exception when others then
+    if sqlerrm ilike '%job sheet%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' done gate ' || sqlerrm || ';'; end if;
+  end;
   reset role;
   select status into v_err from svc.visits where id = v_visit;
-  if v_err = 'done' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' progress ' || coalesce(v_err, 'null') || ';'; end if;
+  if v_err = 'scheduled' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' progress ' || coalesce(v_err, 'null') || ';'; end if;
   perform set_config('request.jwt.claim.sub', v_eng::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', v_eng, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
@@ -377,6 +434,105 @@ begin
   exception when others then
     if sqlerrm ilike '%cannot see%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' engineer still ' || sqlerrm || ';'; end if;
   end;
+
+  reset role;
+  update svc.visits set completion_note = 'Belt replaced' where id = v_visit;
+  insert into core.files (bucket, storage_path, mime_type, byte_size, entity_schema, entity_table, entity_id, kind)
+  values ('job-sheets', 'svc/' || v_visit::text || '/engineer.png', 'image/png', 80, 'ops', 'service_visits', v_visit, 'engineer_signature')
+  returning id into v_eng_file;
+  insert into core.files (bucket, storage_path, mime_type, byte_size, entity_schema, entity_table, entity_id, kind)
+  values ('job-sheets', 'svc/' || v_visit::text || '/customer.png', 'image/png', 80, 'ops', 'service_visits', v_visit, 'customer_signature')
+  returning id into v_cust_file;
+  insert into core.files (bucket, storage_path, mime_type, byte_size, entity_schema, entity_table, entity_id, kind)
+  values ('job-sheets', 'svc/' || v_visit::text || '/sheet.pdf', 'application/pdf', 120, 'ops', 'service_visits', v_visit, 'visit_pack')
+  returning id into v_pdf_file;
+  insert into core.files (bucket, storage_path, mime_type, byte_size, entity_schema, entity_table, entity_id, kind)
+  values ('job-sheets', 'svc/' || v_visit::text || '/equipment.jpg', 'image/jpeg', 90, 'ops', 'service_visits', v_visit, 'equipment')
+  returning id into v_photo_file;
+  insert into core.files (bucket, storage_path, mime_type, byte_size, entity_schema, entity_table, entity_id, kind)
+  values ('job-sheets', 'svc/' || v_visit::text || '/old.jpg', 'image/jpeg', 90, 'ops', 'service_visits', v_visit, 'service_photo')
+  returning id into v_old_file;
+  insert into svc.visit_photos (visit_id, file_id, created_by)
+  values (v_visit, v_old_file, v_eng);
+
+  perform set_config('request.jwt.claim.sub', v_eng::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_eng, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform public.service_visit_upload_gate(v_visit, 'equipment');
+    v_sheet := public.service_save_visit_sheet(v_visit, jsonb_build_object(
+      'customerName', 'Riverside Gym',
+      'engineerName', 'Lewis',
+      'workCarriedOut', 'Replaced the belt.',
+      'engineerSignatureFileId', v_eng_file,
+      'customerSignatureFileId', v_cust_file,
+      'pdfFileId', v_pdf_file,
+      'floorSheeting', true,
+      'builtCheckedTag', true,
+      'dustCover', true,
+      'service', true,
+      'installation', false,
+      'kitLines', jsonb_build_array(
+        jsonb_build_object('code', 'JF-1', 'description', 'Treadmill', 'qty', '1', 'fulfilment', 'installed'),
+        jsonb_build_object('code', 'JF-2', 'description', 'Mat', 'qty', '1', 'fulfilment', 'to_follow')
+      )
+    ), array[v_photo_file]);
+    if v_sheet->>'id' is not null then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' sheet save ' || coalesce(v_sheet::text, 'null') || ';'; end if;
+  exception when others then
+    v_fail := v_fail + 1; v_notes := v_notes || ' sheet ' || sqlerrm || ';';
+  end;
+  begin
+    perform public.service_save_visit_sheet(v_visit, '{}'::jsonb, array[v_photo_file]);
+    v_fail := v_fail + 1; v_notes := v_notes || ' second sheet allowed;';
+  exception when others then
+    if sqlerrm ilike '%already in%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' second sheet ' || sqlerrm || ';'; end if;
+  end;
+
+  reset role;
+  select status into v_err from svc.visits where id = v_visit;
+  select completion_note into v_level from svc.visits where id = v_visit;
+  if v_err = 'done' and v_level = 'Belt replaced' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' sheet status ' || coalesce(v_err, 'null') || ' ' || coalesce(v_level, 'null') || ';'; end if;
+  if exists (
+    select 1 from ops.visit_sheets
+    where service_visit_id = v_visit and visit_type = 'service' and install_id is null and submitted_at is not null
+  ) then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' sheet row;'; end if;
+  select count(*) into v_count from core.tasks where entity_table = 'service_visits' and entity_id = v_visit and title = 'Kit still to follow';
+  if v_count = 1 then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' follow up ' || v_count::text || ';'; end if;
+  if position('assert_visit_started' in pg_get_functiondef('public.install_save_visit_sheet(uuid,jsonb,text)'::regprocedure)) > 0 then
+    v_ok := v_ok + 1;
+  else
+    v_fail := v_fail + 1; v_notes := v_notes || ' install RAMS missing;';
+  end if;
+  if position('assert_visit_started' in pg_get_functiondef('public.service_save_visit_sheet(uuid,jsonb,uuid[])'::regprocedure)) = 0 then
+    v_ok := v_ok + 1;
+  else
+    v_fail := v_fail + 1; v_notes := v_notes || ' service sheet requires RAMS;';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_other::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_other, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform public.service_save_visit_sheet(v_visit, '{}'::jsonb, array[v_photo_file]);
+    v_fail := v_fail + 1; v_notes := v_notes || ' unassigned sheet;';
+  exception when others then
+    if sqlerrm ilike '%cannot save%' or sqlerrm ilike '%already in%' then v_ok := v_ok + 1; else v_fail := v_fail + 1; v_notes := v_notes || ' unassigned sheet ' || sqlerrm || ';'; end if;
+  end;
+
+  reset role;
+  perform set_config('request.jwt.claim.sub', v_office::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_office, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  v_board := public.service_visit_open(v_visit);
+  v_sheet := public.service_visit_sheet(v_visit);
+  if v_board->>'completionNote' = 'Belt replaced'
+     and jsonb_array_length(v_board->'photos') >= 1
+     and (v_sheet->>'submitted')::boolean
+  then
+    v_ok := v_ok + 1;
+  else
+    v_fail := v_fail + 1; v_notes := v_notes || ' readable ' || coalesce(v_board::text, 'null') || ' ' || coalesce(v_sheet::text, 'null') || ';';
+  end if;
 
   raise exception 'RESULTS ok=% fail=% %', v_ok, v_fail, v_notes;
 end

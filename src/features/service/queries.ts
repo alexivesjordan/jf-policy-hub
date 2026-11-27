@@ -250,3 +250,13 @@ export async function loadMyServiceDay() {
   }));
   return { day: text(data.day).slice(0, 10), stops, error: null as string | null };
 }
+
+export async function loadServiceSheet(visitId: string) {
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("service_visit_sheet", { p_visit: visitId });
+  if (loaded.error || !loaded.data || typeof loaded.data !== "object") return null;
+  const row = loaded.data as Record<string, unknown>;
+  if (row.submitted !== true) return { submitted: false, pdfUrl: null as string | null };
+  const pdfUrl = await signPath(text(row.pdfBucket), text(row.pdfPath));
+  return { submitted: true, pdfUrl };
+}

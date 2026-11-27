@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { loadCin7ServicePrefill } from "@/lib/cin7/client";
 import { cin7IsConnected } from "@/lib/cin7/client";
+import { commitServiceVisit } from "@/features/service/commit-sheet";
+import { getCurrentProfile } from "@/lib/auth";
 import { messageFromError } from "@/lib/errors";
+import type { StorageTicket } from "@/lib/installs/upload-ticket";
+import type { SheetDraft } from "@/lib/installs/visit-form";
+import { issuePhotoTicket, registerPhotoObject } from "@/lib/pulse/signed-upload";
 import { geocodeUkPostcode } from "@/lib/service/geocode";
 import { parseVisitDraft, type VisitDraft } from "@/lib/service/model";
-import { storePulseFile } from "@/lib/pulse/files";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
 
 export type ServiceActionResult =
   | { ok: true; id?: string; message: string }
@@ -94,12 +97,12 @@ export async function deleteServiceVisit(id: string): Promise<ServiceActionResul
   return { ok: true, message: "Deleted." };
 }
 
-export async function setServiceProgress(id: string, status: string, note: string, reason: string): Promise<ServiceActionResult> {
+export async function setServiceProgress(id: string, status: string, reason: string): Promise<ServiceActionResult> {
   const supabase = await createClient();
   const saved = await supabase.rpc("service_visit_set_progress", {
     p_visit: id,
     p_status: status,
-    p_note: note,
+    p_note: null,
     p_reason: reason,
   });
   if (saved.error) return { ok: false, message: messageFromError(saved.error, "That status could not be saved.") };
@@ -107,32 +110,87 @@ export async function setServiceProgress(id: string, status: string, note: strin
   return { ok: true, message: "Saved." };
 }
 
-export async function addServicePhoto(visitId: string, formData: FormData): Promise<ServiceActionResult> {
+export type ServiceUploadResult = {
+  ok: boolean;
+  message: string;
+  ticket?: StorageTicket;
+  fileId?: string;
+};
+
+function fileOf(formData: FormData, name: string) {
+  const file = formData.get(name);
+  return file instanceof File && file.size > 0 ? file : null;
+}
+
+export async function issueServicePhotoUpload(
+  visitId: string,
+  _token: string | null,
+  mimeType: string,
+  byteSize: number,
+  kind: string,
+): Promise<ServiceUploadResult> {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile) return { ok: false, message: "You need to be signed in." };
+    const supabase = await createClient();
+    const gated = await supabase.rpc("service_visit_upload_gate", { p_visit: visitId, p_kind: kind });
+    if (gated.error) return { ok: false, message: messageFromError(gated.error, "That photo is not allowed.") };
+    const ticket = await issuePhotoTicket(visitId, mimeType, byteSize);
+    return { ok: true, message: "Upload ready.", ticket };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not start that upload." };
+  }
+}
+
+export async function registerServicePhotoUpload(
+  visitId: string,
+  _token: string | null,
+  path: string,
+  kind: string,
+): Promise<ServiceUploadResult> {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile) return { ok: false, message: "You need to be signed in." };
+    const supabase = await createClient();
+    const gated = await supabase.rpc("service_visit_upload_gate", { p_visit: visitId, p_kind: kind });
+    if (gated.error) return { ok: false, message: messageFromError(gated.error, "That photo is not allowed.") };
+    const stored = await registerPhotoObject({
+      path,
+      ownerId: visitId,
+      kind,
+      uploadedBy: profile.id,
+      entityTable: "service_visits",
+    });
+    return { ok: true, message: "Photo stored.", fileId: stored.fileId };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not store that photo." };
+  }
+}
+
+export async function submitServiceVisit(formData: FormData): Promise<ServiceActionResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, message: "You need to be signed in." };
-  const file = formData.get("photo");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a photo." };
-  const supabase = await createClient();
-  const allowed = await supabase.rpc("service_visit_photo_allowed", { p_visit: visitId });
-  if (allowed.error || allowed.data !== true) {
-    return { ok: false, message: messageFromError(allowed.error, "You cannot add a photo to that visit.") };
-  }
+  const visitId = String(formData.get("installId") ?? "");
   try {
-    const stored = await storePulseFile({
-      bucket: "job-sheets",
-      mimeType: file.type || "image/jpeg",
-      bytes: Buffer.from(await file.arrayBuffer()),
+    const sheet = JSON.parse(String(formData.get("sheet") ?? "")) as SheetDraft;
+    const photoIds = JSON.parse(String(formData.get("photoIds") ?? "[]")) as string[];
+    const customer = fileOf(formData, "customerSignature");
+    if (!customer) return { ok: false, message: "Add the customer signature." };
+    const result = await commitServiceVisit({
+      visitId,
+      sheet,
+      photoIds: Array.isArray(photoIds) ? photoIds : [],
+      engineerSignature: fileOf(formData, "engineerSignature"),
+      engineerSignatureFileId: String(formData.get("engineerSignatureFileId") ?? "") || null,
+      customerSignature: customer,
+      saveEngineerSignature: formData.get("saveSignature") === "yes",
       uploadedBy: profile.id,
-      entitySchema: "ops",
-      entityTable: "service_visits",
-      entityId: visitId,
-      kind: "service_photo",
     });
-    const linked = await supabase.rpc("service_visit_add_photo", { p_visit: visitId, p_file: stored.fileId });
-    if (linked.error) return { ok: false, message: messageFromError(linked.error, "That photo could not be stored.") };
     refresh(visitId);
-    return { ok: true, message: "Photo stored." };
+    return { ok: true, message: result.message };
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : "That photo could not be stored." };
+    const message = error instanceof Error ? error.message : "Could not save the job sheet.";
+    if (message.includes("already in")) return { ok: true, message: "This job sheet is already in." };
+    return { ok: false, message };
   }
 }

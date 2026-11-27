@@ -4,9 +4,9 @@ import { connection } from "next/server";
 import { addDays, format, startOfWeek } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { ServiceBoardView } from "@/components/service/board";
+import { NewVisitLink } from "@/components/service/new-visit-link";
 import { PageHeader } from "@/components/pulse/page-header";
 import { PageSkeleton } from "@/components/pulse/states";
-import { TextLink } from "@/components/pulse/ui";
 import { loadServiceBoard } from "@/features/service/queries";
 import { requireServiceUser } from "@/lib/auth";
 import { oneParam } from "@/lib/utils";
@@ -52,7 +52,7 @@ async function Board({
       <PageHeader
         eyebrow="Pulse Service"
         title="Board"
-        actions={board.canEdit ? <TextLink href={`/service/visits/new?on=${days[0].iso}`}>New visit</TextLink> : null}
+        actions={board.canEdit ? <NewVisitLink day={days[0].iso} /> : null}
       />
       {board.error ? <p className="text-sm">{board.error}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
