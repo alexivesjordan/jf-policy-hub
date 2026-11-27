@@ -25,6 +25,15 @@ describe("Cin7 GET allowlist", () => {
     });
   }
 
+  it("allows the supply reads and still blocks nearby paths", () => {
+    assert.equal(assertCin7Get("GET", "ref/productavailability", { Sku: "JF-1", Location: "Main" }).path, "ref/productavailability");
+    assert.equal(assertCin7Get("GET", "supplier", { ID: "sup-1" }).path, "supplier");
+    assert.equal(assertCin7Get("GET", "saleList", { UpdatedSince: "2024-01-01T00:00:00", Page: "1" }).path, "saleList");
+    assert.throws(() => assertCin7Get("GET", "ref/productavailability/extra", { Page: "1" }), Cin7RequestBlocked);
+    assert.throws(() => assertCin7Get("POST", "supplier", { Page: "1" }), Cin7RequestBlocked);
+    assert.throws(() => assertCin7Get("GET", "saleList", { Status: "COMPLETED" }), Cin7RequestBlocked);
+  });
+
   it("blocks filters that are not needed for pricing", () => {
     assert.throws(() => assertCin7Get("GET", "saleList", {}), Cin7RequestBlocked);
     assert.throws(() => assertCin7Get("GET", "purchase", {}), Cin7RequestBlocked);

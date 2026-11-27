@@ -1,17 +1,28 @@
 /** Cin7 Core reads pricing is allowed to make. Anything else throws before fetch. */
 export const CIN7_BASE_URL = "https://inventory.dearsystems.com/ExternalApi/v2";
 
-export const CIN7_ALLOWED_PATHS = ["sale", "saleList", "product", "customer", "purchase", "purchaseList"] as const;
+export const CIN7_ALLOWED_PATHS = [
+  "sale",
+  "saleList",
+  "product",
+  "customer",
+  "purchase",
+  "purchaseList",
+  "ref/productavailability",
+  "supplier",
+] as const;
 
 export type Cin7AllowedPath = (typeof CIN7_ALLOWED_PATHS)[number];
 
 const QUERY_KEYS: Record<Cin7AllowedPath, readonly string[]> = {
   sale: ["ID"],
-  saleList: ["Search", "Page", "Limit"],
+  saleList: ["Search", "Page", "Limit", "CreatedSince", "UpdatedSince"],
   product: ["ID", "Sku", "Page", "Limit", "IncludeDeprecated"],
   customer: ["ID", "Limit"],
   purchase: ["ID"],
-  purchaseList: ["Search", "Page", "Limit"],
+  purchaseList: ["Search", "Page", "Limit", "CreatedSince", "UpdatedSince"],
+  "ref/productavailability": ["Page", "Limit", "Sku", "Location"],
+  supplier: ["Page", "Limit", "ID"],
 };
 
 export class Cin7RequestBlocked extends Error {
@@ -32,7 +43,8 @@ export function assertCin7Get(method: string, path: string, query: Record<string
     throw new Cin7RequestBlocked("Cin7 blocked that path.");
   }
   const name = raw.replace(/^\/+/, "").replace(/\/+$/, "");
-  if (!CIN7_ALLOWED_PATHS.includes(name as Cin7AllowedPath) || name.includes("/")) {
+  // A slash is allowed only when the whole path is one allowlisted value.
+  if (!(CIN7_ALLOWED_PATHS as readonly string[]).includes(name)) {
     throw new Cin7RequestBlocked(`Cin7 blocked path "${name || "/"}".`);
   }
 
@@ -43,14 +55,25 @@ export function assertCin7Get(method: string, path: string, query: Record<string
     }
   }
   if (name === "sale" && !query.ID) throw new Cin7RequestBlocked("Cin7 sale requires a SaleID.");
-  if (name === "saleList" && !query.Search) throw new Cin7RequestBlocked("Cin7 saleList requires an order number search.");
+  const hasWindow = Boolean(query.CreatedSince || query.UpdatedSince);
+  if (name === "saleList" && !query.Search && !hasWindow) {
+    throw new Cin7RequestBlocked("Cin7 saleList requires a search or an updated-since date.");
+  }
   if (name === "product" && query.ID && query.Sku) throw new Cin7RequestBlocked("Cin7 product accepts an ID or a SKU, not both.");
   if (name === "product" && !query.ID && !query.Sku && !query.Page && !query.Limit) {
     throw new Cin7RequestBlocked("Cin7 product requires an ID, a SKU, or a page.");
   }
   if (name === "customer" && !query.ID) throw new Cin7RequestBlocked("Cin7 customer requires an ID.");
   if (name === "purchase" && !query.ID) throw new Cin7RequestBlocked("Cin7 purchase requires an ID.");
-  if (name === "purchaseList" && !query.Search) throw new Cin7RequestBlocked("Cin7 purchaseList requires an order number search.");
+  if (name === "purchaseList" && !query.Search && !hasWindow) {
+    throw new Cin7RequestBlocked("Cin7 purchaseList requires a search or an updated-since date.");
+  }
+  if (name === "ref/productavailability" && !query.Page && !query.Sku) {
+    throw new Cin7RequestBlocked("Cin7 product availability requires a page or a SKU.");
+  }
+  if (name === "supplier" && !query.Page && !query.ID) {
+    throw new Cin7RequestBlocked("Cin7 supplier requires a page or an ID.");
+  }
 
   return { path: name as Cin7AllowedPath, query };
 }
