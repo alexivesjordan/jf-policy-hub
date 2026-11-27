@@ -667,6 +667,45 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
     const rows = rpcData("workspace_member_list") as Array<{ id: string }>;
     return rows.find((row) => row.id === args?.p_id) ?? null;
   }
+  if (fn === "workspace_member_activity") {
+    const id = String(args?.p_id ?? "");
+    const before = typeof args?.p_before === "string" ? Date.parse(args.p_before) : Number.POSITIVE_INFINITY;
+    const limit = typeof args?.p_limit === "number" ? args.p_limit : 50;
+    const alex = USER_ID;
+    const sam = "00000000-0000-4000-8000-000000000002";
+    const row = (eventId: string, at: string, action: string, entityId: string | null) => ({
+      id: eventId,
+      at,
+      action,
+      actor_id: alex,
+      actor_name: "Alex Ives",
+      entity_type: "profile",
+      entity_id: entityId,
+      before: null,
+      after: action === "user.signed_in" ? { at } : { email: "person@jordanfitness.com" },
+    });
+    let rows: ReturnType<typeof row>[] = [];
+    if (id === sam) {
+      rows = [
+        row("act-sam-resent", "2026-11-18T09:30:00.000Z", "user.invite_resent", sam),
+        row("act-sam-invited", "2026-11-01T09:00:00.000Z", "user.invited", null),
+      ];
+    } else if (id === alex) {
+      rows = [
+        row("act-alex-sign", "2026-11-20T09:00:00.000Z", "user.signed_in", alex),
+        row("act-alex-access", "2026-11-12T11:15:00.000Z", "user.access_changed", alex),
+        row("act-alex-name", "2026-11-02T08:05:00.000Z", "user.name_changed", alex),
+      ];
+      for (let index = 0; index < 52; index += 1) {
+        const at = new Date(Date.UTC(2025, 11, 31, 12, 0, 0) - index * 60 * 60 * 1000).toISOString();
+        rows.push(row(`act-alex-old-${index}`, at, "user.access_changed", alex));
+      }
+    }
+    return rows
+      .filter((event) => Date.parse(event.at) < before)
+      .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
+      .slice(0, limit);
+  }
   if (fn === "workspace_pending_invites") {
     return [{ email: "new.person@jordanfitness.com", full_name: "New Person", role: "staff", created_at: "2026-11-01T00:00:00.000Z" }];
   }

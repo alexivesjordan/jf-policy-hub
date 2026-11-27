@@ -8,6 +8,7 @@ import { hasServiceRole } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { MEMBER_ACTIVITY_PAGE, pageOfActivity, parseMemberActivity, type MemberActivityEvent } from "@/lib/member-activity";
 import { INVITE_ALREADY_SIGNED_IN, INVITE_NEEDS_EMAIL, INVITE_NOT_SENT, resendInviteEmail, type ResendState } from "@/lib/workspace-invite";
 import { PULSE_MODULE_IDS } from "@/lib/types";
 import { personName } from "@/lib/names";
@@ -257,10 +258,27 @@ export async function resendWorkspaceInvite(_prev: ResendState, formData: FormDa
     send: service ? (address, options) => service.auth.admin.inviteUserByEmail(address, options) : null,
   });
   if (result?.ok) {
+    const logged = await supabase.rpc("workspace_log_invite_resent", { p_email: email });
+    if (logged.error) denyWorkspace(logged.error);
     revalidatePath("/settings/workspace/members");
     revalidatePath("/settings/workspace/members/[id]", "page");
   }
   return result;
+}
+
+export async function loadEarlierMemberActivity(id: string, before: string): Promise<{ events: MemberActivityEvent[]; hasMore: boolean }> {
+  await requireWorkspaceAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("workspace_member_activity", {
+    p_id: id,
+    p_limit: MEMBER_ACTIVITY_PAGE + 1,
+    p_before: before,
+  });
+  if (error) {
+    denyWorkspace(error);
+    throw new Error(messageFromError(error, "Could not load earlier activity."));
+  }
+  return pageOfActivity(parseMemberActivity(data));
 }
 
 export async function revokeWorkspaceInvite(formData: FormData) {
