@@ -51,7 +51,7 @@ describe("module nav", () => {
 
   it("groups commercial invoices and keeps Generate off the search page", () => {
     const logistics = visibleNav(pulseModules.find((module) => module.id === "logistics")?.nav ?? [], profile, false);
-    expect(logistics.map((item) => item.label)).toEqual(["Commercial Invoices", "Pack estimate", "Packaging", "Customs statements", "Landed cost"]);
+    expect(logistics.map((item) => item.label)).toEqual(["Commercial Invoices", "Pack estimate", "Load plan", "Packaging", "Customs statements", "Landed cost"]);
     const children = logistics[0]?.children ?? [];
     expect(children.map((item) => item.label)).toEqual(["Generate a Commercial Invoice", "Search Commercial Invoices"]);
     expect(navItemActive(children[0]!.href, "/logistics/commercial-invoices/search", children[0]!.exact)).toBe(false);

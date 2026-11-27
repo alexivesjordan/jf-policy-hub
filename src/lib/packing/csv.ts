@@ -123,3 +123,85 @@ function optionalBool(value: string, fallback: boolean, row: number, label: stri
   if (["no", "false", "n", "0"].includes(text)) return false;
   return `Row ${row}: ${label} must be yes or no.`;
 }
+
+/** Supplier packing list. Weight is the weight of one piece, not the line total. */
+export type PackingListRow = {
+  sku: string;
+  name: string;
+  qty: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  weightKg: number;
+};
+
+const LIST_ALIAS: Record<string, "sku" | "name" | "qty" | "length" | "width" | "height" | "weight"> = {
+  sku: "sku",
+  name: "name",
+  product_name: "name",
+  qty: "qty",
+  quantity: "qty",
+  l: "length",
+  length: "length",
+  length_cm: "length",
+  w: "width",
+  width: "width",
+  width_cm: "width",
+  h: "height",
+  height: "height",
+  height_cm: "height",
+  kg: "weight",
+  weight: "weight",
+  weight_kg: "weight",
+  gross_weight_kg: "weight",
+};
+
+export function packingListFromCsv(text: string): { rows: PackingListRow[]; error: string } {
+  const [header, ...records] = parseCsv(text.replace(/^\uFEFF/, ""));
+  if (!header) return { rows: [], error: "The CSV needs a sku column." };
+  const index = new Map<string, number>();
+  header.forEach((name, position) => {
+    const key = LIST_ALIAS[name.trim().toLowerCase()];
+    if (key) index.set(key, position);
+  });
+  if (!index.has("sku")) return { rows: [], error: "The CSV needs a sku column." };
+  if (!index.has("length") || !index.has("width") || !index.has("height") || !index.has("weight")) {
+    return { rows: [], error: "The CSV needs length, width, height, and weight columns." };
+  }
+  if (records.length > 500) return { rows: [], error: "That CSV has too many rows." };
+  const rows: PackingListRow[] = [];
+  for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
+    const record = records[recordIndex] ?? [];
+    const rowNumber = recordIndex + 2;
+    const column = (name: "sku" | "name" | "qty" | "length" | "width" | "height" | "weight") => {
+      const position = index.get(name);
+      return position == null ? "" : (record[position] ?? "").trim();
+    };
+    const sku = column("sku");
+    if (!sku) continue;
+    if (sku.length > 80) return { rows: [], error: `Row ${rowNumber}: SKU must be 1 to 80 characters.` };
+    const qtyText = column("qty");
+    const qty = qtyText === "" ? 1 : whole(qtyText, rowNumber, "quantity", 1, 500);
+    if (typeof qty !== "number") return { rows: [], error: qty };
+    const lengthCm = whole(column("length"), rowNumber, "length", 1, 2000);
+    const widthCm = whole(column("width"), rowNumber, "width", 1, 500);
+    const heightCm = whole(column("height"), rowNumber, "height", 1, 400);
+    const weightKg = optionalWeight(column("weight"), rowNumber);
+    if (typeof lengthCm !== "number") return { rows: [], error: lengthCm };
+    if (typeof widthCm !== "number") return { rows: [], error: widthCm };
+    if (typeof heightCm !== "number") return { rows: [], error: heightCm };
+    if (typeof weightKg === "string") return { rows: [], error: weightKg };
+    if (weightKg == null) return { rows: [], error: `Row ${rowNumber}: weight is required.` };
+    rows.push({
+      sku,
+      name: column("name").slice(0, 200) || sku,
+      qty,
+      lengthCm,
+      widthCm,
+      heightCm,
+      weightKg,
+    });
+  }
+  if (!rows.length) return { rows: [], error: "The CSV has no SKUs." };
+  return { rows, error: "" };
+}

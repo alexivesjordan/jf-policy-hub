@@ -343,12 +343,18 @@ function visibleCalendar() {
 const FIXTURE_LOAD_SPACES = [
   { code: "uk-standard", kind: "pallet", name: "UK standard", length_cm: 120, width_cm: 100, height_cm: 180, max_weight_kg: 1000, tare_kg: 25, deck_cm: 15, active: true, sort_order: 10 },
   { code: "euro", kind: "pallet", name: "Euro", length_cm: 120, width_cm: 80, height_cm: 180, max_weight_kg: 1000, tare_kg: 20, deck_cm: 14, active: true, sort_order: 20 },
+  { code: "container-20dc", kind: "container", name: "20ft dry", length_cm: 590, width_cm: 235, height_cm: 239, max_weight_kg: 21700, tare_kg: 0, deck_cm: 0, active: true, sort_order: 30 },
+  { code: "container-40dc", kind: "container", name: "40ft dry", length_cm: 1203, width_cm: 235, height_cm: 239, max_weight_kg: 26500, tare_kg: 0, deck_cm: 0, active: true, sort_order: 40 },
+  { code: "container-40hc", kind: "container", name: "40ft high cube", length_cm: 1203, width_cm: 235, height_cm: 270, max_weight_kg: 26400, tare_kg: 0, deck_cm: 0, active: true, sort_order: 50 },
+  { code: "van-lwb", kind: "vehicle", name: "LWB panel van", length_cm: 350, width_cm: 178, height_cm: 189, max_weight_kg: 1200, tare_kg: 0, deck_cm: 0, active: true, sort_order: 60 },
+  { code: "rigid-7-5", kind: "vehicle", name: "7.5t rigid", length_cm: 610, width_cm: 240, height_cm: 220, max_weight_kg: 2500, tare_kg: 0, deck_cm: 0, active: true, sort_order: 70 },
 ];
 
 const FIXTURE_PACKING_SETTINGS: Record<string, unknown>[] = [
   { id: "default", pallet_code: "uk-standard", max_pallet_height_cm: 180, max_pallet_weight_kg: 1000, max_parcel_weight_kg: 30, max_parcel_length_cm: 120 },
 ];
 const fixturePackEstimates: Record<string, unknown>[] = ((globalThis as { __jfFixturePackEstimates?: Record<string, unknown>[] }).__jfFixturePackEstimates ??= []);
+const fixtureLoadPlans: Record<string, unknown>[] = ((globalThis as { __jfFixtureLoadPlans?: Record<string, unknown>[] }).__jfFixtureLoadPlans ??= []);
 
 const FIXTURE_SKU_PACKAGES: Record<string, unknown>[] = [
   { id: 1, sku: "JF-RACK", product_name: "Rig upright", cin7_category: "Rigs", package_no: 1, length_cm: 110, width_cm: 40, height_cm: 25, gross_weight_kg: 48, stackable: true, max_stack: 3, can_be_on_side: false, ships_on_pallet_only: false },
@@ -360,6 +366,7 @@ function tables(): Record<string, Record<string, unknown>[]> {
   return {
     profiles: [sessionProfile()],
     load_spaces: FIXTURE_LOAD_SPACES,
+    load_plans: fixtureLoadPlans,
     packing_settings: FIXTURE_PACKING_SETTINGS,
     sku_packages: FIXTURE_SKU_PACKAGES,
     pack_estimates: fixturePackEstimates,
@@ -1029,6 +1036,7 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       { id: "00000000-0000-4000-8000-000000000003", full_name: "Riley Hart" },
     ];
   }
+  if (fn === "logistics_can_admin_spaces") return sessionProfile().role === "admin";
   if (fn === "logistics_list_sku_packages") {
     const search = String(args?.p_search ?? "").trim().toLowerCase();
     const missing = Boolean(args?.p_missing);
@@ -1137,6 +1145,7 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   private asSingle = false;
   private head = false;
   private write: Record<string, unknown> | null = null;
+  private pending: Record<string, unknown> | null = null;
   private inserted: Record<string, unknown> | null = null;
 
   constructor(private table: string) {}
@@ -1202,16 +1211,22 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 
   insert(values?: Record<string, unknown> | Record<string, unknown>[]) {
-    if (!values || (this.table !== "pack_estimates" && this.table !== "sku_packages")) {
+    if (!values || !["pack_estimates", "sku_packages", "load_plans", "load_spaces"].includes(this.table)) {
       this.write = {};
       return this;
     }
     const rows = (Array.isArray(values) ? values : [values]).map((row) => ({ ...row }));
-    if (this.table === "pack_estimates") {
+    if (this.table === "pack_estimates" || this.table === "load_plans") {
       for (const row of rows) {
         if (!row.id) row.id = crypto.randomUUID();
-        fixturePackEstimates.push(row);
+        if (this.table === "load_plans") {
+          if (!row.created_at) row.created_at = new Date().toISOString();
+          if (!row.updated_at) row.updated_at = row.created_at;
+        }
+        (this.table === "load_plans" ? fixtureLoadPlans : fixturePackEstimates).push(row);
       }
+    } else if (this.table === "load_spaces") {
+      for (const row of rows) FIXTURE_LOAD_SPACES.push(row as (typeof FIXTURE_LOAD_SPACES)[number]);
     } else {
       for (const row of rows) {
         if (row.id == null) row.id = FIXTURE_SKU_PACKAGES.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
@@ -1223,7 +1238,11 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 
   update(values?: Record<string, unknown>) {
-    if (values && ["sku_packages", "packing_settings", "pack_estimates", "load_spaces"].includes(this.table)) {
+    if (this.table === "load_plans" || this.table === "load_spaces") {
+      this.pending = values ?? {};
+      return this;
+    }
+    if (values && ["sku_packages", "packing_settings", "pack_estimates"].includes(this.table)) {
       for (const row of this.matched()) Object.assign(row, values);
       return this;
     }
@@ -1262,6 +1281,9 @@ class FixtureQuery implements PromiseLike<{ data: unknown; error: null; count: n
   }
 
   private result() {
+    if (this.pending) {
+      for (const row of this.matched()) Object.assign(row, this.pending);
+    }
     if (this.inserted) return { data: this.asSingle ? this.inserted : [this.inserted], error: null, count: 1 };
     let rows = tables()[this.table] ?? [];
     for (const filter of this.filters) {
