@@ -8,6 +8,7 @@ import { hasServiceRole } from "@/lib/env";
 import { messageFromError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { INVITE_ALREADY_SIGNED_IN, INVITE_NEEDS_EMAIL, INVITE_NOT_SENT, resendInviteEmail, type ResendState } from "@/lib/workspace-invite";
 import { PULSE_MODULE_IDS } from "@/lib/types";
 import { personName } from "@/lib/names";
 import { newEngineerProblem } from "@/lib/installs/new-engineer";
@@ -234,15 +235,32 @@ export async function deleteWorkspaceUser(_prev: WorkspaceFormState, formData: F
   return { message: mode === "hard" ? "User deleted." : "User deleted. Their name stays on past records." };
 }
 
-export async function resendWorkspaceInvite(formData: FormData) {
+export async function resendWorkspaceInvite(_prev: ResendState, formData: FormData): Promise<ResendState> {
   await requireWorkspaceAdmin();
-  revalidatePath("/settings/workspace/members");
-  if (!hasServiceRole()) return;
-  const service = createAdminClient();
-  if (!service) return;
-  await service.auth.admin.inviteUserByEmail(clean(formData.get("email")), {
-    redirectTo: authConfirmRedirect(passwordSetupPath()),
+  const email = clean(formData.get("email"));
+  if (!email) return { ok: false, message: INVITE_NEEDS_EMAIL, nonce: crypto.randomUUID() };
+  const supabase = await createClient();
+  const existing = await supabase.from("profiles").select("last_sign_in_at").eq("email", email).maybeSingle();
+  if (existing.error) {
+    denyWorkspace(existing.error);
+    return { ok: false, message: INVITE_NOT_SENT, nonce: crypto.randomUUID() };
+  }
+  if (existing.data?.last_sign_in_at) {
+    return { ok: false, message: INVITE_ALREADY_SIGNED_IN, nonce: crypto.randomUUID() };
+  }
+  const redirectTo = authConfirmRedirect(passwordSetupPath());
+  const service = hasServiceRole() ? createAdminClient() : null;
+  const result = await resendInviteEmail({
+    email,
+    redirectTo,
+    hasServiceRole: hasServiceRole(),
+    send: service ? (address, options) => service.auth.admin.inviteUserByEmail(address, options) : null,
   });
+  if (result?.ok) {
+    revalidatePath("/settings/workspace/members");
+    revalidatePath("/settings/workspace/members/[id]", "page");
+  }
+  return result;
 }
 
 export async function revokeWorkspaceInvite(formData: FormData) {

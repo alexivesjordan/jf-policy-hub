@@ -1322,6 +1322,11 @@ export function createFixtureClient() {
       async getUser() {
         return { data: { user: { id: USER_ID, email: fixtureIdentity().email } }, error: null };
       },
+      admin: {
+        async inviteUserByEmail() {
+          return { data: { user: { id: USER_ID } }, error: null };
+        },
+      },
     },
     from(table: string) {
       return new FixtureQuery(table);

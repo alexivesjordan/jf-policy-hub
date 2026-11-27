@@ -1,9 +1,11 @@
 "use client";
 
-import { resendWorkspaceInvite, revokeWorkspaceInvite } from "@/features/workspace/actions";
+import { revokeWorkspaceInvite } from "@/features/workspace/actions";
+import { ResendInviteButton } from "@/components/resend-invite-button";
 import { Button } from "@/components/pulse/ui";
+import type { WorkspaceInviteRow } from "@/lib/members";
 
-export function PendingInvites({ invites }: { invites: { email: string; full_name: string | null; role: string }[] }) {
+export function PendingInvites({ invites }: { invites: WorkspaceInviteRow[] }) {
   if (invites.length === 0) return null;
   return (
     <section className="space-y-3">
@@ -17,19 +19,18 @@ export function PendingInvites({ invites }: { invites: { email: string; full_nam
                 <span className="block font-semibold">{name}</span>
                 <span className="block text-sm text-grey">{invite.email}</span>
               </span>
-              <form action={resendWorkspaceInvite}>
-                <input type="hidden" name="email" value={invite.email} />
-                <Button type="submit" variant="secondary" className="min-h-11">Resend</Button>
-              </form>
-              <form
-                action={revokeWorkspaceInvite}
-                onSubmit={(event) => {
-                  if (!window.confirm(`Revoke the invite for ${name}?`)) event.preventDefault();
-                }}
-              >
-                <input type="hidden" name="email" value={invite.email} />
-                <Button type="submit" variant="danger" className="min-h-11">Revoke</Button>
-              </form>
+              <ResendInviteButton email={invite.email} name={name} />
+              {invite.revocable ? (
+                <form
+                  action={revokeWorkspaceInvite}
+                  onSubmit={(event) => {
+                    if (!window.confirm(`Revoke the invite for ${name}?`)) event.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="email" value={invite.email} />
+                  <Button type="submit" variant="danger" className="min-h-11">Revoke</Button>
+                </form>
+              ) : null}
             </li>
           );
         })}

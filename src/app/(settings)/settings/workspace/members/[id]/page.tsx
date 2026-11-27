@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/pulse/page-header";
+import { ResendInviteButton } from "@/components/resend-invite-button";
 import { WorkspaceUserCard, type FieldResourceOption, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
 import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
 import { memberName, type MemberAccess, type MemberRow } from "@/lib/members";
@@ -71,7 +72,10 @@ async function MemberBody({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={memberName(person)} />
+      <PageHeader
+        title={memberName(person)}
+        actions={person.last_sign_in_at ? undefined : <ResendInviteButton email={person.email} name={memberName(person)} />}
+      />
       <nav className="flex flex-wrap gap-2" aria-label="Person">
         {TABS.map((item) => (
           <Link

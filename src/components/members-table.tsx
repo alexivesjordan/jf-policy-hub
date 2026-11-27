@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ResendInviteButton } from "@/components/resend-invite-button";
 import { Input, Select } from "@/components/pulse/ui";
 import { memberMatches, memberName, pulseSummary, teamNames, type MemberRow } from "@/lib/members";
 
@@ -72,9 +73,12 @@ export function MembersTable({ people, teams }: { people: MemberRow[]; teams: st
             {rows.map((person) => (
               <tr key={person.id} className="border-b border-line">
                 <td className="py-1 pr-3">
-                  <Link href={`/settings/workspace/members/${person.id}`} className="flex min-h-11 items-center font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-                    {memberName(person)}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/settings/workspace/members/${person.id}`} className="flex min-h-11 items-center font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                      {memberName(person)}
+                    </Link>
+                    {person.last_sign_in_at ? null : <ResendInviteButton email={person.email} name={memberName(person)} />}
+                  </div>
                 </td>
                 <td className="py-1 pr-3 capitalize">{person.workspace_role}</td>
                 <td className="py-1 pr-3">{teamNames(person).join(", ") || "—"}</td>
@@ -88,12 +92,17 @@ export function MembersTable({ people, teams }: { people: MemberRow[]; teams: st
       </div>
       <ul className="space-y-2 md:hidden">
         {rows.map((person) => (
-          <li key={person.id}>
-            <Link href={`/settings/workspace/members/${person.id}`} className="block min-h-11 rounded-2xl border border-line bg-card px-4 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+          <li key={person.id} className="rounded-2xl border border-line bg-card">
+            <Link href={`/settings/workspace/members/${person.id}`} className="block min-h-11 px-4 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
               <span className="block font-semibold">{memberName(person)}</span>
               <span className="mt-1 block text-sm capitalize text-grey">{person.workspace_role} · {person.two_step ? "Two-step on" : "Two-step off"}</span>
               <span className="mt-1 block text-sm text-grey">{teamNames(person).join(", ") || "No team"}</span>
             </Link>
+            {person.last_sign_in_at ? null : (
+              <div className="px-4 pb-3">
+                <ResendInviteButton email={person.email} name={memberName(person)} />
+              </div>
+            )}
           </li>
         ))}
       </ul>
