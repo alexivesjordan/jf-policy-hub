@@ -141,6 +141,7 @@ export const pulseModules: PulseModule[] = [
         ],
       },
       { href: "/logistics/pack-estimate", label: "Pack estimate" },
+      { href: "/logistics/load-plan", label: "Load plan" },
       { href: "/logistics/packaging", label: "Packaging" },
       { href: "/logistics/customs-statements", label: "Customs statements" },
       { href: "/logistics/landed-cost", label: "Landed cost" },
