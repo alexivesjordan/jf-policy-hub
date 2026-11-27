@@ -112,6 +112,7 @@ export const pulseModules: PulseModule[] = [
     nav: [
       { href: "/sales", label: "Overview" },
       { href: "/sales/installs", label: "Installs" },
+      { href: "/sales/orders", label: "Order tracking" },
       { href: "/sales/radar", label: "Radar" },
       {
         href: "/sales/quote",

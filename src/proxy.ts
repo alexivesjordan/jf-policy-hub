@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { passwordLinkHandoff } from "@/lib/auth-link";
 
-const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/visit", "/api/access/media", "/api/amendments", "/api/policies"];
+const PUBLIC_PREFIXES = ["/login", "/auth/", "/account-inactive", "/no-access", "/access", "/visit", "/api/access/media", "/api/amendments", "/api/policies", "/track", "/api/track"];
 /** Cron calls this with no session. The route itself rejects a missing Bearer CRON_SECRET. */
 export const CRON_PATHS = [
   "/api/orbit/sync-products",
@@ -13,6 +13,10 @@ export const CRON_PATHS = [
 ];
 /** Resend inbound. The route verifies the Svix signature and does not use a session. */
 const WEBHOOK_PATHS = ["/api/orbit/inbound-email"];
+
+function isCustomerTrack(path: string) {
+  return path === "/track" || path.startsWith("/track/") || path === "/api/track" || path.startsWith("/api/track/");
+}
 
 function continueRequest(request: NextRequest) {
   const headers = new Headers(request.headers);
@@ -70,7 +74,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (user && path !== "/settings/account/security" && !path.startsWith("/settings/account/security/")) {
+  if (user && !isCustomerTrack(path) && path !== "/settings/account/security" && !path.startsWith("/settings/account/security/")) {
     const trust = request.cookies.get("pulse-device")?.value ?? "";
     const [{ data: due }, { data: trusted }] = await Promise.all([
       supabase.rpc("two_step_due"),
@@ -83,7 +87,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (user && !path.startsWith("/guest") && path !== "/settings/account/security") {
+  if (user && !isCustomerTrack(path) && !path.startsWith("/guest") && path !== "/settings/account/security") {
     const { data: guest } = await supabase.rpc("guest_home_only");
     if (guest === true) {
       const redirect = NextResponse.redirect(new URL("/guest", request.url));
