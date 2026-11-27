@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memberMatches, memberName, pulseSummary, type MemberRow } from "@/lib/members";
+import { invitesIncludingNeverSignedIn, memberMatches, memberName, pulseSummary, type MemberRow } from "@/lib/members";
 
 const people: MemberRow[] = [
   {
@@ -41,5 +41,26 @@ describe("member list", () => {
     expect(people.filter((person) => memberMatches(person, { query: "", role: "", team: "Installs", status: "" }))).toHaveLength(1);
     expect(people.filter((person) => memberMatches(person, { query: "", role: "", team: "", status: "inactive" }))).toHaveLength(1);
     expect(people.filter((person) => memberMatches(person, { query: "alex", role: "member", team: "", status: "" }))).toHaveLength(0);
+  });
+
+  it("adds never-signed-in members to invites and leaves signed-in members out", () => {
+    const grants = [{ email: "new.person@jordanfitness.com", full_name: "New Person", role: "member" }];
+    const rows = invitesIncludingNeverSignedIn(grants, [
+      { ...people[0]!, last_sign_in_at: "2026-11-20T09:00:00Z" },
+      { ...people[1]!, last_sign_in_at: null, email: "Sam@jordanfitness.com" },
+    ]);
+    expect(rows.map((row) => row.email)).toEqual(["new.person@jordanfitness.com", "Sam@jordanfitness.com"]);
+    expect(rows[0]?.revocable).toBe(true);
+    expect(rows[1]?.revocable).toBe(false);
+    expect(rows[1]?.full_name).toBe("Sam Cole");
+  });
+
+  it("does not list a never-signed-in member twice when the grant is still open", () => {
+    const rows = invitesIncludingNeverSignedIn(
+      [{ email: "sam@jordanfitness.com", full_name: null, role: "member" }],
+      [{ ...people[1]!, last_sign_in_at: null }],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.revocable).toBe(true);
   });
 });

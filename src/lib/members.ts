@@ -39,6 +39,30 @@ export function pulseSummary(access: MemberAccess[] | undefined) {
     .join(", ");
 }
 
+export type WorkspaceInviteRow = {
+  email: string;
+  full_name: string | null;
+  role: string;
+  revocable: boolean;
+};
+
+/** Grants still waiting for an account, then members who have never signed in. */
+export function invitesIncludingNeverSignedIn(
+  grants: { email: string; full_name: string | null; role: string }[],
+  people: Pick<MemberRow, "email" | "full_name" | "first_name" | "last_name" | "workspace_role" | "last_sign_in_at">[],
+): WorkspaceInviteRow[] {
+  const seen = new Set(grants.map((row) => row.email.trim().toLowerCase()));
+  const waiting = people
+    .filter((person) => !person.last_sign_in_at && person.email.trim() && !seen.has(person.email.trim().toLowerCase()))
+    .map((person) => ({
+      email: person.email,
+      full_name: memberName(person),
+      role: person.workspace_role,
+      revocable: false,
+    }));
+  return [...grants.map((row) => ({ ...row, revocable: true })), ...waiting];
+}
+
 export function memberMatches(
   person: MemberRow,
   filters: { query: string; role: string; team: string; status: string },

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/pulse/page-header";
 import { WorkspaceInviteForm } from "@/components/workspace-invite-form";
 import type { FieldResourceOption } from "@/components/workspace-user-card";
 import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
-import type { MemberRow } from "@/lib/members";
+import { invitesIncludingNeverSignedIn, type MemberRow } from "@/lib/members";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Members" };
@@ -35,7 +35,8 @@ export default async function MembersPage() {
   const inviteData = inviteResult.data;
   const people = (Array.isArray(peopleData) ? peopleData : []) as MemberRow[];
   const teams = (Array.isArray(teamData) ? teamData : []) as { id: string; name: string }[];
-  const invites = (Array.isArray(inviteData) ? inviteData : []) as { email: string; full_name: string | null; role: string }[];
+  const grants = (Array.isArray(inviteData) ? inviteData : []) as { email: string; full_name: string | null; role: string }[];
+  const invites = invitesIncludingNeverSignedIn(grants, people);
   const directory = resourceResult.data as { resources?: FieldResourceOption[] } | null;
   const resources = !resourceResult.error && Array.isArray(directory?.resources) ? directory.resources : [];
   const installsTeamId = teams.find((team) => team.name === "Installs")?.id ?? "";
