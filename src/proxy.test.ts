@@ -32,10 +32,14 @@ describe("customer upload routes stay public", () => {
 
     const sign = await proxy(new NextRequest("https://pulse.example/api/access/media/sign", { method: "POST" }));
     const register = await proxy(new NextRequest("https://pulse.example/api/access/media/register", { method: "POST" }));
+    const track = await proxy(new NextRequest("https://pulse.example/track/example-token"));
+    const media = await proxy(new NextRequest("https://pulse.example/api/track/media/example-token/photo"));
     const sales = await proxy(new NextRequest("https://pulse.example/sales/installs"));
 
     assert.equal(sign.headers.get("location"), null);
     assert.equal(register.headers.get("location"), null);
+    assert.equal(track.headers.get("location"), null);
+    assert.equal(media.headers.get("location"), null);
     assert.match(sales.headers.get("location") ?? "", /\/login/);
   });
 });
