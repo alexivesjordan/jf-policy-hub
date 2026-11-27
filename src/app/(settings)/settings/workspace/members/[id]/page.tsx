@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { MemberActivity } from "@/components/member-activity";
 import { PageHeader } from "@/components/pulse/page-header";
 import { ResendInviteButton } from "@/components/resend-invite-button";
 import { WorkspaceUserCard, type FieldResourceOption, type WorkspaceDirectoryUser } from "@/components/workspace-user-card";
+import { loadEarlierMemberActivity } from "@/features/workspace/actions";
 import { denyWorkspace, requireWorkspaceAdmin } from "@/lib/auth";
+import { formatMemberTimestamp } from "@/lib/format";
+import { MEMBER_ACTIVITY_PAGE, pageOfActivity, parseMemberActivity } from "@/lib/member-activity";
 import { memberName, type MemberAccess, type MemberRow } from "@/lib/members";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -39,15 +43,23 @@ async function MemberBody({
   const query = await searchParams;
   const tab = String(query.tab ?? "Overview");
   const supabase = await createClient();
-  const [memberResult, teamResult, resourceResult] = await Promise.all([
+  const [memberResult, teamResult, resourceResult, activityResult] = await Promise.all([
     supabase.rpc("workspace_member", { p_id: id }),
     supabase.rpc("workspace_teams"),
     supabase.rpc("install_field_resources"),
+    tab === "Activity"
+      ? supabase.rpc("workspace_member_activity", { p_id: id, p_limit: MEMBER_ACTIVITY_PAGE + 1 })
+      : Promise.resolve(null),
   ]);
   if (memberResult.error) {
     denyWorkspace(memberResult.error);
     throw new Error(memberResult.error.message);
   }
+  if (activityResult?.error) {
+    denyWorkspace(activityResult.error);
+    throw new Error(activityResult.error.message);
+  }
+  const activity = pageOfActivity(parseMemberActivity(activityResult?.data));
   const data = memberResult.data;
   const teamData = teamResult.data;
   if (!data || typeof data !== "object") notFound();
@@ -105,11 +117,17 @@ async function MemberBody({
           </div>
           <div>
             <dt className="text-grey">Last sign-in</dt>
-            <dd className="font-semibold">{person.last_sign_in_at ? new Date(person.last_sign_in_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—"}</dd>
+            <dd className="font-semibold">{person.last_sign_in_at ? formatMemberTimestamp(person.last_sign_in_at) : "—"}</dd>
           </div>
         </dl>
       ) : null}
-      {tab === "Activity" ? <p className="text-sm text-grey">No activity yet</p> : null}
+      {tab === "Activity" ? (
+        <MemberActivity
+          events={activity.events}
+          hasMore={activity.hasMore}
+          loadEarlier={loadEarlierMemberActivity.bind(null, person.id)}
+        />
+      ) : null}
       {tab === "Overview" || !TABS.includes(tab as (typeof TABS)[number]) ? (
         <WorkspaceUserCard
           person={cardPerson}

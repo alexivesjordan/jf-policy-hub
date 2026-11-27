@@ -90,6 +90,8 @@ describe("resend workspace invite action", () => {
     expect(fn).toContain("authConfirmRedirect(passwordSetupPath())");
     expect(fn).toContain('revalidatePath("/settings/workspace/members")');
     expect(fn).toContain('revalidatePath("/settings/workspace/members/[id]", "page")');
+    expect(fn.indexOf("if (result?.ok)")).toBeLessThan(fn.indexOf("workspace_log_invite_resent"));
+    expect(fn.indexOf("workspace_log_invite_resent")).toBeLessThan(fn.indexOf('revalidatePath("/settings/workspace/members")'));
     expect(fn.indexOf("if (result?.ok)")).toBeLessThan(fn.indexOf('revalidatePath("/settings/workspace/members")'));
     expect(fn).toContain("last_sign_in_at");
     const previous = process.env.NEXT_PUBLIC_SITE_URL;

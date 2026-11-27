@@ -22,6 +22,16 @@ export function formatDate(value: string | null | undefined) {
   return `${Number(match[3])} ${month} ${match[1]}`;
 }
 
+export function formatMemberTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/London",
+  });
+}
+
 export function formatTimestamp(value: string | null | undefined) {
   if (!value) return "";
   const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value);
