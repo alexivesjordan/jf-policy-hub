@@ -59,6 +59,14 @@ describe("module nav", () => {
     expect(navItemActive(children[0]!.href, "/logistics/commercial-invoices", children[0]!.exact)).toBe(true);
   });
 
+  it("opens Supply on its own pages", () => {
+    const supply = visibleNav(pulseModules.find((module) => module.id === "supply")?.nav ?? [], profile, false);
+    expect(supply.map((item) => item.label)).toEqual(["Overview", "Reorder", "SKUs", "Suppliers", "Import", "Settings"]);
+    expect(navItemActive("/supply", "/supply", true)).toBe(true);
+    expect(navItemActive("/supply", "/supply/reorder", true)).toBe(false);
+    expect(navItemActive("/supply/skus", "/supply/skus/JF-1", false)).toBe(true);
+  });
+
   it("keeps Quotes as a parent over the existing quote pages", () => {
     const sales = visibleNav(pulseModules.find((module) => module.id === "sales")?.nav ?? [], profile, false);
     expect(sales.map((item) => item.label)).toEqual(["Overview", "Installs", "Radar", "Quotes"]);

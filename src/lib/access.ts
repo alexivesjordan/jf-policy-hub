@@ -75,6 +75,28 @@ export function canUseLogistics(profile: Profile) {
   return false;
 }
 
+/** Supply is its own Pulse. Owners and admins can open it. */
+export function canUseSupply(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.role === "admin") return true;
+  const supply = profile.levels?.supply;
+  if (supply === "view" || supply === "edit" || supply === "admin") return true;
+  return false;
+}
+
+export function canEditSupply(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.role === "admin") return true;
+  const supply = profile.levels?.supply;
+  return supply === "edit" || supply === "admin";
+}
+
+export function canAdminSupply(profile: Profile) {
+  if (!profile.access_granted || !profile.is_active) return false;
+  if (profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.role === "admin") return true;
+  return profile.levels?.supply === "admin";
+}
+
 export function canAdminOperations(profile: Profile) {
   return profile.workspace_role === "owner" || profile.workspace_role === "admin" || profile.levels?.operations === "admin";
 }
@@ -115,6 +137,6 @@ export function homeRedirect(profile: Profile | null) {
   if (!profile) return "/login";
   if (!profile.access_granted) return "/no-access";
   if (!profile.is_active) return "/account-inactive";
-  if (canUsePeople(profile) || canUseOperations(profile) || canUseSales(profile) || canUseService(profile)) return null;
+  if (canUsePeople(profile) || canUseOperations(profile) || canUseSales(profile) || canUseService(profile) || canUseSupply(profile)) return null;
   return "/no-access";
 }

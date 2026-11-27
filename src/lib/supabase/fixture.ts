@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { effortRowForSku, priceInstall } from "@/lib/pricer/engine";
+import { fixtureSupplyRpc } from "@/lib/supply/fixture-rpc";
 import { fixtureSubcontractorRpc } from "@/lib/subcontractors/fixture-board";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
@@ -426,6 +427,8 @@ function tables(): Record<string, Record<string, unknown>[]> {
 }
 
 function rpcData(fn: string, args?: Record<string, unknown>) {
+  const supply = fixtureSupplyRpc(fn, args);
+  if (supply.handled) return supply.data;
   const subcontractor = fixtureSubcontractorRpc(fn, args);
   if (subcontractor.handled) return subcontractor.data;
   if (fn === "workspace_is_admin") return process.env.PULSE_FIXTURE_ROLE !== "rep" && process.env.PULSE_FIXTURE_ROLE !== "lead" && process.env.PULSE_FIXTURE_ROLE !== "engineer";
