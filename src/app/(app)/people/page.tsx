@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 import { TextLink } from "@/components/pulse/ui";
 import { loadHrHome } from "@/features/hr/queries";
+import { formatLondonDate, kindLabel } from "@/lib/hr/checklists";
 import { requireUser } from "@/lib/auth";
 
 export const metadata = { title: "My HR" };
@@ -47,6 +48,29 @@ async function Home() {
           </ul>
         )}
       </section>
+      {home.checklistScope === "mfa" ? (
+        <section className="space-y-3">
+          <h2 className="font-display text-2xl">Joiners & leavers</h2>
+          <p className="text-sm font-semibold">Turn on two-step sign-in to open this.</p>
+        </section>
+      ) : null}
+      {home.checklistScope === "all" || home.checklistScope === "reports" ? (
+        <section className="space-y-3">
+          <h2 className="font-display text-2xl">Joiners & leavers</h2>
+          {home.checklists.length === 0 ? <EmptyState title="No open checklists" /> : (
+            <ul className="space-y-2">
+              {home.checklists.map((item) => (
+                <li key={item.id}>
+                  <Link href={`/people/team/${item.employeeId}?tab=checklist`} className="flex min-h-11 flex-col justify-center gap-0.5 rounded-2xl border border-line bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-semibold">{item.name}</span>
+                    <span className="text-sm text-grey">{kindLabel(item.kind)} · {item.openItems} open · {formatLondonDate(item.dueOn)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
       {home.manager ? (
         <section className="space-y-3">
           <h2 className="font-display text-2xl">Waiting for you</h2>

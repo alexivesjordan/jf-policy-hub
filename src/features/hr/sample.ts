@@ -11,6 +11,11 @@ export const sampleHome = {
   manager: true,
   director: true,
   mfaRequired: false,
+  checklistScope: "all" as const,
+  checklists: [
+    { id: "chk-1", employeeId: "emp-avery", name: "Avery Quinn", kind: "onboarding", dueOn: "2026-12-14", openItems: 6 },
+    { id: "chk-2", employeeId: "emp-blake", name: "Blake Morgan", kind: "offboarding", dueOn: "2026-12-18", openItems: 4 },
+  ],
 };
 
 export const sampleMe = {
@@ -55,6 +60,24 @@ export const samplePerson = {
   sickness: [{ id: "sick-1", from: "2026-02-02", to: "2026-02-03", status: "Closed" }],
   changes: [] as { id: string; field: string; status: string }[],
   review: false,
+  status: "active",
+  end: "",
+  profileId: "11111111-1111-4111-8111-111111111111",
+  engineerResourceId: "22222222-2222-4222-8222-222222222222",
+  checklistAccess: "edit" as const,
+  checklists: [
+    {
+      id: "chk-1",
+      kind: "onboarding",
+      status: "open",
+      dueOn: "2026-12-14",
+      items: [
+        { id: "item-1", label: "Contract issued", owner: "hr", dueOn: "2026-11-30", doneAt: "2026-11-27T09:30:00Z", linkKind: "none" },
+        { id: "item-2", label: "Pulse login invited", owner: "hr", dueOn: "2026-12-01", doneAt: null, linkKind: "pulse_invite" },
+        { id: "item-3", label: "Engineer record", owner: "operations", dueOn: "2026-12-01", doneAt: null, linkKind: "engineer_record" },
+      ],
+    },
+  ],
 };
 
 export const sampleCases = [
