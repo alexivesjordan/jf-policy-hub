@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { PageHeader } from "@/components/pulse/page-header";
 import { EmptyState, PageSkeleton } from "@/components/pulse/states";
 import { DecisionButtons } from "@/components/hr/decision-buttons";
+import { TextLink } from "@/components/pulse/ui";
 import { loadHrHome, loadTeam } from "@/features/hr/queries";
 import { requireUser } from "@/lib/auth";
 
@@ -31,7 +32,11 @@ async function Team() {
   }
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Jordan Pulse" title="Team" />
+      <PageHeader
+        eyebrow="Jordan Pulse"
+        title="Team"
+        actions={home.checklistScope === "all" ? <TextLink href="/people/team/new">Add a joiner</TextLink> : null}
+      />
       {people.length === 0 ? <EmptyState title="No one on your team" /> : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {people.map((person) => (
