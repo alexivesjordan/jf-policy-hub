@@ -1012,7 +1012,23 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
       assets: [{ id: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1", make: "Jordan", model: "Runner", serial: "SN-100" }],
       photos: [],
     };
-    if (fn === "service_visit_day") return { day: today, stops: [visit] };
+    if (fn === "service_visit_day") {
+      return {
+        day: today,
+        stops: [
+          visit,
+          {
+            ...visit,
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+            customerName: "Harbour Fitness",
+            addressLine1: "4 Quay Street",
+            city: "Norwich",
+            postcode: "NR1 1AA",
+            assignees: [{ id: "f3000000-0000-4000-8000-000000000003", name: "Christian", stopOrder: 2 }],
+          },
+        ],
+      };
+    }
     return visit;
   }
   if (fn === "service_visit_sheet") return { submitted: false };
@@ -1023,6 +1039,60 @@ function rpcData(fn: string, args?: Record<string, unknown>) {
   if (fn === "service_visit_save") return "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
   if (fn === "service_visit_arrange" || fn === "service_visit_delete" || fn === "service_visit_set_progress") return null;
   if (fn === "service_visit_photo_allowed") return true;
+  if (fn === "svc_set_route" || fn === "svc_set_site_point" || fn === "svc_set_plan_status" || fn === "svc_advance_plan") return null;
+  if (fn === "svc_create_plan") return "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1";
+  if (fn === "svc_route_day") {
+    return {
+      resourceId: String(args?.p_resource ?? "f3000000-0000-4000-8000-000000000001"),
+      day: String(args?.p_day ?? "2026-11-27").slice(0, 10),
+      stops: [
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1", stopOrder: 1, customerName: "Cambridge Gym", addressLine1: "1 Station Road", addressLine2: "", city: "Cambridge", postcode: "CB1 1AA", latitude: 52.205, longitude: 0.119, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "repair" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2", stopOrder: 2, customerName: "Norwich Gym", addressLine1: "4 Quay Street", addressLine2: "", city: "Norwich", postcode: "NR1 1AA", latitude: 52.628, longitude: 1.297, windowStart: "12:00", windowEnd: "15:00", durationMinutes: 45, status: "scheduled", visitType: "service" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3", stopOrder: 3, customerName: "Wisbech Gym", addressLine1: "2 Market Place", addressLine2: "", city: "Wisbech", postcode: "PE13 1AA", latitude: 52.666, longitude: 0.16, windowStart: "08:00", windowEnd: "09:30", durationMinutes: 45, status: "scheduled", visitType: "repair" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4", stopOrder: 4, customerName: "Ipswich Gym", addressLine1: "8 Arcade Street", addressLine2: "", city: "Ipswich", postcode: "IP1 1AA", latitude: 52.056, longitude: 1.148, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "service" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5", stopOrder: 5, customerName: "Lynn Gym", addressLine1: "10 High Street", addressLine2: "", city: "King's Lynn", postcode: "PE30 1AA", latitude: 52.755, longitude: 0.398, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "repair" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6", stopOrder: 6, customerName: "Bury Gym", addressLine1: "3 Abbeygate", addressLine2: "", city: "Bury St Edmunds", postcode: "IP33 1AA", latitude: 52.246, longitude: 0.712, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "service" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb7", stopOrder: 7, customerName: "Ely Gym", addressLine1: "5 Market Street", addressLine2: "", city: "Ely", postcode: "CB7 4AA", latitude: 52.399, longitude: 0.262, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "repair" },
+        { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8", siteId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb8", stopOrder: 8, customerName: "Thetford Gym", addressLine1: "6 King Street", addressLine2: "", city: "Thetford", postcode: "IP24 1AA", latitude: 52.416, longitude: 0.749, windowStart: null, windowEnd: null, durationMinutes: 45, status: "scheduled", visitType: "service" },
+      ],
+    };
+  }
+  if (fn === "svc_list_plans") {
+    return [
+      { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1", customerName: "Harbour Fitness", postcode: "NR1 1AA", city: "Norwich", orderNumber: "SVC-PLAN-1", cadenceMonths: 6, startsOn: "2026-01-31", nextDueOn: "2026-12-15", endsOn: null, status: "active", installId: "11111111-1111-4111-8111-1111111111a1" },
+      { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2", customerName: "Riverside Gym", postcode: "PE30 4JJ", city: "King's Lynn", orderNumber: "SVC-PLAN-2", cadenceMonths: 12, startsOn: "2026-02-01", nextDueOn: "2027-01-20", endsOn: null, status: "paused", installId: "11111111-1111-4111-8111-1111111111b2" },
+    ];
+  }
+  if (fn === "svc_due_plans") {
+    const days = Number(args?.p_days ?? 30);
+    const rows = [
+      { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1", customerName: "Harbour Fitness", postcode: "NR1 1AA", city: "Norwich", orderNumber: "SVC-PLAN-1", cadenceMonths: 6, startsOn: "2026-01-31", nextDueOn: "2026-12-15", endsOn: null, status: "active", installId: "11111111-1111-4111-8111-1111111111a1" },
+      { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3", customerName: "Ely Gym", postcode: "CB7 4AA", city: "Ely", orderNumber: "SVC-PLAN-3", cadenceMonths: 12, startsOn: "2026-01-20", nextDueOn: "2027-01-20", endsOn: null, status: "active", installId: "11111111-1111-4111-8111-1111111111c3" },
+    ];
+    return days >= 60 ? rows : rows.slice(0, 1);
+  }
+  if (fn === "svc_eligible_installs") {
+    return [
+      { id: "11111111-1111-4111-8111-1111111111d4", orderNumber: "SVC-SOLD-1", customerName: "Example Gym", siteAddress: "4 Quay Street, Norwich, NR1 1AA", warrantyOption: "twice_yearly", cadenceMonths: 6, endOn: "2026-01-31", status: "completed", postcode: "NR1 1AA", ready: true },
+    ];
+  }
+  if (fn === "svc_plan_prefill") {
+    return {
+      id: String(args?.p_plan ?? "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1"),
+      customerName: "Harbour Fitness",
+      addressLine1: "4 Quay Street",
+      addressLine2: "",
+      city: "Norwich",
+      postcode: "NR1 1AA",
+      contactName: "Pat Example",
+      contactPhone: "01603 000000",
+      contactEmail: "desk@example.com",
+      nextDueOn: "2026-12-15",
+      orderNumber: "SVC-PLAN-1",
+      cadenceMonths: 6,
+      status: "active",
+    };
+  }
   if (fn === "radar_owner_choices") {
     return [
       { id: USER_ID, full_name: "Alex Ives" },

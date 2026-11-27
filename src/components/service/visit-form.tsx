@@ -20,22 +20,24 @@ export function VisitForm({
   visit: ServiceVisit | null;
   people: ServicePerson[];
   canEdit: boolean;
-  preset?: { day?: string; personId?: string };
+  preset?: { day?: string; personId?: string; seed?: Partial<VisitDraft> | null };
 }) {
   const router = useRouter();
-  const [customerName, setCustomerName] = useState(visit?.customerName ?? "");
-  const [addressLine1, setAddressLine1] = useState(visit?.addressLine1 ?? "");
-  const [addressLine2, setAddressLine2] = useState(visit?.addressLine2 ?? "");
-  const [city, setCity] = useState(visit?.city ?? "");
-  const [postcode, setPostcode] = useState(visit?.postcode ?? "");
-  const [contactName, setContactName] = useState(visit?.contactName ?? "");
-  const [contactPhone, setContactPhone] = useState(visit?.contactPhone ?? "");
-  const [contactEmail, setContactEmail] = useState(visit?.contactEmail ?? "");
-  const [visitType, setVisitType] = useState(visit?.visitType ?? "repair");
-  const [notes, setNotes] = useState(visit?.notes ?? "");
-  const [cin7OrderNumber, setCin7OrderNumber] = useState(visit?.cin7OrderNumber ?? "");
-  const [hubspotTicket, setHubspotTicket] = useState(visit?.hubspotTicket ?? "");
-  const [visitOn, setVisitOn] = useState(visit?.visitOn || preset?.day || "");
+  const seed = visit ? null : preset?.seed ?? null;
+  const [customerName, setCustomerName] = useState(visit?.customerName ?? seed?.customerName ?? "");
+  const [addressLine1, setAddressLine1] = useState(visit?.addressLine1 ?? seed?.addressLine1 ?? "");
+  const [addressLine2, setAddressLine2] = useState(visit?.addressLine2 ?? seed?.addressLine2 ?? "");
+  const [city, setCity] = useState(visit?.city ?? seed?.city ?? "");
+  const [postcode, setPostcode] = useState(visit?.postcode ?? seed?.postcode ?? "");
+  const [contactName, setContactName] = useState(visit?.contactName ?? seed?.contactName ?? "");
+  const [contactPhone, setContactPhone] = useState(visit?.contactPhone ?? seed?.contactPhone ?? "");
+  const [contactEmail, setContactEmail] = useState(visit?.contactEmail ?? seed?.contactEmail ?? "");
+  const [visitType, setVisitType] = useState(visit?.visitType ?? seed?.visitType ?? "repair");
+  const [notes, setNotes] = useState(visit?.notes ?? seed?.notes ?? "");
+  const [cin7OrderNumber, setCin7OrderNumber] = useState(visit?.cin7OrderNumber ?? seed?.cin7OrderNumber ?? "");
+  const [hubspotTicket, setHubspotTicket] = useState(visit?.hubspotTicket ?? seed?.hubspotTicket ?? "");
+  const [visitOn, setVisitOn] = useState(visit?.visitOn || seed?.visitOn || preset?.day || "");
+  const [maintenancePlanId] = useState(seed?.maintenancePlanId);
   const [windowStart, setWindowStart] = useState(visit?.windowStart ?? "");
   const [windowEnd, setWindowEnd] = useState(visit?.windowEnd ?? "");
   const [durationMinutes, setDurationMinutes] = useState(String(visit?.durationMinutes ?? 60));
@@ -52,7 +54,7 @@ export function VisitForm({
     return {
       customerName, addressLine1, addressLine2, city, postcode, contactName, contactPhone, contactEmail,
       visitType, notes, cin7OrderNumber, hubspotTicket, visitOn, windowStart, windowEnd, durationMinutes,
-      assigneeIds, lines, assets,
+      assigneeIds, lines, assets, ...(maintenancePlanId ? { maintenancePlanId } : {}),
     };
   }
 

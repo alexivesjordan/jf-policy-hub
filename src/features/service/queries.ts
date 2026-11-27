@@ -260,3 +260,205 @@ export async function loadServiceSheet(visitId: string) {
   const pdfUrl = await signPath(text(row.pdfBucket), text(row.pdfPath));
   return { submitted: true, pdfUrl };
 }
+
+export type RouteStopRow = {
+  id: string;
+  siteId: string;
+  stopOrder: number;
+  customerName: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  postcode: string;
+  latitude: number | null;
+  longitude: number | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  durationMinutes: number;
+  status: string;
+  visitType: string;
+};
+
+export type MaintenancePlanRow = {
+  id: string;
+  customerName: string;
+  postcode: string;
+  city: string | null;
+  orderNumber: string;
+  cadenceMonths: number;
+  startsOn: string;
+  nextDueOn: string;
+  endsOn: string | null;
+  status: string;
+  installId: string | null;
+};
+
+export type EligibleInstall = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  siteAddress: string;
+  warrantyOption: string;
+  cadenceMonths: number;
+  endOn: string;
+  status: string;
+  postcode: string | null;
+  ready: boolean;
+};
+
+export type PlanPrefill = {
+  id: string;
+  customerName: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  postcode: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  nextDueOn: string;
+  orderNumber: string;
+  cadenceMonths: number;
+  status: string;
+};
+
+function num(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+  return null;
+}
+
+function asRouteStop(value: unknown): RouteStopRow | null {
+  const row = record(value);
+  if (!row?.id || !row.siteId) return null;
+  return {
+    id: String(row.id),
+    siteId: String(row.siteId),
+    stopOrder: Number(row.stopOrder) || 0,
+    customerName: text(row.customerName) || "Customer",
+    addressLine1: text(row.addressLine1),
+    addressLine2: text(row.addressLine2),
+    city: text(row.city),
+    postcode: text(row.postcode),
+    latitude: num(row.latitude),
+    longitude: num(row.longitude),
+    windowStart: text(row.windowStart) || null,
+    windowEnd: text(row.windowEnd) || null,
+    durationMinutes: Number(row.durationMinutes) || 60,
+    status: text(row.status) || "scheduled",
+    visitType: text(row.visitType) || "repair",
+  };
+}
+
+function asPlan(value: unknown): MaintenancePlanRow | null {
+  const row = record(value);
+  if (!row?.id) return null;
+  return {
+    id: String(row.id),
+    customerName: text(row.customerName) || "Customer",
+    postcode: text(row.postcode),
+    city: text(row.city) || null,
+    orderNumber: text(row.orderNumber),
+    cadenceMonths: Number(row.cadenceMonths) || 0,
+    startsOn: text(row.startsOn).slice(0, 10),
+    nextDueOn: text(row.nextDueOn).slice(0, 10),
+    endsOn: text(row.endsOn).slice(0, 10) || null,
+    status: text(row.status) || "active",
+    installId: row.installId ? String(row.installId) : null,
+  };
+}
+
+export async function loadRouteDay(resourceId: string, day: string) {
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("svc_route_day", { p_resource: resourceId, p_day: day });
+  if (loaded.error || !loaded.data || typeof loaded.data !== "object") {
+    return { stops: [] as RouteStopRow[], error: messageFromError(loaded.error, "That route is not available yet.") };
+  }
+  const data = loaded.data as Record<string, unknown>;
+  const stops = Array.isArray(data.stops) ? data.stops.flatMap((item) => {
+    const stop = asRouteStop(item);
+    return stop ? [stop] : [];
+  }) : [];
+  return { stops, error: null as string | null };
+}
+
+export async function loadMaintenancePlans() {
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("svc_list_plans");
+  if (loaded.error || !Array.isArray(loaded.data)) {
+    return { plans: [] as MaintenancePlanRow[], error: messageFromError(loaded.error, "Plans are not available yet.") };
+  }
+  return {
+    plans: loaded.data.flatMap((item) => {
+      const plan = asPlan(item);
+      return plan ? [plan] : [];
+    }),
+    error: null as string | null,
+  };
+}
+
+export async function loadEligibleInstalls() {
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("svc_eligible_installs");
+  if (loaded.error || !Array.isArray(loaded.data)) {
+    return { installs: [] as EligibleInstall[], error: messageFromError(loaded.error, "Sold installs are not available yet.") };
+  }
+  return {
+    installs: loaded.data.flatMap((item) => {
+      const row = record(item);
+      if (!row?.id) return [];
+      return [{
+        id: String(row.id),
+        orderNumber: text(row.orderNumber),
+        customerName: text(row.customerName) || "Customer",
+        siteAddress: text(row.siteAddress),
+        warrantyOption: text(row.warrantyOption),
+        cadenceMonths: Number(row.cadenceMonths) || 0,
+        endOn: text(row.endOn).slice(0, 10),
+        status: text(row.status),
+        postcode: text(row.postcode) || null,
+        ready: row.ready === true,
+      }];
+    }),
+    error: null as string | null,
+  };
+}
+
+export async function loadDuePlans(days: 30 | 60) {
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("svc_due_plans", { p_days: days });
+  if (loaded.error || !Array.isArray(loaded.data)) {
+    return { plans: [] as MaintenancePlanRow[], error: messageFromError(loaded.error, "Due plans are not available yet.") };
+  }
+  return {
+    plans: loaded.data.flatMap((item) => {
+      const plan = asPlan(item);
+      return plan ? [plan] : [];
+    }),
+    error: null as string | null,
+  };
+}
+
+export async function loadPlanPrefill(id: string): Promise<PlanPrefill | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  const supabase = await createClient();
+  const loaded = await supabase.rpc("svc_plan_prefill", { p_plan: id });
+  if (loaded.error || !loaded.data || typeof loaded.data !== "object") return null;
+  const row = record(loaded.data);
+  if (!row?.id) return null;
+  return {
+    id: String(row.id),
+    customerName: text(row.customerName),
+    addressLine1: text(row.addressLine1),
+    addressLine2: text(row.addressLine2),
+    city: text(row.city),
+    postcode: text(row.postcode),
+    contactName: text(row.contactName),
+    contactPhone: text(row.contactPhone),
+    contactEmail: text(row.contactEmail),
+    nextDueOn: text(row.nextDueOn).slice(0, 10),
+    orderNumber: text(row.orderNumber),
+    cadenceMonths: Number(row.cadenceMonths) || 0,
+    status: text(row.status) || "active",
+  };
+}

@@ -56,6 +56,7 @@ export type VisitDraft = {
   assets: VisitAsset[];
   latitude?: number | null;
   longitude?: number | null;
+  maintenancePlanId?: string;
 };
 
 export function visitTypeLabel(value: string) {
@@ -122,6 +123,10 @@ export function parseVisitDraft(draft: VisitDraft): { ok: true; payload: Record<
   if (windowStart && windowEnd && windowEnd <= windowStart) return { ok: false, message: "The window end must be after the start." };
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, message: "Enter a contact email." };
   if ((blank(draft.contactPhone) || email) && !blank(draft.contactName)) return { ok: false, message: "Enter the contact name." };
+  const maintenancePlanId = blank(draft.maintenancePlanId ?? "");
+  if (maintenancePlanId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(maintenancePlanId)) {
+    return { ok: false, message: "That plan was not found." };
+  }
   const lines = draft.lines
     .map((line) => ({
       kind: line.kind,
@@ -162,6 +167,7 @@ export function parseVisitDraft(draft: VisitDraft): { ok: true; payload: Record<
       assets,
       latitude: draft.latitude ?? null,
       longitude: draft.longitude ?? null,
+      ...(maintenancePlanId ? { maintenancePlanId } : {}),
     },
   };
 }
